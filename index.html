@@ -700,29 +700,12 @@ updateCloudUI();
 
 /* JSONBin calls go through a CORS proxy so file:// and hosted URLs both work */
 const JB_BASE = 'https://api.jsonbin.io/v3';
-/* Multiple CORS proxies - tries each one until one works */
-const PROXIES = [
-  'https://corsproxy.io/?url=',
-  'https://api.allorigins.win/raw?url=',
-  'https://proxy.cors.sh/'
-];
 
 async function jbFetch(path, options){
-  /* First try direct (works when hosted on https) */
-  try{
-    const r = await fetch(JB_BASE + path, options);
-    if(r.status !== 0) return r;
-  } catch(e){}
-  /* Try each CORS proxy */
-  const url = JB_BASE + path;
-  for(let i=0; i<PROXIES.length; i++){
-    try{
-      const proxyUrl = PROXIES[i] + encodeURIComponent(url);
-      const r = await fetch(proxyUrl, options);
-      if(r.status !== 0) return r;
-    } catch(e){ continue; }
-  }
-  throw new Error('No se pudo conectar a JSONBin. Verifica tu conexion a internet.');
+  /* JSONBin supports CORS from any HTTPS origin - no proxy needed */
+  var url = JB_BASE + path;
+  var resp = await fetch(url, options);
+  return resp;
 }
 
 function setCloudStatus(state, msg){
@@ -742,144 +725,140 @@ async function syncNow(){
 
 /* ── Diagnóstico ── */
 async function diagnosticar(){
-  const key = document.getElementById('jb-key').value.trim();
-  const card = document.getElementById('diag-card');
-  const body = document.getElementById('diag-body');
+  var key  = document.getElementById('jb-key').value.trim();
+  var card = document.getElementById('diag-card');
+  var body = document.getElementById('diag-body');
   card.style.display = 'block';
   body.innerHTML = '';
-  const log = function(msg, ok){
-    const icon = ok === true ? '✅ ' : ok === false ? '❌ ' : '⏳ ';
-    body.innerHTML += icon + msg + '<br>';
-  };
 
-  log('Protocolo: ' + location.protocol);
-  if(location.protocol === 'file:'){
-    log('Abriendo como archivo local — usando proxy CORS para conectar', null);
-  } else {
-    log('Protocolo web OK', true);
+  function log(msg, ok){
+    var icon = ok === true ? '✅ ' : ok === false ? '❌ ' : '⏳ ';
+    body.innerHTML += icon + msg + '<br>';
   }
 
-  if(!key){ log('No ingresaste clave', false); return; }
+  log('Protocolo: ' + location.protocol + '//' + location.host);
 
+  if(location.protocol === 'file:'){
+    log('PROBLEMA: La app esta abierta como archivo local (file://). Subela a GitHub Pages primero.', false);
+    return;
+  }
+  log('Protocolo HTTPS correcto — conexion directa a JSONBin posible', true);
+
+  if(!key){
+    log('Ingresa tu Master Key primero', false);
+    return;
+  }
   if(key.startsWith('$2a$') || key.startsWith('$2b$')){
     log('Formato de clave correcto', true);
   } else {
-    log('Formato de clave inusual — copia la Secret Key completa de jsonbin.io > API Keys', false);
+    log('Formato de clave inusual — copia la clave completa desde jsonbin.io > API Keys', false);
   }
 
-  log('Probando conexión a JSONBin via proxy CORS...');
+  log('Conectando a https://api.jsonbin.io/v3/b ...');
   try{
-    const r = await jbFetch('/b', {
+    var r = await fetch('https://api.jsonbin.io/v3/b', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Master-Key': key,
-        'X-Bin-Name': 'alpha-diag'
+        'X-Bin-Name': 'alpha-diag-' + Date.now()
       },
-      body: JSON.stringify({diag: true})
+      body: JSON.stringify({diag:1})
     });
-    const txt = await r.text();
-    log('HTTP ' + r.status + ' — ' + txt.substring(0, 150));
+    var txt = await r.text();
+    log('Respuesta HTTP: ' + r.status, r.ok);
     if(r.status === 200 || r.status === 201){
-      log('Conexion exitosa con JSONBin', true);
-      try{
-        const d = JSON.parse(txt);
-        const binId = d.metadata ? d.metadata.id : null;
-        if(binId) log('Bin de prueba creado: ' + binId, true);
-      } catch(e){}
+      var d = JSON.parse(txt);
+      var bid = d.metadata ? d.metadata.id : '?';
+      log('Conexion exitosa. Bin de prueba: ' + bid, true);
+      log('Tu clave y conexion funcionan correctamente. Ahora toca CONECTAR.', true);
     } else if(r.status === 401){
-      log('Clave invalida o sin permisos — verifica en jsonbin.io > API Keys', false);
+      log('Clave invalida. Ve a jsonbin.io > API Keys y copia la Secret Key completa.', false);
     } else if(r.status === 403){
-      log('Acceso denegado — verifica los permisos de tu cuenta JSONBin', false);
+      log('Sin permisos. Verifica tu cuenta en jsonbin.io.', false);
     } else {
-      log('Error inesperado: ' + r.status, false);
+      log('Error ' + r.status + ': ' + txt.substring(0,200), false);
     }
   } catch(e){
-    log('Error de red: ' + e.message, false);
-    log('Intenta con otro navegador o verifica tu conexion a internet', false);
+    log('Error de conexion: ' + e.message, false);
+    log('Posible causa: bloqueado por antivirus, firewall o red corporativa. Intenta desde datos moviles.', false);
   }
 }
 
 /* ── JSONBin ── */
 async function conectarJSONBin(){
-  const key = document.getElementById('jb-key').value.trim();
-  const binId = document.getElementById('jb-bin').value.trim();
+  var key   = document.getElementById('jb-key').value.trim();
+  var binId = document.getElementById('jb-bin').value.trim();
+
   if(!key){
-    showAlert('al-cfg', 'Ingresa tu Secret Key de JSONBin.io', 'err');
+    showAlert('al-cfg','Ingresa tu Master Key de JSONBin.io','err');
+    return;
+  }
+  if(location.protocol === 'file:'){
+    showAlert('al-cfg','Sube la app a GitHub Pages primero. No funciona desde archivo local.','err',10000);
     return;
   }
 
-  setCloudStatus('sync', 'Conectando a JSONBin...');
-  showAlert('al-cfg', 'Conectando...', 'info');
+  setCloudStatus('sync','Conectando...');
+  showAlert('al-cfg','Conectando a JSONBin...','info');
 
   try{
     if(binId){
-      /* Conectar a bin existente */
-      CFG.jbKey = key;
-      CFG.jbBin = binId;
-      CFG.proveedor = 'jsonbin';
+      /* --- Conectar a bin existente --- */
+      CFG.jbKey = key; CFG.jbBin = binId; CFG.proveedor = 'jsonbin';
       await pullJSONBin();
       if(!DB.alumnos) DB.alumnos = [];
-      if(!DB.citas) DB.citas = [];
-      saveLocal();
-      updateCloudUI();
-      showAlert('al-cfg', String.fromCharCode(10003) + ' Conectado. ' + DB.alumnos.length + ' alumnos cargados.', 'ok');
-      setCloudStatus('ok', 'JSONBin conectado ' + new Date().toLocaleTimeString('es-MX'));
+      if(!DB.citas)   DB.citas   = [];
+      saveLocal(); updateCloudUI();
+      setCloudStatus('ok','JSONBin conectado ' + new Date().toLocaleTimeString('es-MX'));
+      showAlert('al-cfg','Conectado. ' + DB.alumnos.length + ' alumnos cargados.','ok');
+
     } else {
-      /* Crear nuevo bin */
-      const r = await jbFetch('/b', {
+      /* --- Crear nuevo bin --- */
+      var r = await fetch('https://api.jsonbin.io/v3/b', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Master-Key': key,
           'X-Bin-Name': 'alpha-app-db'
         },
-        body: JSON.stringify({alumnos: [], citas: []})
+        body: JSON.stringify({alumnos:[], citas:[]})
       });
 
-      const txt = await r.text();
+      var txt = await r.text();
 
       if(!r.ok){
-        let errMsg = 'Error ' + r.status;
-        try{
-          const j = JSON.parse(txt);
-          errMsg += ': ' + (j.message || j.msg || txt.substring(0, 100));
-        } catch(e){
-          errMsg += ': ' + txt.substring(0, 100);
-        }
+        var errMsg = 'Error ' + r.status;
+        try{ var j = JSON.parse(txt); errMsg += ': ' + (j.message || j.msg || txt.substring(0,100)); }
+        catch(e){ errMsg += ': ' + txt.substring(0,100); }
         throw new Error(errMsg);
       }
 
-      const d = JSON.parse(txt);
-      const newBinId = d.metadata ? d.metadata.id : (d._id || d.id || '');
+      var d = JSON.parse(txt);
+      var newBin = (d.metadata && d.metadata.id) ? d.metadata.id : (d._id || d.id || '');
+      if(!newBin) throw new Error('No se recibio Bin ID. Respuesta: ' + txt.substring(0,150));
 
-      if(!newBinId){
-        throw new Error('No se recibio Bin ID. Respuesta: ' + txt.substring(0, 150));
-      }
+      CFG.jbKey = key; CFG.jbBin = newBin; CFG.proveedor = 'jsonbin';
+      document.getElementById('jb-bin').value = newBin;
+      saveLocal(); updateCloudUI();
 
-      CFG.jbKey = key;
-      CFG.jbBin = newBinId;
-      CFG.proveedor = 'jsonbin';
-      document.getElementById('jb-bin').value = newBinId;
-      saveLocal();
-      updateCloudUI();
-
-      const det = document.getElementById('cfg-status-detail');
+      var det = document.getElementById('cfg-status-detail');
       if(det){
         det.innerHTML =
-          '<strong style="color:var(--rosa)">Bin ID: ' + newBinId + '</strong><br>' +
-          'IMPORTANTE: Anota este ID. En otros dispositivos ingresa la misma Key + este Bin ID y toca Conectar.';
+          '<div style="background:var(--bg3);border-radius:8px;padding:.9rem;margin-top:.5rem">' +
+          '<p style="color:var(--rosa);font-weight:700;font-size:14px;margin-bottom:.4rem">Base de datos creada</p>' +
+          '<p style="font-size:12px;margin-bottom:.3rem">Tu Bin ID es:</p>' +
+          '<p style="font-family:monospace;font-size:13px;background:var(--bg);padding:6px 10px;border-radius:6px;word-break:break-all;color:var(--cyan)">' + newBin + '</p>' +
+          '<p style="font-size:11px;color:var(--muted);margin-top:.5rem">Copia este ID. En otros dispositivos: ingresa la misma Master Key + este Bin ID y toca Conectar.</p>' +
+          '</div>';
       }
 
-      setCloudStatus('ok', 'JSONBin creado ' + newBinId.substring(0, 12));
-      showAlert('al-cfg',
-        String.fromCharCode(10003) + ' Base de datos creada. Bin ID: ' + newBinId +
-        ' — Guardalo para usarlo en otros dispositivos.',
-        'ok', 15000);
+      setCloudStatus('ok','Base de datos creada en JSONBin');
+      showAlert('al-cfg','Base de datos creada. Bin ID: ' + newBin,'ok',20000);
     }
   } catch(e){
-    setCloudStatus('err', 'Error: ' + e.message);
-    showAlert('al-cfg', 'Error al conectar: ' + e.message, 'err', 12000);
+    setCloudStatus('err','Error: ' + e.message);
+    showAlert('al-cfg','Error: ' + e.message + ' — Usa el boton Diagnostico para mas info.','err',12000);
   }
 }
 
