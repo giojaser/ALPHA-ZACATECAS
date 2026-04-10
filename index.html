@@ -2,142 +2,147 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Control de Visitas PRO</title>
+<title>Control de Visitas</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- QR -->
 <script src="https://unpkg.com/html5-qrcode"></script>
-
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
 
 <style>
 body {
-  font-family: Arial;
-  background: #121212;
+  font-family: 'Segoe UI';
+  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
   color: white;
+  margin: 0;
   padding: 20px;
 }
 
-h1 { text-align: center; }
+h1 {
+  text-align: center;
+}
 
-.container {
-  background: #1e1e1e;
+.card {
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(10px);
   padding: 15px;
-  border-radius: 10px;
+  border-radius: 15px;
   margin-bottom: 20px;
 }
 
 button {
   padding: 12px;
   width: 100%;
-  margin-top: 10px;
   border: none;
-  border-radius: 5px;
+  border-radius: 10px;
+  background: #00e676;
+  color: black;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:hover {
   background: #00c853;
-  color: white;
 }
 
 input {
-  padding: 10px;
   width: 100%;
+  padding: 10px;
+  margin-top: 10px;
+  border-radius: 8px;
+  border: none;
+}
+
+#reader {
   margin-top: 10px;
 }
 
 li {
-  margin: 5px 0;
-  background: #2a2a2a;
-  padding: 8px;
-  border-radius: 5px;
+  background: rgba(0,0,0,0.3);
+  padding: 10px;
+  margin-top: 5px;
+  border-radius: 8px;
 }
 </style>
 </head>
 
 <body>
 
-<h1>🚀 Control de Visitas PRO</h1>
+<h1>🚀 Control de Visitas</h1>
 
-<div class="container">
+<div class="card">
   <h2>📷 Escanear QR</h2>
+  <button onclick="iniciarQR()">Activar Cámara</button>
   <div id="reader"></div>
   <p id="qrResultado"></p>
 </div>
 
-<div class="container">
+<div class="card">
   <h2>➕ Registro Manual</h2>
   <input type="text" id="nombre" placeholder="Nombre visitante">
-  <button onclick="registrarManual()">Registrar</button>
+  <button onclick="registrar()">Registrar</button>
 </div>
 
-<div class="container">
-  <h2>📋 Visitas en Tiempo Real</h2>
+<div class="card">
+  <h2>📋 Visitas</h2>
   <ul id="lista"></ul>
 </div>
 
 <script>
-// =======================
-// 🔥 CONFIGURA FIREBASE AQUÍ
-// =======================
-const firebaseConfig = {
-  apiKey: "AQUI",
-  authDomain: "AQUI",
-  projectId: "AQUI",
-  storageBucket: "AQUI",
-  messagingSenderId: "AQUI",
-  appId: "AQUI"
-};
+// =================
+// VARIABLES
+// =================
+const lista = document.getElementById("lista");
+const qrResultado = document.getElementById("qrResultado");
 
-// Inicializar Firebase
-const app = firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-
-// =======================
-// 🎯 GENERAR FOLIO
-// =======================
+// =================
+// FOLIO
+// =================
 function generarFolio() {
   return "VIS-" + Date.now();
 }
 
-// =======================
-// 📷 QR
-// =======================
-const qrResultado = document.getElementById("qrResultado");
-
+// =================
+// QR SEGURO
+// =================
 function iniciarQR() {
   const qr = new Html5Qrcode("reader");
 
-  Html5Qrcode.getCameras().then(devices => {
-    if (devices.length) {
-      qr.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: 250 },
-        async (qrCodeMessage) => {
+  qr.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: 250 },
+    (qrCodeMessage) => {
 
-          qrResultado.innerText = "QR: " + qrCodeMessage;
+      qrResultado.innerText = "QR detectado: " + qrCodeMessage;
 
-          const visita = {
-            folio: generarFolio(),
-            nombre: qrCodeMessage,
-            fecha: new Date().toLocaleString()
-          };
+      guardarVisita(qrCodeMessage);
 
-          await db.collection("visitas").add(visita);
-
-        }
-      );
-    }
-  }).catch(err => {
-    qrResultado.innerText = "Error cámara: " + err;
+    },
+    (error) => {}
+  ).catch(err => {
+    qrResultado.innerText = "⚠️ Usa celular o habilita cámara";
   });
 }
 
-window.onload = iniciarQR;
+// =================
+// GUARDAR VISITA
+// =================
+function guardarVisita(nombre) {
+  const visita = {
+    folio: generarFolio(),
+    nombre,
+    fecha: new Date().toLocaleString()
+  };
 
-// =======================
-// ➕ REGISTRO MANUAL
-// =======================
-async function registrarManual() {
+  let visitas = JSON.parse(localStorage.getItem("visitas")) || [];
+  visitas.push(visita);
+  localStorage.setItem("visitas", JSON.stringify(visitas));
+
+  mostrar();
+}
+
+// =================
+// REGISTRO MANUAL
+// =================
+function registrar() {
   const nombre = document.getElementById("nombre").value.trim();
 
   if (!nombre) {
@@ -145,35 +150,26 @@ async function registrarManual() {
     return;
   }
 
-  const visita = {
-    folio: generarFolio(),
-    nombre,
-    fecha: new Date().toLocaleString()
-  };
-
-  await db.collection("visitas").add(visita);
-
+  guardarVisita(nombre);
   document.getElementById("nombre").value = "";
 }
 
-// =======================
-// 📋 TIEMPO REAL
-// =======================
-const lista = document.getElementById("lista");
-
-db.collection("visitas").orderBy("fecha", "desc")
-.onSnapshot(snapshot => {
+// =================
+// MOSTRAR
+// =================
+function mostrar() {
   lista.innerHTML = "";
 
-  snapshot.forEach(doc => {
-    const v = doc.data();
+  const visitas = JSON.parse(localStorage.getItem("visitas")) || [];
 
+  visitas.reverse().forEach(v => {
     const li = document.createElement("li");
     li.textContent = `${v.folio} - ${v.nombre} (${v.fecha})`;
-
     lista.appendChild(li);
   });
-});
+}
+
+mostrar();
 </script>
 
 </body>
