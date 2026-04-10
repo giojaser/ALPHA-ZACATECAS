@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Control de Visitas PRO</title>
+<title>Control de Visitas</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <script src="https://unpkg.com/html5-qrcode"></script>
@@ -10,104 +10,71 @@
 <style>
 body {
   font-family: Arial;
-  margin: 0;
+  padding: 20px;
   background: #f4f4f4;
 }
 
-header {
-  background: #007bff;
-  color: white;
-  padding: 15px;
+h1 {
   text-align: center;
 }
 
-.container { padding: 15px; }
-
-.card {
-  background: white;
-  padding: 15px;
-  margin-bottom: 15px;
+video {
+  width: 100%;
   border-radius: 10px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
 button {
   padding: 10px;
-  width: 100%;
-  border: none;
-  border-radius: 5px;
-  background: #007bff;
-  color: white;
   margin-top: 10px;
-  cursor: pointer;
+  width: 100%;
 }
 
-button:hover { background: #0056b3; }
-
 input {
-  width: 100%;
   padding: 10px;
+  width: 100%;
   margin-top: 10px;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
 }
 
 li {
-  background: #eee;
-  padding: 8px;
+  background: white;
+  padding: 10px;
   margin-top: 5px;
   border-radius: 5px;
-  display: flex;
-  justify-content: space-between;
-}
-
-.admin {
-  background: #212121;
-  color: white;
-  padding: 10px;
-  border-radius: 10px;
 }
 </style>
 </head>
 
 <body>
 
-<header>
 <h1>Control de Visitas</h1>
-</header>
 
-<div class="container">
-
-<div class="card">
 <h2>📷 Escanear QR</h2>
 <button onclick="iniciarQR()">Activar cámara</button>
 <div id="reader"></div>
 <p id="resultadoQR"></p>
-</div>
 
-<div class="card">
 <h2>➕ Agregar Visita Manual</h2>
 <input type="text" id="nombreVisita" placeholder="Nombre visitante">
 <button onclick="agregarVisita()">Agregar</button>
-</div>
 
-<div class="card">
 <h2>📋 Lista de Visitas</h2>
 <ul id="listaVisitas"></ul>
-</div>
 
-<div class="card admin">
-<h2>🔐 Panel Administrador</h2>
+<h2>🔐 Panel Admin</h2>
 <input type="password" id="adminPass" placeholder="Contraseña">
-<button onclick="abrirAdmin()">Entrar</button>
-
-<div id="adminPanel" style="display:none;">
-  <button onclick="exportarExcel()">📤 Exportar Excel</button>
-  <button onclick="limpiarTodo()">🗑️ Limpiar Todo</button>
-</div>
-</div>
-
+<button onclick="activarAdmin()">Entrar</button>
+<div id="adminOpciones" style="display:none;">
+  <button onclick="exportar()">Exportar</button>
+  <button onclick="limpiar()">Limpiar todo</button>
 </div>
 
 <script>
+
 // =======================
 // FOLIO
 // =======================
@@ -116,37 +83,31 @@ function generarFolio() {
 }
 
 // =======================
-// QR
+// QR (ARREGLADO)
 // =======================
-let qrActivo = false;
+let qr;
 
 function iniciarQR() {
 
-  if (qrActivo) return;
-
-  const qr = new Html5Qrcode("reader");
+  qr = new Html5Qrcode("reader");
 
   qr.start(
     { facingMode: "environment" },
     { fps: 10, qrbox: 250 },
-    (qrCodeMessage) => {
+    (mensaje) => {
 
       document.getElementById("resultadoQR").innerText =
-        "QR detectado: " + qrCodeMessage;
+        "QR detectado: " + mensaje;
 
-      guardarVisita(qrCodeMessage);
+      guardarVisita(mensaje);
     }
-  ).then(() => {
-    qrActivo = true;
-  })
-  .catch(() => {
-    document.getElementById("resultadoQR").innerText =
-      "⚠️ Usa celular o habilita cámara";
+  ).catch(() => {
+    alert("Usa celular o habilita cámara");
   });
 }
 
 // =======================
-// GUARDAR
+// GUARDAR VISITA
 // =======================
 function guardarVisita(nombre) {
 
@@ -158,11 +119,12 @@ function guardarVisita(nombre) {
   };
 
   let visitas = JSON.parse(localStorage.getItem("visitas")) || [];
+
   visitas.push(visita);
 
   localStorage.setItem("visitas", JSON.stringify(visitas));
 
-  mostrarVisitas();
+  mostrar();
 }
 
 // =======================
@@ -183,72 +145,43 @@ function agregarVisita() {
 }
 
 // =======================
-// MOSTRAR
+// MOSTRAR (COMO ORIGINAL)
 // =======================
-function mostrarVisitas() {
+function mostrar() {
 
   const lista = document.getElementById("listaVisitas");
   lista.innerHTML = "";
 
   const visitas = JSON.parse(localStorage.getItem("visitas")) || [];
 
-  visitas.slice().reverse().forEach(v => {
+  visitas.forEach(v => {
 
     const li = document.createElement("li");
-
-    li.innerHTML = `
-      <span>${v.folio} - ${v.nombre} (${v.fecha})</span>
-      <button onclick="eliminar(${v.id})" style="background:red;width:auto;">X</button>
-    `;
+    li.textContent = `${v.folio} - ${v.nombre} (${v.fecha})`;
 
     lista.appendChild(li);
   });
 }
 
 // =======================
-// ELIMINAR
-// =======================
-function eliminar(id) {
-
-  let visitas = JSON.parse(localStorage.getItem("visitas")) || [];
-
-  visitas = visitas.filter(v => v.id !== id);
-
-  localStorage.setItem("visitas", JSON.stringify(visitas));
-
-  mostrarVisitas();
-}
-
-// =======================
 // ADMIN
 // =======================
-function abrirAdmin() {
-
-  const pass = document.getElementById("adminPass").value;
-
-  if (pass === "admin123") {
-    document.getElementById("adminPanel").style.display = "block";
+function activarAdmin() {
+  if (document.getElementById("adminPass").value === "admin123") {
+    document.getElementById("adminOpciones").style.display = "block";
   } else {
-    alert("Contraseña incorrecta");
+    alert("Incorrecto");
   }
 }
 
-// =======================
-// LIMPIAR
-// =======================
-function limpiarTodo() {
-
-  if (confirm("¿Eliminar todo?")) {
+function limpiar() {
+  if (confirm("Eliminar todo?")) {
     localStorage.removeItem("visitas");
-    mostrarVisitas();
+    mostrar();
   }
 }
 
-// =======================
-// EXPORTAR
-// =======================
-function exportarExcel() {
-
+function exportar() {
   const visitas = JSON.parse(localStorage.getItem("visitas")) || [];
 
   let csv = "Folio,Nombre,Fecha\n";
@@ -257,17 +190,16 @@ function exportarExcel() {
     csv += `${v.folio},${v.nombre},${v.fecha}\n`;
   });
 
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-
+  const blob = new Blob([csv]);
   const a = document.createElement("a");
-  a.href = url;
+  a.href = URL.createObjectURL(blob);
   a.download = "visitas.csv";
   a.click();
 }
 
 // =======================
-mostrarVisitas();
+mostrar();
+
 </script>
 
 </body>
