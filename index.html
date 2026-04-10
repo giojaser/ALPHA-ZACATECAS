@@ -9,167 +9,182 @@
 
 <style>
 body {
-  font-family: 'Segoe UI';
-  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-  color: white;
+  font-family: Arial;
   margin: 0;
-  padding: 20px;
+  background: #f4f4f4;
 }
 
-h1 {
+header {
+  background: #007bff;
+  color: white;
+  padding: 15px;
   text-align: center;
 }
 
-.card {
-  background: rgba(255,255,255,0.08);
-  backdrop-filter: blur(10px);
+.container {
   padding: 15px;
-  border-radius: 15px;
-  margin-bottom: 20px;
+}
+
+.card {
+  background: white;
+  padding: 15px;
+  margin-bottom: 15px;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
 button {
-  padding: 12px;
+  padding: 10px;
   width: 100%;
   border: none;
-  border-radius: 10px;
-  background: #00e676;
-  color: black;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-button:hover {
-  background: #00c853;
+  border-radius: 5px;
+  background: #007bff;
+  color: white;
+  margin-top: 10px;
 }
 
 input {
   width: 100%;
   padding: 10px;
   margin-top: 10px;
-  border-radius: 8px;
-  border: none;
-}
-
-#reader {
-  margin-top: 10px;
 }
 
 li {
-  background: rgba(0,0,0,0.3);
-  padding: 10px;
+  background: #eee;
+  padding: 8px;
   margin-top: 5px;
-  border-radius: 8px;
+  border-radius: 5px;
 }
 </style>
 </head>
 
 <body>
 
-<h1>🚀 Control de Visitas</h1>
+<header>
+<h1>Control de Visitas</h1>
+</header>
+
+<div class="container">
 
 <div class="card">
-  <h2>📷 Escanear QR</h2>
-  <button onclick="iniciarQR()">Activar Cámara</button>
-  <div id="reader"></div>
-  <p id="qrResultado"></p>
+<h2>📷 Escanear QR</h2>
+<button onclick="iniciarQR()">Activar cámara</button>
+<div id="reader"></div>
+<p id="resultadoQR"></p>
 </div>
 
 <div class="card">
-  <h2>➕ Registro Manual</h2>
-  <input type="text" id="nombre" placeholder="Nombre visitante">
-  <button onclick="registrar()">Registrar</button>
+<h2>➕ Agregar Visita Manual</h2>
+<input type="text" id="nombreVisita" placeholder="Nombre visitante">
+<button onclick="agregarVisita()">Agregar</button>
 </div>
 
 <div class="card">
-  <h2>📋 Visitas</h2>
-  <ul id="lista"></ul>
+<h2>📋 Lista de Visitas</h2>
+<ul id="listaVisitas"></ul>
+</div>
+
 </div>
 
 <script>
-// =================
-// VARIABLES
-// =================
-const lista = document.getElementById("lista");
-const qrResultado = document.getElementById("qrResultado");
-
-// =================
+// =======================
 // FOLIO
-// =================
+// =======================
 function generarFolio() {
-  return "VIS-" + Date.now();
+  return 'VIS-' + Date.now();
 }
 
-// =================
-// QR SEGURO
-// =================
+// =======================
+// QR
+// =======================
+let qrActivo = false;
+let qr;
+
 function iniciarQR() {
-  const qr = new Html5Qrcode("reader");
+
+  if (qrActivo) return;
+
+  qr = new Html5Qrcode("reader");
 
   qr.start(
     { facingMode: "environment" },
     { fps: 10, qrbox: 250 },
     (qrCodeMessage) => {
 
-      qrResultado.innerText = "QR detectado: " + qrCodeMessage;
+      document.getElementById("resultadoQR").innerText =
+        "QR detectado: " + qrCodeMessage;
 
       guardarVisita(qrCodeMessage);
-
-    },
-    (error) => {}
-  ).catch(err => {
-    qrResultado.innerText = "⚠️ Usa celular o habilita cámara";
+    }
+  ).then(() => {
+    qrActivo = true;
+  })
+  .catch(err => {
+    document.getElementById("resultadoQR").innerText =
+      "⚠️ Usa celular o habilita cámara";
   });
 }
 
-// =================
+// =======================
 // GUARDAR VISITA
-// =================
+// =======================
 function guardarVisita(nombre) {
+
   const visita = {
     folio: generarFolio(),
-    nombre,
+    nombre: nombre,
     fecha: new Date().toLocaleString()
   };
 
   let visitas = JSON.parse(localStorage.getItem("visitas")) || [];
+
   visitas.push(visita);
+
   localStorage.setItem("visitas", JSON.stringify(visitas));
 
-  mostrar();
+  mostrarVisitas();
 }
 
-// =================
-// REGISTRO MANUAL
-// =================
-function registrar() {
-  const nombre = document.getElementById("nombre").value.trim();
+// =======================
+// MANUAL
+// =======================
+function agregarVisita() {
+
+  const nombre = document.getElementById("nombreVisita").value.trim();
 
   if (!nombre) {
-    alert("Ingresa nombre");
+    alert("Ingresa un nombre");
     return;
   }
 
   guardarVisita(nombre);
-  document.getElementById("nombre").value = "";
+
+  document.getElementById("nombreVisita").value = "";
 }
 
-// =================
+// =======================
 // MOSTRAR
-// =================
-function mostrar() {
+// =======================
+function mostrarVisitas() {
+
+  const lista = document.getElementById("listaVisitas");
+
   lista.innerHTML = "";
 
   const visitas = JSON.parse(localStorage.getItem("visitas")) || [];
 
-  visitas.reverse().forEach(v => {
+  visitas.slice().reverse().forEach(v => {
+
     const li = document.createElement("li");
+
     li.textContent = `${v.folio} - ${v.nombre} (${v.fecha})`;
+
     lista.appendChild(li);
   });
 }
 
-mostrar();
+// =======================
+mostrarVisitas();
 </script>
 
 </body>
