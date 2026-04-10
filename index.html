@@ -3,17 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Alpha — Sistema de Gestión</title>
+<title>Alpha — Centro de Desarrollo Artístico y Cultural</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js"></script>
 <style>
 /* Estilos Globales Alpha */
-:root {
-  --bg:#0a0a0a; --bg2:#141414; --rosa:#d4537e; --cyan:#00d4ff; --blanco:#f0ece4;
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0a;--bg2:#141414;--bg3:#1e1e1e;--bg4:#252525;
+  --rosa:#d4537e;--rosa2:#e8729a;--rosa-d:#8c2f50;--rosa-xl:rgba(212,83,126,.12);
+  --cyan:#00d4ff;--blanco:#f0ece4;--muted:#777;
+  --border2:rgba(255,255,255,.13);--r:12px;--r2:8px;
 }
-body { background: var(--bg); color: var(--blanco); font-family: 'Outfit', sans-serif; margin: 0; }
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--blanco);overflow-x:hidden;padding-bottom:70px}
 
-/* Escáner Mejorado */
+/* Contenedor del Escáner Corregido */
 #cam-container {
     width: 100%; max-width: 400px; margin: 20px auto;
     position: relative; border-radius: 20px; overflow: hidden;
@@ -27,132 +32,8 @@ body { background: var(--bg); color: var(--blanco); font-family: 'Outfit', sans-
 }
 @keyframes scan { 0% { top: 0%; } 100% { top: 100%; } }
 
-/* Formularios de Cobro */
-.price-tag { background: var(--bg2); padding: 15px; border-radius: 10px; margin-bottom: 10px; border-left: 4px solid var(--rosa); }
-input, select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid var(--bg3); background: var(--bg3); color: white; }
-
-.btn { background: var(--rosa); color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; width: 100%; }
-.btn-delete { background: #ff4444; margin-top: 5px; }
-</style>
-</head>
-<body>
-
-<div id="p-pagos" class="page">
-    <div style="padding: 20px;">
-        <h2 style="font-family: 'Bebas Neue'; font-size: 2rem;">Registrar Pago / Actividad</h2>
-        
-        <label>Disciplina / Actividad</label>
-        <select id="sel-disciplina" onchange="checkPrice(this.value)">
-            <option value="450">Disciplina General ($450)</option>
-            <option value="400">Ritmos Latinos ($400)</option>
-            <option value="custom">Taller / Curso Especial (Manual)</option>
-        </select>
-
-        <div id="custom-price-wrap" style="display:none;">
-            <label>Nombre del Taller</label>
-            <input type="text" id="custom-name" placeholder="Ej. Taller de Verano">
-            <label>Costo Personalizado ($)</label>
-            <input type="number" id="custom-val" placeholder="0.00">
-        </div>
-        
-        <button class="btn" onclick="guardarPago()">Confirmar Pago</button>
-    </div>
-</div>
-
-<hr style="border: 0; border-top: 1px solid #333;">
-
-<div id="p-scan" class="page">
-    <div style="padding: 20px; text-align: center;">
-        <h2 style="font-family: 'Bebas Neue'; color: var(--cyan);">Escanear Visita</h2>
-        <div id="cam-container">
-            <video id="cam-preview"></video>
-            <div class="scan-line"></div>
-        </div>
-        <button class="btn" onclick="startScanner()">Abrir Cámara</button>
-        <p id="scan-msg" style="margin-top: 10px; color: var(--rosa);"></p>
-    </div>
-</div>
-
-<script>
-// --- CONFIGURACIÓN DE COSTOS ---
-function checkPrice(val) {
-    const wrap = document.getElementById('custom-price-wrap');
-    wrap.style.display = (val === 'custom') ? 'block' : 'none';
-}
-
-// --- LÓGICA DEL ESCÁNER (CORREGIDA) ---
-let video = document.getElementById("cam-preview");
-let scanning = false;
-
-async function startScanner() {
-    document.getElementById("scan-msg").innerText = "Iniciando cámara...";
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { 
-                facingMode: "environment",
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            } 
-        });
-        video.srcObject = stream;
-        video.setAttribute("playsinline", true);
-        await video.play();
-        scanning = true;
-        requestAnimationFrame(tick);
-    } catch (err) {
-        alert("Error: Asegúrate de dar permisos de cámara y usar HTTPS.");
-    }
-}
-
-function tick() {
-    if (video.readyState === video.HAVE_ENOUGH_DATA && scanning) {
-        const canvas = document.createElement("canvas");
-        canvas.height = video.videoHeight;
-        canvas.width = video.videoWidth;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height);
-
-        if (code) {
-            scanning = false;
-            video.srcObject.getTracks().forEach(t => t.stop());
-            handleVisit(code.data);
-            return;
-        }
-    }
-    if (scanning) requestAnimationFrame(tick);
-}
-
-function handleVisit(folio) {
-    alert("¡Código detectado! Alumno: " + folio);
-    // Aquí llamas a tu función de subir a Firebase
-}
-
-// --- LÓGICA DE BORRADO REAL (FIREBASE) ---
-// IMPORTANTE: Para que se borre en todos los dispositivos, 
-// no debes solo borrar del array local, debes actualizar la URL de Firebase.
-
-function eliminarCitaCloud(citaId) {
-    if(!confirm("¿Borrar permanentemente de la nube?")) return;
-
-    // 1. Borrar local
-    DB.citas = DB.citas.filter(c => c.id !== citaId);
-    
-    // 2. Sincronizar inmediatamente con Firebase usando PUT (o el método que uses)
-    // Esto asegura que el JSON en la nube ya no tenga esa cita.
-    fetch(FIREBASE_URL, {
-        method: 'PUT',
-        body: JSON.stringify(DB)
-    })
-    .then(res => {
-        alert("Eliminado en todos los dispositivos");
-        renderCitas(); // Refrescar vista
-    })
-    .catch(err => alert("Error de conexión"));
-}
-
-</script>
-</body>
-</html>
+/* Formularios y Botones */
+.card{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:1rem;margin-bottom:.75rem}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:15px}
+.field label{font-size:11px;color:var(--muted);font-weight:500}
+input, select { background:var(--bg3); border:
