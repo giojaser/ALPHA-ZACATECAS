@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Alpha — Centro de Desarrollo Artístico y Cultural</title>
+<title>Alpha — Centro de Desarrollo Artístico</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js"></script>
 <style>
-/* --- ESTILOS DE LA APP --- */
+/* --- ESTILOS ALPHA --- */
 :root {
   --bg:#0a0a0a; --bg2:#141414; --bg3:#1e1e1e;
   --rosa:#d4537e; --cyan:#00d4ff; --blanco:#f0ece4; --muted:#777;
@@ -17,113 +17,113 @@
 body { font-family:'Outfit',sans-serif; background:var(--bg); color:var(--blanco); padding-bottom:80px; }
 
 .topbar { background:var(--bg2); padding:15px; border-bottom:1px solid var(--border); text-align:center; position:sticky; top:0; z-index:100; }
-.topbar h1 { font-family:'Bebas Neue'; color:var(--rosa); letter-spacing:2px; }
+.topbar h1 { font-family:'Bebas Neue'; color:var(--rosa); letter-spacing:2px; font-size:26px; }
 
 .bot-nav { position:fixed; bottom:0; left:0; right:0; background:var(--bg2); display:flex; border-top:1px solid var(--border); z-index:100; }
-.bn { flex:1; padding:15px; border:none; background:transparent; color:var(--muted); font-size:10px; cursor:pointer; }
-.bn.on { color:var(--rosa); font-weight:700; }
+.bn { flex:1; padding:15px; border:none; background:transparent; color:var(--muted); font-size:10px; cursor:pointer; font-weight:600; }
+.bn.on { color:var(--rosa); }
 
 .page { display:none; padding:20px; max-width:500px; margin:0 auto; }
 .page.on { display:block; animation: fadeIn 0.3s; }
 @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
 
-.card { background:var(--bg2); padding:15px; border-radius:var(--r); border:1px solid var(--border); margin-bottom:15px; }
-input, select { width:100%; padding:12px; margin:10px 0; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:white; }
+.card { background:var(--bg2); padding:15px; border-radius:var(--r); border:1px solid var(--border); margin-bottom:15px; position:relative; }
+input, select { width:100%; padding:12px; margin:10px 0; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:white; font-size:14px; }
 .btn { width:100%; padding:14px; border:none; border-radius:10px; font-weight:700; cursor:pointer; background:var(--rosa); color:white; }
-.btn-del { background:#ff4444; margin-top:10px; padding:8px; font-size:11px; border-radius:5px; border:none; color:white; }
+.btn-del { background:#ff4444; margin-top:10px; padding:8px; font-size:11px; border-radius:5px; border:none; color:white; width:100%; }
 
-/* Escáner */
-#cam-container { width:100%; aspect-ratio:1/1; background:#000; border-radius:20px; overflow:hidden; position:relative; border:2px solid var(--rosa); margin:15px 0; }
-#cam-preview { width:100%; height:100%; object-fit:cover; }
+/* Contenedor de Cámara */
+#cam-wrap { width:100%; aspect-ratio:1/1; background:#000; border-radius:20px; overflow:hidden; position:relative; border:2px solid var(--rosa); margin:15px 0; display:none; }
+#video { width:100%; height:100%; object-fit:cover; }
 .scan-line { position:absolute; top:0; width:100%; height:2px; background:var(--cyan); box-shadow:0 0 10px var(--cyan); animation: scan 2s linear infinite; }
 @keyframes scan { from { top:0%; } to { top:100%; } }
 </style>
 </head>
 <body>
 
-<div class="topbar"><h1>ALPHA</h1></div>
+<div class="topbar">
+    <h1>ALPHA</h1>
+    <p style="font-size:9px; color:var(--muted); margin-top:-5px;">GESTIÓN ACADÉMICA</p>
+</div>
 
 <div id="p-citas" class="page on">
-    <h2 style="font-family:'Bebas Neue'; margin-bottom:15px;">Citas Agendadas</h2>
-    <div id="lista-citas">
-        </div>
+    <h2 style="font-family:'Bebas Neue'; margin-bottom:15px; color:var(--rosa);">Citas Agendadas</h2>
+    <div id="cont-citas">Cargando datos desde la nube...</div>
 </div>
 
 <div id="p-pagos" class="page">
-    <h2 style="font-family:'Bebas Neue'; margin-bottom:15px;">Registrar Cobro</h2>
+    <h2 style="font-family:'Bebas Neue'; margin-bottom:15px; color:var(--rosa);">Registrar Pago</h2>
     <div class="card">
-        <label>Disciplina / Actividad</label>
-        <select id="sel-tipo" onchange="toggleCostoLibre()">
+        <label style="font-size:12px; color:var(--muted);">Seleccionar Disciplina</label>
+        <select id="sel-pago" onchange="checkLibre()">
             <option value="450">Disciplina General ($450)</option>
             <option value="400">Ritmos Latinos ($400)</option>
-            <option value="libre">Taller / Curso (Costo Libre)</option>
+            <option value="custom">Taller / Actividad Especial</option>
         </select>
 
-        <div id="area-libre" style="display:none;">
-            <input type="text" id="nombre-actividad" placeholder="Nombre de la actividad (ej. Taller de Verano)">
-            <input type="number" id="costo-libre" placeholder="Monto a cobrar $">
+        <div id="wrap-custom" style="display:none;">
+            <input type="text" id="custom-nom" placeholder="Nombre del Taller">
+            <input type="number" id="custom-val" placeholder="Monto a cobrar $">
         </div>
 
-        <button class="btn" onclick="guardarCobro()">Guardar Pago</button>
+        <button class="btn" onclick="guardarPago()">Confirmar Registro</button>
     </div>
 </div>
 
 <div id="p-scan" class="page">
-    <h2 style="font-family:'Bebas Neue'; text-align:center;">Escáner de Visitas</h2>
-    <div id="cam-container">
-        <video id="cam-preview" playsinline></video>
+    <h2 style="font-family:'Bebas Neue'; text-align:center; color:var(--cyan);">Lector QR de Visitas</h2>
+    <div id="cam-wrap">
+        <video id="video" playsinline></video>
         <div class="scan-line"></div>
     </div>
-    <button class="btn" onclick="encenderCamara()">Activar Cámara</button>
-    <p id="info-scan" style="text-align:center; margin-top:10px; color:var(--cyan); font-size:12px;"></p>
+    <button class="btn" onclick="iniciarCamara()">Abrir Cámara</button>
+    <p id="info-scan" style="text-align:center; margin-top:15px; font-size:12px; color:var(--muted);"></p>
 </div>
 
 <nav class="bot-nav">
-    <button class="bn on" onclick="irPagina('p-citas', this)">CITAS</button>
-    <button class="bn" onclick="irPagina('p-pagos', this)">PAGOS</button>
-    <button class="bn" onclick="irPagina('p-scan', this)">ESCÁNER</button>
+    <button class="bn on" onclick="irA('p-citas', this)">CITAS</button>
+    <button class="bn" onclick="irA('p-pagos', this)">PAGOS</button>
+    <button class="bn" onclick="irA('p-scan', this)">ESCÁNER</button>
 </nav>
 
 <script>
-// --- CONFIGURACIÓN ---
-const FIREBASE_URL = "https://alpha-64b34-default-rtdb.firebaseio.com/data.json"; // <-- REEMPLAZA ESTO
-let localDB = { citas: [], alumnos: [] };
-let video = document.getElementById("cam-preview");
-let escanerActivo = false;
+// --- CONFIGURACIÓN DE TU BASE DE DATOS ---
+const FB_URL = "https://alpha-64b34-default-rtdb.firebaseio.com/.json";
+let DB = { citas: [], alumnos: [], pagos: [] };
+let video = document.getElementById("video");
+let scOn = false;
 
-// --- FUNCIONES DE NAVEGACIÓN ---
-function irPagina(id, btn) {
+// --- NAVEGACIÓN ---
+function irA(pid, btn) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
     document.querySelectorAll('.bn').forEach(b => b.classList.remove('on'));
-    document.getElementById(id).classList.add('on');
+    document.getElementById(pid).classList.add('on');
     btn.classList.add('on');
-    if(id !== 'p-scan') apagarCamara();
-    if(id === 'p-citas') cargarDesdeNube();
+    stopCam();
+    if(pid === 'p-citas') fetchCloud();
 }
 
-// --- LÓGICA DE PAGOS ---
-function toggleCostoLibre() {
-    const seleccion = document.getElementById('sel-tipo').value;
-    document.getElementById('area-libre').style.display = (seleccion === 'libre') ? 'block' : 'none';
+// --- PAGOS Y COSTOS ---
+function checkLibre() {
+    const val = document.getElementById('sel-pago').value;
+    document.getElementById('wrap-custom').style.display = (val === 'custom') ? 'block' : 'none';
 }
 
-function guardarCobro() {
-    const tipo = document.getElementById('sel-tipo').value;
-    let nombre = "Mensualidad";
-    let monto = tipo;
-
-    if(tipo === 'libre') {
-        nombre = document.getElementById('nombre-actividad').value || "Actividad Especial";
-        monto = document.getElementById('costo-libre').value || 0;
-    } else if(tipo === '400') {
-        nombre = "Mensualidad Ritmos Latinos";
-    }
-
-    alert(`Pago registrado: ${nombre} por $${monto}`);
+function guardarPago() {
+    const v = document.getElementById('sel-pago').value;
+    let nom = "Mensualidad", cost = v;
+    if(v === 'custom') {
+        nom = document.getElementById('custom-nom').value || "Taller";
+        cost = document.getElementById('custom-val').value || "0";
+    } else if(v === '400') nom = "Ritmos Latinos";
+    
+    alert("Registrado correctamente: " + nom + " ($" + cost + ")");
 }
 
-// --- LÓGICA DE CÁMARA (MEJORADA PARA QR) ---
-async function encenderCamara() {
+// --- CÁMARA QR (SOLUCIÓN DEFINITIVA) ---
+async function iniciarCamara() {
+    document.getElementById('cam-wrap').style.display = 'block';
+    document.getElementById('info-scan').innerText = "Escaneando...";
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
             video: { 
@@ -135,84 +135,70 @@ async function encenderCamara() {
         video.srcObject = stream;
         video.setAttribute("playsinline", true);
         await video.play();
-        escanerActivo = true;
-        document.getElementById("info-scan").innerText = "Apunte al código QR...";
-        requestAnimationFrame(tickEscaneo);
-    } catch (err) {
-        alert("Error al acceder a la cámara. Asegúrate de usar HTTPS y dar permisos.");
+        scOn = true;
+        requestAnimationFrame(tick);
+    } catch (e) {
+        alert("Error: Asegúrate de estar en HTTPS y dar permisos a la cámara.");
     }
 }
 
-function tickEscaneo() {
-    if (video.readyState === video.HAVE_ENOUGH_DATA && escanerActivo) {
+function stopCam() {
+    scOn = false;
+    if(video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+    document.getElementById('cam-wrap').style.display = 'none';
+}
+
+function tick() {
+    if (video.readyState === video.HAVE_ENOUGH_DATA && scOn) {
         const canvas = document.createElement("canvas");
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         const ctx = canvas.getContext("2d");
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const qr = jsQR(imageData.data, imageData.width, imageData.height);
-
-        if (qr) {
-            escanerActivo = false;
-            alert("Código detectado: " + qr.data);
-            apagarCamara();
+        const code = jsQR(ctx.getImageData(0,0,canvas.width,canvas.height).data, canvas.width, canvas.height);
+        if (code) {
+            alert("QR Detectado: " + code.data);
+            stopCam();
             return;
         }
     }
-    if (escanerActivo) requestAnimationFrame(tickEscaneo);
+    if (scOn) requestAnimationFrame(tick);
 }
 
-function apagarCamara() {
-    escanerActivo = false;
-    if (video.srcObject) {
-        video.srcObject.getTracks().forEach(track => track.stop());
-    }
-}
-
-// --- SINCRONIZACIÓN CON FIREBASE ---
-async function cargarDesdeNube() {
+// --- SINCRONIZACIÓN FIREBASE ---
+async function fetchCloud() {
     try {
-        const res = await fetch(FIREBASE_URL);
+        const res = await fetch(FB_URL);
         const data = await res.json();
-        if(data) {
-            localDB = data;
-            mostrarCitas();
-        }
-    } catch (e) { console.error("Error al cargar datos"); }
+        if(data) { DB = data; renderCitas(); }
+    } catch (e) { document.getElementById('cont-citas').innerText = "Error de conexión"; }
 }
 
 async function borrarCitaCloud(id) {
-    if(!confirm("¿Deseas eliminar esta cita para todos los dispositivos?")) return;
-    
-    localDB.citas = localDB.citas.filter(c => c.id !== id);
-    
+    if(!confirm("¿Eliminar cita en todos los dispositivos?")) return;
+    DB.citas = DB.citas.filter(c => c.id !== id);
     try {
-        await fetch(FIREBASE_URL, {
-            method: 'PUT',
-            body: JSON.stringify(localDB)
-        });
-        mostrarCitas();
-    } catch (e) { alert("Error al sincronizar el borrado"); }
+        await fetch(FB_URL, { method: 'PUT', body: JSON.stringify(DB) });
+        renderCitas();
+    } catch (e) { alert("Error al sincronizar"); }
 }
 
-function mostrarCitas() {
-    const div = document.getElementById('lista-citas');
-    div.innerHTML = localDB.citas.length === 0 ? '<p style="color:var(--muted)">No hay citas pendientes.</p>' : '';
-    localDB.citas.forEach(cita => {
-        div.innerHTML += `
+function renderCitas() {
+    const c = document.getElementById('cont-citas');
+    if(!DB.citas || DB.citas.length === 0) { c.innerHTML = "<p>No hay citas agendadas.</p>"; return; }
+    c.innerHTML = "";
+    DB.citas.forEach(cita => {
+        c.innerHTML += `
             <div class="card">
                 <strong>${cita.nombre}</strong><br>
-                <small>${cita.fecha} - ${cita.hora}</small>
-                <button class="btn-del" onclick="borrarCitaCloud('${cita.id}')">Eliminar Definitivamente</button>
-            </div>
-        `;
+                <small style="color:var(--muted)">${cita.fecha} — ${cita.hora}</small>
+                <button class="btn-del" onclick="borrarCitaCloud('${cita.id}')">Eliminar de la nube</button>
+            </div>`;
     });
 }
 
-// Carga inicial
-cargarDesdeNube();
+// Carga Inicial
+fetchCloud();
 </script>
 </body>
 </html>
