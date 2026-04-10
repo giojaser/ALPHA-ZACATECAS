@@ -2,33 +2,41 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>App de Visitas</title>
+<title>Control de Visitas PRO</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+<!-- QR -->
 <script src="https://unpkg.com/html5-qrcode"></script>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
 
 <style>
 body {
   font-family: Arial;
+  background: #121212;
+  color: white;
   padding: 20px;
-  background: #f4f4f4;
 }
 
-h2 { margin-top: 30px; }
+h1 { text-align: center; }
 
-video {
-  width: 100%;
+.container {
+  background: #1e1e1e;
+  padding: 15px;
   border-radius: 10px;
+  margin-bottom: 20px;
 }
 
 button {
-  padding: 10px;
-  margin-top: 10px;
+  padding: 12px;
   width: 100%;
+  margin-top: 10px;
   border: none;
-  background: #007bff;
-  color: white;
   border-radius: 5px;
+  background: #00c853;
+  color: white;
 }
 
 input {
@@ -36,115 +44,136 @@ input {
   width: 100%;
   margin-top: 10px;
 }
+
+li {
+  margin: 5px 0;
+  background: #2a2a2a;
+  padding: 8px;
+  border-radius: 5px;
+}
 </style>
 </head>
 
 <body>
 
-<h1>Control de Visitas</h1>
+<h1>🚀 Control de Visitas PRO</h1>
 
-<h2>📷 Escanear QR</h2>
-<div id="reader"></div>
-<p id="resultadoQR"></p>
+<div class="container">
+  <h2>📷 Escanear QR</h2>
+  <div id="reader"></div>
+  <p id="qrResultado"></p>
+</div>
 
-<h2>➕ Agregar Visita Manual</h2>
-<input type="text" id="nombreVisita" placeholder="Nombre visitante">
-<button onclick="agregarVisita()">Agregar</button>
+<div class="container">
+  <h2>➕ Registro Manual</h2>
+  <input type="text" id="nombre" placeholder="Nombre visitante">
+  <button onclick="registrarManual()">Registrar</button>
+</div>
 
-<h2>📋 Lista de Visitas</h2>
-<ul id="listaVisitas"></ul>
+<div class="container">
+  <h2>📋 Visitas en Tiempo Real</h2>
+  <ul id="lista"></ul>
+</div>
 
 <script>
 // =======================
-// QR SCANNER MEJORADO
+// 🔥 CONFIGURA FIREBASE AQUÍ
 // =======================
-const resultadoQR = document.getElementById("resultadoQR");
+const firebaseConfig = {
+  apiKey: "AQUI",
+  authDomain: "AQUI",
+  projectId: "AQUI",
+  storageBucket: "AQUI",
+  messagingSenderId: "AQUI",
+  appId: "AQUI"
+};
+
+// Inicializar Firebase
+const app = firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// =======================
+// 🎯 GENERAR FOLIO
+// =======================
+function generarFolio() {
+  return "VIS-" + Date.now();
+}
+
+// =======================
+// 📷 QR
+// =======================
+const qrResultado = document.getElementById("qrResultado");
 
 function iniciarQR() {
-  const html5QrCode = new Html5Qrcode("reader");
+  const qr = new Html5Qrcode("reader");
 
   Html5Qrcode.getCameras().then(devices => {
-    if (devices && devices.length) {
+    if (devices.length) {
+      qr.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        async (qrCodeMessage) => {
 
-      html5QrCode.start(
-        { facingMode: "environment" }, // cámara trasera
-        {
-          fps: 10,
-          qrbox: 250
-        },
-        qrCodeMessage => {
-          resultadoQR.innerText = "QR detectado: " + qrCodeMessage;
-        },
-        errorMessage => {
-          // silencioso
+          qrResultado.innerText = "QR: " + qrCodeMessage;
+
+          const visita = {
+            folio: generarFolio(),
+            nombre: qrCodeMessage,
+            fecha: new Date().toLocaleString()
+          };
+
+          await db.collection("visitas").add(visita);
+
         }
-      ).catch(err => {
-        resultadoQR.innerText = "Error iniciando cámara: " + err;
-      });
-
-    } else {
-      resultadoQR.innerText = "No se encontró cámara";
+      );
     }
   }).catch(err => {
-    resultadoQR.innerText = "Error permisos cámara: " + err;
+    qrResultado.innerText = "Error cámara: " + err;
   });
 }
 
-// IMPORTANTE: iniciar después de cargar
 window.onload = iniciarQR;
 
-
 // =======================
-// VISITAS
+// ➕ REGISTRO MANUAL
 // =======================
-
-function generarFolio() {
-  return 'VIS-' + Date.now();
-}
-
-function agregarVisita() {
-  const nombre = document.getElementById("nombreVisita").value.trim();
+async function registrarManual() {
+  const nombre = document.getElementById("nombre").value.trim();
 
   if (!nombre) {
-    alert("Ingresa un nombre");
+    alert("Ingresa nombre");
     return;
   }
 
-  const folio = generarFolio();
-
   const visita = {
-    folio,
+    folio: generarFolio(),
     nombre,
     fecha: new Date().toLocaleString()
   };
 
-  let visitas = JSON.parse(localStorage.getItem('visitas')) || [];
-  visitas.push(visita);
-  localStorage.setItem('visitas', JSON.stringify(visitas));
+  await db.collection("visitas").add(visita);
 
-  document.getElementById("nombreVisita").value = "";
-
-  mostrarVisitas();
+  document.getElementById("nombre").value = "";
 }
 
 // =======================
-// MOSTRAR VISITAS
+// 📋 TIEMPO REAL
 // =======================
+const lista = document.getElementById("lista");
 
-function mostrarVisitas() {
-  const lista = document.getElementById("listaVisitas");
+db.collection("visitas").orderBy("fecha", "desc")
+.onSnapshot(snapshot => {
   lista.innerHTML = "";
 
-  const visitas = JSON.parse(localStorage.getItem('visitas')) || [];
+  snapshot.forEach(doc => {
+    const v = doc.data();
 
-  visitas.forEach(v => {
     const li = document.createElement("li");
     li.textContent = `${v.folio} - ${v.nombre} (${v.fecha})`;
+
     lista.appendChild(li);
   });
-}
-
-mostrarVisitas();
+});
 </script>
 
 </body>
