@@ -6,7 +6,7 @@
 <title>Alpha — Centro de Desarrollo Artístico y Cultural</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -173,13 +173,14 @@ body{padding-bottom:70px}
 .scan-input-row{display:flex;gap:8px;margin:1rem 0}
 .scan-input-row input{flex:1;background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:11px 12px;color:var(--blanco);font-size:14px;outline:none;transition:border .15s}
 .scan-input-row input:focus{border-color:var(--rosa)}
-#cam-wrap{position:relative;margin:1rem auto;max-width:320px;border-radius:var(--r);overflow:hidden;display:none;background:#000}
-#cam-wrap video{width:100%;display:block;border-radius:var(--r)}
-#cam-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
-.scan-frame{width:60%;aspect-ratio:1;border:2px solid var(--rosa);border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,.5)}
-.scan-frame::before,.scan-frame::after{content:"";position:absolute;width:20px;height:20px;border-color:var(--rosa2);border-style:solid}
-.scan-frame::before{top:-2px;left:-2px;border-width:3px 0 0 3px;border-radius:8px 0 0 0}
-.scan-frame::after{bottom:-2px;right:-2px;border-width:0 3px 3px 0;border-radius:0 0 8px 0}
+#cam-wrap{margin:.75rem auto;max-width:340px;border-radius:var(--r);overflow:hidden;display:none}
+#qr-reader{width:100%!important}
+#qr-reader video{border-radius:var(--r)!important}
+#qr-reader__scan_region{border-radius:var(--r)!important}
+#qr-reader__dashboard button{background:var(--rosa)!important;color:#fff!important;border:none!important;border-radius:var(--r2)!important;padding:8px 14px!important;font-family:var(--font)!important;cursor:pointer!important}
+#qr-reader__dashboard_section_csr span{color:var(--blanco)!important;font-size:12px!important}
+#qr-reader__header_message{color:var(--muted)!important;font-size:12px!important}
+#qr-reader select{background:var(--bg3)!important;color:var(--blanco)!important;border:1px solid rgba(255,255,255,.1)!important;border-radius:var(--r2)!important;padding:4px 8px!important}
 
 /* MODAL */
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:500;align-items:center;justify-content:center;padding:.75rem}
@@ -316,6 +317,7 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
       <button class="tpill on" id="tp-paq" onclick="setTipoPlan('paq')">Paquetes</button>
       <button class="tpill" id="tp-mem" onclick="setTipoPlan('mem')">Membresías</button>
       <button class="tpill" id="tp-cl" onclick="setTipoPlan('cl')">Clase suelta</button>
+      <button class="tpill" id="tp-otro" onclick="setTipoPlan('otro')">Taller / Curso</button>
     </div>
     <div class="pkg-scroll" id="pkg-grid"></div>
     <p style="font-size:11px;color:var(--muted);margin-top:.6rem">Inscripción anual: <strong style="color:var(--rosa)">$200</strong> · Clase/hora: <strong style="color:var(--rosa)">$100</strong></p>
@@ -447,11 +449,10 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
       <button class="btn-p" style="width:auto;margin:0;padding:11px 16px" onclick="regVisita()">OK</button>
     </div>
     <button id="cam-btn" class="btn-s" style="width:100%;margin-bottom:.75rem" onclick="toggleCam()">📷 Activar cámara para escanear QR</button>
-    <div id="cam-wrap">
-      <video id="cam-video" playsinline autoplay muted style="width:100%;display:block;border-radius:var(--r)"></video>
-      <div id="cam-overlay"><div class="scan-frame"></div></div>
+    <div id="cam-wrap" style="display:none">
+      <div id="qr-reader" style="width:100%;border-radius:var(--r);overflow:hidden"></div>
     </div>
-    <div id="cam-status" style="font-size:12px;color:var(--muted);margin-top:.4rem;display:none">Apunta el QR al recuadro…</div>
+    <div id="cam-status" style="font-size:12px;color:var(--muted);margin-top:.4rem;display:none"></div>
   </div>
   <div id="qr-result"></div>
   <div class="card">
@@ -673,7 +674,8 @@ const PLANES=[
   {id:'M3',n:'Membresía #3',t:'6 meses',d:'2 disciplinas · 4 clases/sem · 16 hrs',p:4000,tipo:'mem'},
   {id:'M4',n:'Membresía #4',t:'6 meses',d:'3 disciplinas · 6 clases/sem · 24 hrs',p:5000,tipo:'mem'},
   {id:'M5',n:'Membresía #5',t:'12 meses',d:'Anualidad · 2 hrs por semana',p:4800,tipo:'mem'},
-  {id:'CL',n:'Clase suelta',t:'Por hora',d:'$100 por hora',p:100,tipo:'cl'}
+  {id:'CL',n:'Clase suelta',t:'Por hora',d:'$100 por hora',p:100,tipo:'cl'},
+  {id:'OT',n:'Otro / Taller',t:'Libre',d:'Taller, curso, evento especial — precio libre',p:0,tipo:'otro',libre:1}
 ];
 
 /* ══════════════════════ ESTADO GLOBAL ══════════════════════ */
@@ -1048,11 +1050,18 @@ async function saveDB(){
       await pushJSONBin();
       setCloudStatus('ok','Guardado ' + new Date().toLocaleTimeString('es-MX'));
     } catch(e){
-      setCloudStatus('err','Error al guardar: ' + e.message);
+      setCloudStatus('err','Error: ' + e.message);
     }
   } else if(CFG.proveedor === 'firebase' && CFG.fbUrl){
     try{
-      await sincFirebase();
+      /* PUT full DB to Firebase */
+      var r = await fetch(CFG.fbUrl + '/alpha.json', {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(DB)
+      });
+      if(!r.ok) throw new Error('Firebase PUT ' + r.status);
+      setCloudStatus('ok','Guardado ' + new Date().toLocaleTimeString('es-MX'));
     } catch(e){
       setCloudStatus('err','Error Firebase: ' + e.message);
     }
@@ -1150,24 +1159,32 @@ function qHor(ek,contId,dispId,cardId){
 }
 
 /* ══════════════════════ PAQUETES ══════════════════════ */
-function setTipoPlan(t){S.tipoPlan=t;['paq','mem','cl'].forEach(x=>document.getElementById('tp-'+x).classList.toggle('on',x===t));renderPkgs();}
+function setTipoPlan(t){S.tipoPlan=t;['paq','mem','cl','otro'].forEach(x=>{var el=document.getElementById('tp-'+x);if(el)el.classList.toggle('on',x===t);});renderPkgs();}
 function renderPkgs(){
-  const g=document.getElementById('pkg-grid');
-  g.innerHTML=PLANES.filter(p=>p.tipo===S.tipoPlan).map(p=>`
-    <div class="pkg${S.rPlan===p.id?' on':''}" data-pid="${p.id}">
-      ${p.vip?'<div class="pkg-vip">VIP</div>':''}
-      <div class="pkg-name">${p.n}</div><div class="pkg-time">${p.t}</div>
-      <div class="pkg-desc">${p.d}</div><div class="pkg-price">$${p.p.toLocaleString('es-MX')}</div>
-    </div>`).join('');
-  g.querySelectorAll('.pkg').forEach(el=>{
-    el.addEventListener('click',function(){
-      S.rPlan=this.dataset.pid;
-      const pl=PLANES.find(x=>x.id===S.rPlan);
-      if(pl) document.getElementById('r-monto').value=pl.p;
-      renderPkgs(); updateSum();
+  var g = document.getElementById('pkg-grid');
+  var list = PLANES.filter(function(p){ return p.tipo===S.tipoPlan; });
+  g.innerHTML = list.map(function(p){
+    return '<div class="pkg' + (S.rPlan===p.id?' on':'') + '" data-pid="' + p.id + '">' +
+      (p.vip ? '<div class="pkg-vip">VIP</div>' : '') +
+      '<div class="pkg-name">' + p.n + '</div>' +
+      '<div class="pkg-time">' + p.t + '</div>' +
+      '<div class="pkg-desc">' + p.d + '</div>' +
+      (p.libre
+        ? '<input type="number" class="pkg-price-input" placeholder="$ Precio libre" min="0" style="width:100%;background:var(--bg2);border:1px solid var(--rosa);border-radius:var(--r2);padding:6px 10px;color:var(--rosa);font-family:var(--font);font-size:16px;font-weight:700;text-align:center;margin-top:4px" onclick="event.stopPropagation()" oninput="setPrecioLibre(this.value)">'
+        : '<div class="pkg-price">$' + p.p.toLocaleString('es-MX') + '</div>') +
+      '</div>';
+  }).join('');
+  g.querySelectorAll('.pkg').forEach(function(el){
+    el.addEventListener('click', function(){
+      S.rPlan = this.dataset.pid;
+      var pl = PLANES.find(function(x){ return x.id===S.rPlan; });
+      if(pl && !pl.libre) document.getElementById('r-monto').value = pl.p;
+      renderPkgs();
+      updateSum();
     });
   });
 }
+function setPrecioLibre(val){ document.getElementById("r-monto").value=val; updateSum(); }
 function updateSum(){
   const c=document.getElementById('sum-card');
   if(!S.rDiscs.length&&!S.rPlan){c.style.display='none';return;}
@@ -1284,33 +1301,31 @@ function renderCitas(){
     </div>`).join('');
 }
 async function confCita(id){
-  var c = DB.citas.find(function(x){ return x.id === id; });
+  var c = DB.citas.find(function(x){ return x.id===id; });
   if(!c) return;
   S.writeLock = true;
   c.estado = 'Confirmada';
   saveLocal();
-  renderCitas();
   try{
     await saveDB();
   } finally{
-    setTimeout(function(){ S.writeLock = false; }, 2000);
+    setTimeout(function(){ S.writeLock=false; },3000);
   }
+  renderCitas();
 }
 
 async function delCita(id){
   if(!confirm('Eliminar esta cita?')) return;
   S.writeLock = true;
-  DB.citas = DB.citas.filter(function(x){ return x.id !== id; });
+  DB.citas = DB.citas.filter(function(x){ return x.id!==id; });
   saveLocal();
-  renderCitas();
+  renderCitas(); /* show change immediately on this device */
   try{
     await saveDB();
   } finally{
-    setTimeout(function(){ S.writeLock = false; }, 2000);
+    setTimeout(function(){ S.writeLock=false; },3000);
   }
-}
-
-/* ══════════════════════ ALUMNOS LIST ══════════════════════ */
+}══════════════════════ ALUMNOS LIST ══════════════════════ */
 function renderAls(){
   const q=(document.getElementById('als-q').value||'').toLowerCase();
   const lst=document.getElementById('als-list');
@@ -1479,116 +1494,78 @@ function enviarWA(){
 
 /* ══════════════════════ CÁMARA QR ══════════════════════ */
 function toggleCam(){S.camActive?stopCam():startCam();}
+
+var html5QrScanner = null;
+
 function startCam(){
-  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
-    alert('Usa Chrome en Android o Safari en iPhone para escanear QR.');
-    return;
-  }
-  var video = document.getElementById('cam-video');
-  var wrap  = document.getElementById('cam-wrap');
-  var btn   = document.getElementById('cam-btn');
-  var stat  = document.getElementById('cam-status');
+  var wrap   = document.getElementById('cam-wrap');
+  var btn    = document.getElementById('cam-btn');
+  var stat   = document.getElementById('cam-status');
 
-  function initWithMode(mode){
-    var constraints = mode
-      ? {video:{facingMode:mode,width:{ideal:1920},height:{ideal:1080}}}
-      : {video:{width:{ideal:1280},height:{ideal:720}}};
+  if(S.camActive){ stopCam(); return; }
 
-    navigator.mediaDevices.getUserMedia(constraints)
-    .then(function(stream){
-      S.camStream  = stream;
-      S.camActive  = false; /* set true only when video is playing */
-      S.scanCanvas = null;
-
-      video.srcObject = stream;
-      video.setAttribute('playsinline','true');
-      video.muted = true;
-
-      /* Start scanning only when first frame arrives */
-      video.addEventListener('canplay', function onCanPlay(){
-        video.removeEventListener('canplay', onCanPlay);
-        video.play().then(function(){
-          S.camActive = true;
-          wrap.style.display = 'block';
-          stat.style.display = 'block';
-          stat.textContent   = 'Apunta el QR al recuadro...';
-          btn.textContent    = 'Detener camara';
-          requestAnimationFrame(scanLoop);
-        }).catch(function(e){
-          S.camActive = true; /* play() rejected on some browsers but stream still works */
-          wrap.style.display = 'block';
-          stat.style.display = 'block';
-          stat.textContent   = 'Apunta el QR al recuadro...';
-          btn.textContent    = 'Detener camara';
-          requestAnimationFrame(scanLoop);
-        });
-      });
-
-      video.load();
-    })
-    .catch(function(err){
-      if(mode === 'environment'){ initWithMode(null); return; }
-      var m = 'No se pudo acceder a la camara: ' + err.name;
-      if(err.name === 'NotAllowedError') m = 'Permiso de camara denegado.\nAndroid Chrome: menu > Configuracion > Permisos del sitio > Camara > Permitir.\niPhone Safari: Ajustes > Safari > Camara > Permitir.';
-      if(err.name === 'NotFoundError')   m = 'No se encontro camara en este dispositivo.';
-      alert(m);
-    });
-  }
-  initWithMode('environment');
-}
-function stopCam(){
-  if(S.camStream){S.camStream.getTracks().forEach(t=>t.stop());S.camStream=null;}
-  S.camActive=false;
-  const video=document.getElementById('cam-video');video.srcObject=null;
-  document.getElementById('cam-wrap').style.display='none';
-  document.getElementById('cam-status').style.display='none';
-  document.getElementById('cam-btn').textContent='📷 Activar cámara para escanear QR';
-  if(S.camAF){cancelAnimationFrame(S.camAF);S.camAF=null;}
-}
-function scanLoop(){
-  if(!S.camActive) return;
-  var video = document.getElementById('cam-video');
-
-  /* Wait for jsQR CDN script */
-  if(typeof jsQR !== 'function'){
-    setTimeout(function(){ requestAnimationFrame(scanLoop); }, 200);
+  /* Check if library loaded */
+  if(typeof Html5Qrcode === 'undefined'){
+    alert('Error: libreria de camara no cargada. Verifica tu conexion a internet y recarga la pagina.');
     return;
   }
 
-  /* Need actual video frames */
-  if(video.readyState < 2 || video.videoWidth === 0){
-    setTimeout(function(){ requestAnimationFrame(scanLoop); }, 100);
-    return;
-  }
+  wrap.style.display = 'block';
+  stat.style.display = 'block';
+  stat.textContent   = 'Iniciando camara...';
+  btn.textContent    = 'Detener camara';
+  S.camActive = true;
 
-  try{
-    /* Reuse canvas across frames */
-    if(!S.scanCanvas || S.scanCanvas.width !== video.videoWidth){
-      S.scanCanvas = document.createElement('canvas');
-      S.scanCtx    = S.scanCanvas.getContext('2d',{willReadFrequently:true});
-      S.scanCanvas.width  = video.videoWidth;
-      S.scanCanvas.height = video.videoHeight;
-    }
-    S.scanCtx.drawImage(video, 0, 0);
-    var img  = S.scanCtx.getImageData(0, 0, S.scanCanvas.width, S.scanCanvas.height);
-    var code = jsQR(img.data, img.width, img.height, {inversionAttempts:'attemptBoth'});
+  html5QrScanner = new Html5Qrcode('qr-reader');
 
-    if(code && code.data && code.data.trim()){
-      var val = code.data.trim().toUpperCase();
+  var config = {
+    fps: 15,
+    qrbox: function(w,h){ var s=Math.min(w,h)*0.7; return {width:s,height:s}; },
+    aspectRatio: 1.0,
+    disableFlip: false,
+    experimentalFeatures: {useBarCodeDetectorIfSupported: true}
+  };
+
+  /* Try back camera first */
+  html5QrScanner.start(
+    {facingMode:'environment'},
+    config,
+    function(decodedText){
+      /* QR detected */
+      var val = decodedText.trim().toUpperCase();
       stopCam();
-      /* Visual flash */
       document.body.style.background = '#0d3b0d';
-      setTimeout(function(){ document.body.style.background = ''; }, 300);
+      setTimeout(function(){ document.body.style.background=''; }, 300);
       document.getElementById('qr-in').value = val;
-      document.getElementById('cam-status').textContent = 'QR leido: ' + val;
+      stat.textContent = 'QR leido: ' + val;
+      stat.style.display = 'block';
       regVisita();
-      return;
-    }
-  } catch(e){ /* keep scanning */ }
-
-  /* Scan at ~20 fps */
-  setTimeout(function(){ requestAnimationFrame(scanLoop); }, 50);
+    },
+    function(errorMsg){ /* scan error — keep scanning, ignore */ }
+  ).catch(function(err){
+    /* Back camera failed, try any camera */
+    html5QrScanner.start(
+      {facingMode:'user'},
+      config,
+      function(decodedText){
+        var val = decodedText.trim().toUpperCase();
+        stopCam();
+        document.getElementById('qr-in').value = val;
+        regVisita();
+      },
+      function(){}
+    ).catch(function(err2){
+      stopCam();
+      var msg = 'No se pudo acceder a la camara.';
+      if(err2 && err2.toString().includes('NotAllowed'))
+        msg = 'Permiso de camara denegado.\n\nAndroid (Chrome): menu > Configuracion > Permisos del sitio > Camara > Permitir\niPhone (Safari): Ajustes > Safari > Camara > Permitir';
+      alert(msg);
+    });
+  });
 }
+
+
+function scanLoop(){ /* handled by html5-qrcode */ }
 
 /* ══════════════════════ REGISTRAR VISITA ══════════════════════ */
 async function regVisita(){
