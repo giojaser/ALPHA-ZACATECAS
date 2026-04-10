@@ -1325,7 +1325,8 @@ async function delCita(id){
   } finally{
     setTimeout(function(){ S.writeLock=false; },3000);
   }
-}══════════════════════ ALUMNOS LIST ══════════════════════ */
+}
+/* ══════════════════════ ALUMNOS LIST ══════════════════════ */
 function renderAls(){
   const q=(document.getElementById('als-q').value||'').toLowerCase();
   const lst=document.getElementById('als-list');
