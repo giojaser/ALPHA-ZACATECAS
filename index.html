@@ -684,7 +684,8 @@ let S={
   rDiscs:[],rHors:[],rPlan:null,
   cDiscs:[],cHors:[],
   eDiscs:[],eHors:[],editFolio:null,
-  alumno:null,camActive:false,camStream:null,camAF:null
+  alumno:null,camActive:false,camStream:null,camAF:null,
+  scanCanvas:null,scanCtx:null,writeLock:false
 };
 // Cloud config
 let CFG={proveedor:'local',jbKey:'',jbBin:'',fbUrl:''};
@@ -1346,10 +1347,20 @@ function renderPagosHist(a){
   c.innerHTML=[...p].reverse().map(x=>`<div class="pago-row"><span>${x.fecha}</span><span style="color:var(--muted)">${x.plan||''}</span><span class="pago-monto">$${x.monto.toLocaleString('es-MX')}</span><span style="color:var(--muted);font-size:10px">${x.metodo||''}</span></div>`).join('');
 }
 async function marcarVisita(){
-  if(!S.alumno)return;
-  if(!S.alumno.visitas)S.alumno.visitas=[];
-  S.alumno.visitas.push(nowISO()); logEntry(S.alumno);
-  await saveDB(); renderVisGrid(S.alumno);
+  if(!S.alumno) return;
+  S.writeLock = true;
+  if(!S.alumno.visitas) S.alumno.visitas = [];
+  S.alumno.visitas.push(nowISO());
+  saveLocal();
+  logEntry(S.alumno);
+  renderVisGrid(S.alumno);
+  try{
+    await saveDB();
+  } catch(e){
+    setCloudStatus('err', 'Error al guardar visita: ' + e.message);
+  } finally{
+    setTimeout(function(){ S.writeLock = false; }, 2000);
+  }
 }
 function cerrarPerfil(){S.alumno=null;document.getElementById('pf-wrap').style.display='none';document.getElementById('als-list').style.display='';renderAls();}
 async function eliminar(){
@@ -1497,60 +1508,95 @@ function stopCam(){
 }
 function scanLoop(){
   if(!S.camActive) return;
-  const video = document.getElementById('cam-video');
+  var video = document.getElementById('cam-video');
 
-  /* Check if jsQR library loaded */
   if(typeof jsQR === 'undefined'){
-    S.camAF = setTimeout(function(){ requestAnimationFrame(scanLoop); }, 500);
+    S.camAF = setTimeout(function(){ requestAnimationFrame(scanLoop); }, 300);
     return;
   }
 
   if(video.readyState >= 2 && video.videoWidth > 0){
     try{
-      var canvas = document.createElement('canvas');
-      /* Use smaller resolution for faster scanning on mobile */
-      var scale  = Math.min(1, 640 / video.videoWidth);
-      canvas.width  = Math.floor(video.videoWidth  * scale);
-      canvas.height = Math.floor(video.videoHeight * scale);
-      var ctx = canvas.getContext('2d', {willReadFrequently:true});
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      /* Persistent canvas for performance */
+      if(!S.scanCanvas){
+        S.scanCanvas = document.createElement('canvas');
+        S.scanCtx    = S.scanCanvas.getContext('2d', {willReadFrequently:true});
+      }
+      /* Cap at 400px wide — enough to decode QR, much faster on mobile */
+      var scale = Math.min(1, 400 / video.videoWidth);
+      S.scanCanvas.width  = Math.floor(video.videoWidth  * scale);
+      S.scanCanvas.height = Math.floor(video.videoHeight * scale);
+      S.scanCtx.drawImage(video, 0, 0, S.scanCanvas.width, S.scanCanvas.height);
+      var imgData = S.scanCtx.getImageData(0, 0, S.scanCanvas.width, S.scanCanvas.height);
+
       var code = jsQR(imgData.data, imgData.width, imgData.height, {
         inversionAttempts: 'attemptBoth'
       });
-      if(code && code.data){
+
+      if(code && code.data && code.data.trim().length > 0){
         var val = code.data.trim().toUpperCase();
+        /* Flash screen green as feedback */
+        document.body.style.transition = 'background .1s';
+        document.body.style.background = '#1a3a1a';
+        setTimeout(function(){ document.body.style.background = ''; }, 200);
+
         stopCam();
+        S.scanCanvas = null;
         document.getElementById('qr-in').value = val;
-        /* Visual + sound feedback */
-        var stat = document.getElementById('cam-status');
-        if(stat){ stat.textContent = 'QR detectado: ' + val; stat.style.display='block'; }
+        /* Must be called as async properly */
         regVisita();
         return;
       }
-    } catch(e){}
+    } catch(e){ /* continue scanning */ }
   }
 
-  S.camAF = requestAnimationFrame(scanLoop);
+  /* ~15 fps — enough for QR, saves battery */
+  S.camAF = setTimeout(function(){ requestAnimationFrame(scanLoop); }, 66);
 }
 
 /* ══════════════════════ REGISTRAR VISITA ══════════════════════ */
 async function regVisita(){
-  const folio=(document.getElementById('qr-in').value||'').trim().toUpperCase();
-  if(!folio)return;
-  const res=document.getElementById('qr-result');
-  const a=DB.alumnos.find(x=>x.folio===folio);
+  var folio = (document.getElementById('qr-in').value || '').trim().toUpperCase();
+  if(!folio) return;
+  document.getElementById('qr-in').value = '';
+
+  var res = document.getElementById('qr-result');
+  var a = DB.alumnos.find(function(x){ return x.folio === folio; });
   if(!a){
-    res.innerHTML='<div class="alert err" style="display:block">❌ Folio <strong>'+folio+'</strong> no encontrado.</div>';
-    setTimeout(()=>res.innerHTML='',5000); return;
+    res.innerHTML = '<div class="alert err" style="display:block">Folio <strong>' + folio + '</strong> no encontrado.</div>';
+    setTimeout(function(){ res.innerHTML = ''; }, 5000);
+    return;
   }
-  if(!a.visitas) a.visitas=[];
-  a.visitas.push(nowISO()); await saveDB();
-  logEntry(a); renderLogHoy();
-  const v=getVisMes(a);
-  res.innerHTML=`<div class="alert ok" style="display:block;text-align:left"><div style="font-size:22px">✅</div><strong>${a.nombre} ${a.apellidos}</strong><div style="font-size:12px;color:#aaa;margin-top:2px">${(a.disciplinas||[]).join(', ')} · ${a.folio}</div><div style="margin-top:5px">Visita #<strong>${v}</strong> de este mes ✓</div></div>`;
-  document.getElementById('qr-in').value='';
-  setTimeout(()=>res.innerHTML='',7000);
+
+  /* Pause SSE listener during write to avoid race condition */
+  S.writeLock = true;
+  if(!a.visitas) a.visitas = [];
+  a.visitas.push(nowISO());
+  saveLocal();
+
+  /* Show confirmation immediately — don't wait for cloud */
+  var v = getVisMes(a);
+  res.innerHTML =
+    '<div class="alert ok" style="display:block;text-align:left">' +
+    '<div style="font-size:22px">&#x2705;</div>' +
+    '<strong>' + a.nombre + ' ' + a.apellidos + '</strong>' +
+    '<div style="font-size:12px;color:#aaa;margin-top:2px">' + (a.disciplinas||[]).join(', ') + ' &middot; ' + a.folio + '</div>' +
+    '<div style="margin-top:5px">Visita <strong>#' + v + '</strong> de este mes registrada</div>' +
+    '</div>';
+  setTimeout(function(){ res.innerHTML = ''; }, 7000);
+
+  logEntry(a);
+  renderLogHoy();
+
+  /* Now push to cloud */
+  try{
+    await saveDB();
+  } catch(e){
+    setCloudStatus('err', 'Error al guardar visita: ' + e.message);
+  } finally{
+    /* Release write lock after 2s so SSE can resume */
+    setTimeout(function(){ S.writeLock = false; }, 2000);
+  }
 }
 function logEntry(a){logHoy.push({nom:a.nombre+' '+a.apellidos,disc:(a.disciplinas||[]).join(', '),hora:new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})});renderLogHoy();}
 function renderLogHoy(){
@@ -1602,6 +1648,7 @@ function startFirebaseListener(){
 
     fbEventSource.addEventListener('put', function(e){
       try{
+        if(S.writeLock) return; /* local write in progress */
         var payload = JSON.parse(e.data);
         var data = payload.data;
         if(!data) return;
@@ -1622,6 +1669,7 @@ function startFirebaseListener(){
 
     fbEventSource.addEventListener('patch', function(e){
       try{
+        if(S.writeLock) return;
         var payload = JSON.parse(e.data);
         var data = payload.data;
         if(!data) return;
@@ -1671,9 +1719,13 @@ function stopFirebaseListener(){
 
 /* Refresh the currently visible page after remote update */
 function refreshActiveView(){
+  /* Don't refresh if we just wrote — prevents overwriting local changes */
+  if(S.writeLock) return;
+
   var activePage = document.querySelector('.page.on');
   if(!activePage) return;
   var id = activePage.id;
+
   if(id === 'p-als'){
     var pfWrap = document.getElementById('pf-wrap');
     if(pfWrap && pfWrap.style.display !== 'none' && S.alumno){
@@ -1686,6 +1738,8 @@ function refreshActiveView(){
     renderDash();
   } else if(id === 'p-cita'){
     renderCitas();
+  } else if(id === 'p-qr'){
+    renderLogHoy();
   }
 }
 
