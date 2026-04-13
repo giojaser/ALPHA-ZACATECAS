@@ -1494,22 +1494,52 @@ function enviarWA(){
 }
 
 /* ══════════════════════ CÁMARA QR ══════════════════════ */
-function toggleCam(){S.camActive?stopCam():startCam();}
-
 var html5QrScanner = null;
 
+function toggleCam(){
+  if(S.camActive){ stopCam(); } else { startCam(); }
+}
+
+function stopCam(){
+  S.camActive = false;
+  var wrap = document.getElementById('cam-wrap');
+  var btn  = document.getElementById('cam-btn');
+  var stat = document.getElementById('cam-status');
+  if(html5QrScanner){
+    try{
+      html5QrScanner.stop().then(function(){
+        try{ html5QrScanner.clear(); }catch(e){}
+        html5QrScanner = null;
+      }).catch(function(){
+        html5QrScanner = null;
+      });
+    }catch(e){ html5QrScanner = null; }
+  }
+  if(S.camStream){
+    try{ S.camStream.getTracks().forEach(function(t){ t.stop(); }); }catch(e){}
+    S.camStream = null;
+  }
+  if(wrap)  wrap.style.display  = 'none';
+  if(stat)  stat.style.display  = 'none';
+  if(btn)   btn.textContent     = 'Activar camara para escanear QR';
+}
+
 function startCam(){
-  var wrap   = document.getElementById('cam-wrap');
-  var btn    = document.getElementById('cam-btn');
-  var stat   = document.getElementById('cam-status');
+  var wrap = document.getElementById('cam-wrap');
+  var btn  = document.getElementById('cam-btn');
+  var stat = document.getElementById('cam-status');
 
   if(S.camActive){ stopCam(); return; }
 
-  /* Check if library loaded */
   if(typeof Html5Qrcode === 'undefined'){
-    alert('Error: libreria de camara no cargada. Verifica tu conexion a internet y recarga la pagina.');
+    alert('Libreria de camara no cargada. Verifica tu conexion y recarga la pagina.');
     return;
   }
+
+  /* Make sure qr-reader div is empty and visible */
+  var reader = document.getElementById('qr-reader');
+  if(!reader){ alert('Error: elemento qr-reader no encontrado.'); return; }
+  reader.innerHTML = '';
 
   wrap.style.display = 'block';
   stat.style.display = 'block';
@@ -1519,54 +1549,48 @@ function startCam(){
 
   html5QrScanner = new Html5Qrcode('qr-reader');
 
-  var config = {
+  var cfg = {
     fps: 15,
-    qrbox: function(w,h){ var s=Math.min(w,h)*0.7; return {width:s,height:s}; },
+    qrbox: function(w, h){ var s = Math.floor(Math.min(w,h) * 0.72); return {width:s, height:s}; },
     aspectRatio: 1.0,
     disableFlip: false,
-    experimentalFeatures: {useBarCodeDetectorIfSupported: true}
+    experimentalFeatures: { useBarCodeDetectorIfSupported: true }
   };
 
-  /* Try back camera first */
-  html5QrScanner.start(
-    {facingMode:'environment'},
-    config,
-    function(decodedText){
-      /* QR detected */
-      var val = decodedText.trim().toUpperCase();
-      stopCam();
-      document.body.style.background = '#0d3b0d';
-      setTimeout(function(){ document.body.style.background=''; }, 300);
-      document.getElementById('qr-in').value = val;
-      stat.textContent = 'QR leido: ' + val;
-      stat.style.display = 'block';
-      regVisita();
-    },
-    function(errorMsg){ /* scan error — keep scanning, ignore */ }
-  ).catch(function(err){
-    /* Back camera failed, try any camera */
-    html5QrScanner.start(
-      {facingMode:'user'},
-      config,
-      function(decodedText){
-        var val = decodedText.trim().toUpperCase();
-        stopCam();
-        document.getElementById('qr-in').value = val;
-        regVisita();
-      },
-      function(){}
-    ).catch(function(err2){
+  function onSuccess(decoded){
+    var val = decoded.trim().toUpperCase();
+    stopCam();
+    document.body.style.background = '#0d3b0d';
+    setTimeout(function(){ document.body.style.background = ''; }, 350);
+    document.getElementById('qr-in').value = val;
+    if(stat){ stat.textContent = 'QR leido: ' + val; stat.style.display = 'block'; }
+    regVisita();
+  }
+  function onError(){ /* keep scanning */ }
+
+  /* Try rear camera first, then front */
+  html5QrScanner.start({facingMode:'environment'}, cfg, onSuccess, onError)
+  .catch(function(){
+    html5QrScanner.start({facingMode:'user'}, cfg, onSuccess, onError)
+    .catch(function(err){
       stopCam();
       var msg = 'No se pudo acceder a la camara.';
-      if(err2 && err2.toString().includes('NotAllowed'))
-        msg = 'Permiso de camara denegado.\n\nAndroid (Chrome): menu > Configuracion > Permisos del sitio > Camara > Permitir\niPhone (Safari): Ajustes > Safari > Camara > Permitir';
+      var es = err ? err.toString() : '';
+      if(es.indexOf('NotAllowed') >= 0 || es.indexOf('Permission') >= 0){
+        msg = 'PERMISO DENEGADO\n\n' +
+              'Android (Chrome):\nMenu > Configuracion > Permisos del sitio > Camara > Permitir\n\n' +
+              'iPhone (Safari):\nAjustes > Safari > Camara > Permitir';
+      } else if(es.indexOf('NotFound') >= 0){
+        msg = 'No se encontro camara en este dispositivo.';
+      } else {
+        msg = 'Error de camara: ' + es;
+      }
       alert(msg);
     });
   });
 }
 
-
-function scanLoop(){ /* handled by html5-qrcode */ }
+function scanLoop(){ /* not used — html5-qrcode handles scanning internally */ }
 
 /* ══════════════════════ REGISTRAR VISITA ══════════════════════ */
 async function regVisita(){
