@@ -6,7 +6,7 @@
 <title>Alpha — Centro de Desarrollo Artístico y Cultural</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -658,7 +658,7 @@ const DISCS = {
   'Yoga':{precio:500,hors:[{g:'Martes y Jueves',h:['10:15–11:15 am']},{g:'Lunes y Miércoles',h:['9:00–10:00 pm']}]},
   'Twerk':{precio:500,hors:[{g:'Martes y Jueves',h:['5:30–6:30 pm']},{g:'Intensivo – Domingos',h:['5:00–7:00 pm'],it:1}]},
   'Jumping y Baile':{precio:500,hors:[{g:'Lun–Vie (Baile)',h:['8:00–9:00 am']},{g:'Lun–Jue (Jumping)',h:['9:10–10:10 am']},{g:'Sábados',h:['8:00–9:00 am']}]},
-  'Ritmos Latinos':{precio:400,precio2:500,nota2:'Precio sujeto a confirmar',hors:[{g:'Salsa/Bachata Lun/Mié/Vie',h:['7:00–8:00 pm']},{g:'Regional Mar/Jue',h:['8:30–10:00 pm']},{g:'Int. Bachata Sáb',h:['3:00–5:00 pm'],it:1}]},
+  'Ritmos Latinos':{precio:400,hors:[{g:'Salsa/Bachata Lun/Mié/Vie',h:['7:00–8:00 pm']},{g:'Regional Mar/Jue',h:['8:30–10:00 pm']},{g:'Int. Bachata Sáb',h:['3:00–5:00 pm'],it:1}]},
   'Defensa Personal':{precio:500,hors:[{g:'Sábados',h:['9:00–11:00 am']}]},
   'Música/Vocalización':{precio:700,hors:[{g:'Lun/Mié/Jue',h:['6:00–7:00 pm']},{g:'Mar/Jue',h:['5:30–6:30 pm','6:30–7:30 pm']},{g:'Intensivo Viernes',h:['4:00–7:00 pm'],it:1}]},
   'Master Class Heels':{precio:300,hors:[{g:'Sáb 11 Abril',h:['6:00 pm']}]}
@@ -1043,6 +1043,9 @@ function showAlert(id,msg,t,ms=5500){
   clearTimeout(el._t);el._t=setTimeout(()=>el.style.display='none',ms);
 }
 async function saveDB(){
+  /* Increment version on every save so other devices can detect stale data */
+  DB._v = (DB._v || 0) + 1;
+  DB._ts = Date.now();
   saveLocal();
   if(CFG.proveedor === 'jsonbin' && CFG.jbKey && CFG.jbBin){
     setCloudStatus('sync','Guardando...');
@@ -1054,7 +1057,6 @@ async function saveDB(){
     }
   } else if(CFG.proveedor === 'firebase' && CFG.fbUrl){
     try{
-      /* PUT full DB to Firebase */
       var r = await fetch(CFG.fbUrl + '/alpha.json', {
         method: 'PUT',
         headers: {'Content-Type':'application/json'},
@@ -1309,7 +1311,7 @@ async function confCita(id){
   try{
     await saveDB();
   } finally{
-    setTimeout(function(){ S.writeLock=false; },3000);
+    setTimeout(function(){ S.writeLock=false; },5000);
   }
   renderCitas();
 }
@@ -1323,7 +1325,7 @@ async function delCita(id){
   try{
     await saveDB();
   } finally{
-    setTimeout(function(){ S.writeLock=false; },3000);
+    setTimeout(function(){ S.writeLock=false; },5000);
   }
 }
 /* ══════════════════════ ALUMNOS LIST ══════════════════════ */
@@ -1686,14 +1688,18 @@ function startFirebaseListener(){
 
     fbEventSource.addEventListener('put', function(e){
       try{
-        if(S.writeLock) return; /* local write in progress */
         var payload = JSON.parse(e.data);
         var data = payload.data;
         if(!data) return;
-        /* path "/" means full DB update */
+        /* Version check: ignore if our local data is newer */
+        var incomingV = data._v || 0;
+        var localV    = DB._v  || 0;
+        if(S.writeLock && incomingV <= localV) return;
+        /* Apply update */
         if(payload.path === '/'){
           if(data.alumnos !== undefined) DB.alumnos = data.alumnos || [];
           if(data.citas   !== undefined) DB.citas   = data.citas   || [];
+          if(data._v      !== undefined) DB._v      = data._v;
         } else if(payload.path === '/alumnos'){
           DB.alumnos = data || [];
         } else if(payload.path === '/citas'){
@@ -1701,7 +1707,7 @@ function startFirebaseListener(){
         }
         saveLocal();
         refreshActiveView();
-        setCloudStatus('ok', 'Actualizado ' + new Date().toLocaleTimeString('es-MX'));
+        setCloudStatus('ok','Actualizado ' + new Date().toLocaleTimeString('es-MX'));
       } catch(err){}
     });
 
@@ -1713,9 +1719,10 @@ function startFirebaseListener(){
         if(!data) return;
         if(data.alumnos !== undefined) DB.alumnos = data.alumnos || [];
         if(data.citas   !== undefined) DB.citas   = data.citas   || [];
+        if(data._v      !== undefined) DB._v      = data._v;
         saveLocal();
         refreshActiveView();
-        setCloudStatus('ok', 'Actualizado ' + new Date().toLocaleTimeString('es-MX'));
+        setCloudStatus('ok','Actualizado ' + new Date().toLocaleTimeString('es-MX'));
       } catch(err){}
     });
 
