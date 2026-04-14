@@ -646,7 +646,7 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
 
 <script>
 /* ══════════════════════ DATOS DE DISCIPLINAS ══════════════════════ */
-const DISCS_KEYS = ['Pole Sport','Pole Exotic','Pole Espiral',"Pole Kid's",'Danza Aérea Telas','Elementos Aéreos','Enlogación/Flex','Yoga','Twerk','Jumping y Baile','Ritmos Latinos','Defensa Personal','Música/Vocalización','Master Class Heels'];
+const DISCS_KEYS = ['Pole Sport','Pole Exotic','Pole Espiral',"Pole Kid's",'Danza Aérea Telas','Elementos Aéreos','Enlogación/Flex','Yoga','Twerk','Jumping y Baile','Ritmos Latinos','Defensa Personal','Música/Vocalización','Heels','Otra disciplina'];
 const DISCS = {
   'Pole Sport':{precio:500,hors:[{g:'Lunes y Miércoles',h:['6:00–7:00 pm','7:00–8:00 pm']},{g:'Martes y Jueves',h:['6:00–7:00 am','7:00–8:00 am','5:00–6:00 pm','6:00–7:00 pm','7:00–8:00 pm']},{g:'Intensivo – Sábado',h:['2:00–4:00 pm'],it:1},{g:'Domingos',h:['2:00–4:00 pm']}]},
   'Pole Exotic':{precio:500,hors:[{g:'Lunes y Miércoles',h:['8:00–9:00 pm']},{g:'Intensivo – Sábado',h:['12:00–2:00 pm'],it:1}]},
@@ -661,7 +661,8 @@ const DISCS = {
   'Ritmos Latinos':{precio:400,hors:[{g:'Salsa/Bachata Lun/Mié/Vie',h:['7:00–8:00 pm']},{g:'Regional Mar/Jue',h:['8:30–10:00 pm']},{g:'Int. Bachata Sáb',h:['3:00–5:00 pm'],it:1}]},
   'Defensa Personal':{precio:500,hors:[{g:'Sábados',h:['9:00–11:00 am']}]},
   'Música/Vocalización':{precio:700,hors:[{g:'Lun/Mié/Jue',h:['6:00–7:00 pm']},{g:'Mar/Jue',h:['5:30–6:30 pm','6:30–7:30 pm']},{g:'Intensivo Viernes',h:['4:00–7:00 pm'],it:1}]},
-  'Master Class Heels':{precio:300,hors:[{g:'Sáb 11 Abril',h:['6:00 pm']}]}
+  'Heels':{precio:300,hors:[{g:'Sábados / Eventos',h:['Ver horario']}]},
+  'Otra disciplina':{precio:0,libre:1,hors:[]}
 };
 const PLANES=[
   {id:'P1',n:'Paquete #1',t:'1 mes',d:'1 disciplina · 2 clases/sem · 8 hrs',p:500,tipo:'paq'},
@@ -679,7 +680,7 @@ const PLANES=[
 ];
 
 /* ══════════════════════ ESTADO GLOBAL ══════════════════════ */
-let DB={alumnos:[],citas:[]};
+let DB={alumnos:[],citas:[],visLog:[]};
 let logHoy=[];
 let S={
   modo:'nuevo',tipoPlan:'paq',
@@ -694,7 +695,7 @@ let CFG={proveedor:'local',jbKey:'',jbBin:'',fbUrl:''};
 
 function saveLocal(){localStorage.setItem('alpha_v3',JSON.stringify({DB,CFG}))}
 function loadLocal(){
-  try{const d=JSON.parse(localStorage.getItem('alpha_v3')||'{}');if(d.DB)DB=d.DB;if(d.CFG)CFG=d.CFG;}catch(e){}
+  try{const d=JSON.parse(localStorage.getItem('alpha_v3')||'{}');if(d.DB){DB=d.DB;if(!DB.visLog)DB.visLog=[];}if(d.CFG)CFG=d.CFG;}catch(e){}
 }
 loadLocal();
 updateCloudUI();
@@ -882,6 +883,8 @@ async function pullJSONBin(){
   if(rec && typeof rec === 'object' && (rec.alumnos !== undefined || rec.citas !== undefined)){
     DB.alumnos = rec.alumnos || [];
     DB.citas   = rec.citas   || [];
+    DB.visLog  = rec.visLog  || [];
+    if(rec._v) DB._v = rec._v;
   }
   saveLocal();
 }
@@ -931,7 +934,7 @@ async function conectarFirebase(){
     var r = await fetch(CFG.fbUrl + '/alpha.json');
     if(!r.ok) throw new Error('Firebase GET ' + r.status);
     var d = await r.json();
-    if(d && d.alumnos){ DB.alumnos = d.alumnos||[]; DB.citas = d.citas||[]; }
+    if(d && d.alumnos){ DB.alumnos = d.alumnos||[]; DB.citas = d.citas||[]; DB.visLog = d.visLog||[]; if(d._v) DB._v=d._v; }
     if(!DB.alumnos) DB.alumnos = [];
     if(!DB.citas)   DB.citas   = [];
     saveLocal(); updateCloudUI();
@@ -1085,14 +1088,36 @@ function goPage(id,btn){
 
 /* ══════════════════════ DISC GRID ══════════════════════ */
 function buildDiscGrid(containerId, selArr, onToggle){
-  const g=document.getElementById(containerId); if(!g) return;
-  g.innerHTML=DISCS_KEYS.map((d,i)=>
-    `<button class="disc-btn${selArr.includes(d)?' on':''}" data-i="${i}" data-cid="${containerId}">${d}</button>`
-  ).join('');
-  g.querySelectorAll('.disc-btn').forEach(btn=>{
-    btn.addEventListener('click',function(){
-      const disc=DISCS_KEYS[parseInt(this.dataset.i)];
-      onToggle(this,disc,containerId);
+  var g = document.getElementById(containerId); if(!g) return;
+  g.innerHTML = DISCS_KEYS.map(function(d,i){
+    var isOtra = d === 'Otra disciplina';
+    return '<button class="disc-btn' + (selArr.includes(d)?' on':'') + '" data-i="' + i + '" data-cid="' + containerId + '">' + d + '</button>';
+  }).join('');
+  g.querySelectorAll('.disc-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var disc = DISCS_KEYS[parseInt(this.dataset.i)];
+      onToggle(this, disc, containerId);
+      /* Show free-price input for "Otra disciplina" */
+      var extraId = containerId + '-otra-extra';
+      var existing = document.getElementById(extraId);
+      if(disc === 'Otra disciplina'){
+        if(this.classList.contains('on')){
+          if(!existing){
+            var div = document.createElement('div');
+            div.id = extraId;
+            div.style.cssText = 'display:flex;gap:8px;margin-top:8px;grid-column:1/-1';
+            div.innerHTML =
+              '<input type="text" id="' + containerId + '-otra-nombre" placeholder="Nombre de la disciplina (opcional)" ' +
+              'style="flex:1;background:var(--bg3);border:1px solid var(--rosa);border-radius:var(--r2);padding:8px 11px;color:var(--blanco);font-size:13px;outline:none">' +
+              '<input type="number" id="' + containerId + '-otra-precio" placeholder="$ Precio" min="0" ' +
+              'style="width:110px;background:var(--bg3);border:1px solid var(--rosa);border-radius:var(--r2);padding:8px 11px;color:var(--rosa);font-size:14px;font-weight:700;outline:none" ' +
+              'oninput="var m=document.getElementById(\'r-monto\');if(m)m.value=this.value">';
+            g.parentNode.insertBefore(div, g.nextSibling);
+          }
+        } else {
+          if(existing) existing.remove();
+        }
+      }
     });
   });
 }
@@ -1638,11 +1663,37 @@ async function regVisita(){
     setTimeout(function(){ S.writeLock = false; }, 2000);
   }
 }
-function logEntry(a){logHoy.push({nom:a.nombre+' '+a.apellidos,disc:(a.disciplinas||[]).join(', '),hora:new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})});renderLogHoy();}
+function logEntry(a){
+  if(!DB.visLog) DB.visLog = [];
+  var entry = {
+    folio: a.folio,
+    nom:   a.nombre + ' ' + a.apellidos,
+    disc:  (a.disciplinas||[]).join(', '),
+    hora:  new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}),
+    fecha: new Date().toISOString().split('T')[0],
+    ts:    Date.now()
+  };
+  DB.visLog.push(entry);
+  /* Keep only last 500 entries to avoid bloat */
+  if(DB.visLog.length > 500) DB.visLog = DB.visLog.slice(-500);
+  renderLogHoy();
+}
 function renderLogHoy(){
-  const c=document.getElementById('log-hoy');
-  if(!logHoy.length){c.innerHTML='<p style="font-size:12px;color:var(--muted)">Ninguna entrada aún.</p>';return;}
-  c.innerHTML=[...logHoy].reverse().map(v=>`<div style="display:flex;align-items:center;gap:9px;padding:7px 10px;background:var(--bg3);border-radius:8px;margin-bottom:5px;font-size:12px"><div style="width:7px;height:7px;background:var(--rosa);border-radius:50%;flex-shrink:0"></div><div style="flex:1"><strong>${v.nom}</strong> <span style="color:var(--muted)">· ${v.disc}</span></div><div style="color:var(--muted)">${v.hora}</div></div>`).join('');
+  var c = document.getElementById('log-hoy');
+  if(!c) return;
+  var today = new Date().toISOString().split('T')[0];
+  var todayLog = (DB.visLog||[]).filter(function(v){ return v.fecha === today; });
+  if(!todayLog.length){
+    c.innerHTML = '<p style="font-size:12px;color:var(--muted)">Ninguna entrada hoy.</p>';
+    return;
+  }
+  c.innerHTML = [...todayLog].reverse().map(function(v){
+    return '<div style="display:flex;align-items:center;gap:9px;padding:8px 11px;background:var(--bg3);border-radius:8px;margin-bottom:5px;font-size:12px">' +
+      '<div style="width:8px;height:8px;background:var(--rosa);border-radius:50%;flex-shrink:0"></div>' +
+      '<div style="flex:1"><strong>' + v.nom + '</strong> <span style="color:var(--muted)">· ' + v.disc + '</span></div>' +
+      '<div style="color:var(--muted);font-size:11px">' + v.hora + '</div>' +
+      '</div>';
+  }).join('');
 }
 
 /* ══════════════════════ DASHBOARD ══════════════════════ */
@@ -1653,7 +1704,9 @@ function renderDash(){
   document.getElementById('d-act').textContent=act;
   const ing=(DB.alumnos||[]).reduce((s,a)=>(a.pagos||[]).filter(p=>mesStr(p.fecha)===hoy).reduce((ss,p)=>ss+p.monto,s),0);
   document.getElementById('d-ing').textContent='$'+ing.toLocaleString('es-MX');
-  document.getElementById('d-vis').textContent=logHoy.length;
+  var todayDate = new Date().toISOString().split('T')[0];
+  var visHoy = (DB.visLog||[]).filter(function(v){ return v.fecha===todayDate; });
+  document.getElementById('d-vis').textContent = visHoy.length;
   const pd={};(DB.alumnos||[]).forEach(a=>(a.disciplinas||[]).forEach(d=>{pd[d]=(pd[d]||0)+1;}));
   document.getElementById('d-discs').innerHTML=Object.entries(pd).sort((a,b)=>b[1]-a[1]).map(([d,n])=>`<div style="display:flex;align-items:center;gap:9px;margin-bottom:6px"><span style="font-size:12px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d}</span><div style="flex:1.5;height:4px;background:var(--bg3);border-radius:3px;overflow:hidden"><div style="width:${Math.min(100,Math.round(n/Math.max(1,DB.alumnos.length)*100))}%;height:100%;background:var(--rosa);border-radius:3px"></div></div><span style="font-size:11px;color:var(--muted);width:16px;text-align:right">${n}</span></div>`).join('')||'<p style="font-size:12px;color:var(--muted)">Sin datos.</p>';
   document.getElementById('d-ults').innerHTML=[...(DB.alumnos||[])].slice(-5).reverse().map(a=>`<div class="arow" data-f="${a.folio}" style="cursor:default"><div style="flex:1;min-width:0"><div class="arow-name">${a.nombre} ${a.apellidos}</div><div class="arow-disc">${(a.disciplinas||[]).join(', ')}</div></div><div style="text-align:right;flex-shrink:0"><div class="arow-folio">${a.folio}</div><div class="arow-vis">${a.fechaAlta}</div></div></div>`).join('')||'<p style="font-size:12px;color:var(--muted)">Sin registros.</p>';
@@ -1699,6 +1752,7 @@ function startFirebaseListener(){
         if(payload.path === '/'){
           if(data.alumnos !== undefined) DB.alumnos = data.alumnos || [];
           if(data.citas   !== undefined) DB.citas   = data.citas   || [];
+          if(data.visLog  !== undefined) DB.visLog  = data.visLog  || [];
           if(data._v      !== undefined) DB._v      = data._v;
         } else if(payload.path === '/alumnos'){
           DB.alumnos = data || [];
@@ -1719,6 +1773,7 @@ function startFirebaseListener(){
         if(!data) return;
         if(data.alumnos !== undefined) DB.alumnos = data.alumnos || [];
         if(data.citas   !== undefined) DB.citas   = data.citas   || [];
+        if(data.visLog  !== undefined) DB.visLog  = data.visLog  || [];
         if(data._v      !== undefined) DB._v      = data._v;
         saveLocal();
         refreshActiveView();
