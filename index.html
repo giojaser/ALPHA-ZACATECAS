@@ -419,9 +419,9 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
         <div><div class="ig-lbl">Último pago</div><div class="ig-val" id="pf-monto">—</div></div>
         <div><div class="ig-lbl">Alta</div><div class="ig-val" id="pf-alta">—</div></div>
       </div>
-      <div class="vis-title">Visitas del mes</div>
+      <div class="vis-title">Visitas del mes por disciplina</div>
       <div class="vis-grid" id="pf-vis"></div>
-      <div class="vis-count">Este mes: <span id="pf-cnt">0</span> visitas</div>
+      <div class="vis-count">Total este mes: <span id="pf-cnt">0</span> visitas</div>
       <div class="prog"><div class="prog-f" id="pf-prog" style="width:0%"></div></div>
       <div class="ct" style="margin-bottom:.4rem">Historial de pagos</div>
       <div id="pf-pagos"></div>
@@ -702,7 +702,7 @@ let S={
   cDiscs:[],cHors:[],
   eDiscs:[],eHors:[],editFolio:null,
   alumno:null,camActive:false,camStream:null,camAF:null,
-  scanCanvas:null,scanCtx:null,writeLock:false
+  scanCanvas:null,scanCtx:null,writeLock:false,saving:false
 };
 // Cloud config
 let CFG={proveedor:'local',jbKey:'',jbBin:'',fbUrl:''};
@@ -1272,31 +1272,76 @@ function cargarExist(f){
 
 /* ══════════════════════ GUARDAR ══════════════════════ */
 async function guardar(){
-  const nom=document.getElementById('r-nom').value.trim();
-  const ap=document.getElementById('r-ap').value.trim();
-  const tel=document.getElementById('r-tel').value.trim();
-  if(!nom||!ap||!tel){showAlert('al-reg','Completa nombre, apellidos y teléfono.','err');return;}
-  const pl=PLANES.find(p=>p.id===S.rPlan);
-  const fpago=document.getElementById('r-fpago').value||today();
-  const monto=parseFloat(document.getElementById('r-monto').value)||(pl?pl.p:0);
-  const pago={fecha:fpago,plan:pl?pl.n:'Clase suelta',monto,metodo:document.getElementById('r-met').value,ref:document.getElementById('r-ref').value};
-  if(editExist){
-    Object.assign(editExist,{nombre:nom,apellidos:ap,tel,email:document.getElementById('r-email').value});
-    if(S.rDiscs.length) editExist.disciplinas=S.rDiscs;
-    if(S.rHors.length) editExist.horarios=S.rHors;
-    if(S.rPlan) editExist.planActual=pl?pl.n:editExist.planActual;
-    editExist.pagos.push(pago);
-    await saveDB();
-    showAlert('al-reg','✓ Pago actualizado · '+nom+' '+ap+' · '+editExist.folio,'ok');
-    abrirQRDatos(editExist); return;
+  /* Prevent double-submit */
+  if(S.saving){ return; }
+  S.saving = true;
+  try{
+    const nom=document.getElementById('r-nom').value.trim();
+    const ap=document.getElementById('r-ap').value.trim();
+    const tel=document.getElementById('r-tel').value.trim();
+    if(!nom||!ap||!tel){
+      showAlert('al-reg','Completa nombre, apellidos y teléfono.','err');
+      return;
+    }
+    const pl=PLANES.find(p=>p.id===S.rPlan);
+    const fpago=document.getElementById('r-fpago').value||today();
+    const monto=parseFloat(document.getElementById('r-monto').value)||(pl?pl.p:0);
+    const pago={fecha:fpago,plan:pl?pl.n:'Clase suelta',monto,
+      metodo:document.getElementById('r-met').value,
+      ref:document.getElementById('r-ref').value};
+
+    if(editExist){
+      /* Update existing alumno */
+      Object.assign(editExist,{nombre:nom,apellidos:ap,tel,
+        email:document.getElementById('r-email').value});
+      if(S.rDiscs.length) editExist.disciplinas=S.rDiscs;
+      if(S.rHors.length)  editExist.horarios=S.rHors;
+      if(S.rPlan) editExist.planActual=pl?pl.n:editExist.planActual;
+      editExist.pagos.push(pago);
+      S.writeLock=true;
+      saveLocal();
+      await saveDB();
+      setTimeout(function(){S.writeLock=false;},2000);
+      showAlert('al-reg','✓ Pago actualizado · '+nom+' '+ap+' · '+editExist.folio,'ok');
+      abrirQRDatos(editExist);
+      return;
+    }
+
+    /* New alumno — generate folio and check for accidental duplicates */
+    var newFolio = mkFolio();
+    /* Safety: ensure folio is unique */
+    while(DB.alumnos.find(function(x){return x.folio===newFolio;})){
+      newFolio = mkFolio();
+    }
+
+    const a={
+      folio:newFolio, nombre:nom, apellidos:ap, tel,
+      email:document.getElementById('r-email').value,
+      fnac:document.getElementById('r-fnac').value,
+      emergencia:document.getElementById('r-emer').value,
+      disciplinas:[...S.rDiscs],
+      horarios:[...S.rHors],
+      planActual:pl?pl.n:'Clase suelta',
+      notas:document.getElementById('r-notas').value,
+      fechaAlta:fpago, estado:'Activo',
+      pagos:[pago], visitas:[]
+    };
+
+    S.writeLock=true;
+    DB.alumnos.push(a);
+    saveLocal();
+    limpiarForm(); /* Clear form immediately so user can't re-submit */
+    try{
+      await saveDB();
+    } finally{
+      setTimeout(function(){S.writeLock=false;},2000);
+    }
+    showAlert('al-reg','✓ Registro guardado · Folio: '+a.folio,'ok');
+    abrirQRDatos(a);
+
+  } finally{
+    S.saving = false;
   }
-  const a={folio:mkFolio(),nombre:nom,apellidos:ap,tel,email:document.getElementById('r-email').value,fnac:document.getElementById('r-fnac').value,emergencia:document.getElementById('r-emer').value,disciplinas:[...S.rDiscs],horarios:[...S.rHors],planActual:pl?pl.n:'Clase suelta',notas:document.getElementById('r-notas').value,fechaAlta:fpago,estado:'Activo',pagos:[pago],visitas:[]};
-  S.writeLock = true;
-  DB.alumnos.push(a);
-  saveLocal();
-  try{ await saveDB(); } finally{ setTimeout(function(){ S.writeLock=false; },2000); }
-  showAlert('al-reg','✓ Registro guardado · Folio: '+a.folio,'ok');
-  abrirQRDatos(a); limpiarForm();
 }
 function limpiarForm(){
   ['r-nom','r-ap','r-tel','r-email','r-fnac','r-emer','r-notas','r-ref','r-monto'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
@@ -1379,7 +1424,7 @@ function renderAls(){
   if(!arr.length){lst.innerHTML='<div class="card" style="text-align:center;color:var(--muted);font-size:13px">Sin alumnos registrados aún.</div>';return;}
   const hoy=mesCur();
   lst.innerHTML=arr.map(a=>{const v=(a.visitas||[]).filter(x=>mesStr(x)===hoy).length;return `<div class="arow" data-f="${a.folio}"><div style="flex:1;min-width:0"><div class="arow-name">${a.nombre} ${a.apellidos}</div><div class="arow-disc">${(a.disciplinas||[]).join(', ')}</div></div><div style="text-align:right;flex-shrink:0"><div class="arow-folio">${a.folio}</div><div class="arow-vis">${v} vis.</div></div></div>`;}).join('');
-  lst.querySelectorAll('.arow').forEach(el=>el.addEventListener('click',function(){verPerfil(this.dataset.f);}));
+  lst.querySelectorAll('.arow').forEach(function(el){ el.onclick=function(){verPerfil(this.dataset.f);}; });
 }
 
 /* ══════════════════════ PERFIL ══════════════════════ */
@@ -1405,27 +1450,110 @@ function verPerfil(f){
   window.scrollTo(0,0);
 }
 function renderVisGrid(a){
-  const g=document.getElementById('pf-vis'); const hoy=mesCur();
-  const vis=(a.visitas||[]).filter(v=>mesStr(v)===hoy);
-  const total=20;
-  g.innerHTML=Array.from({length:total},(_,i)=>{
-    const done=i<vis.length;
-    const fecha=done?new Date(vis[i]).toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit'}):'';
-    return `<div class="vbox${done?' done':''}" title="${fecha}" data-i="${i}"><span>${i+1}</span>${done?`<span class="vdate">${fecha}</span>`:''}</div>`;
-  }).join('');
-  g.querySelectorAll('.vbox').forEach(el=>{
-    el.addEventListener('click',async function(){
-      const i=parseInt(this.dataset.i); const hoy=mesCur();
-      const vis=(S.alumno.visitas||[]).filter(v=>mesStr(v)===hoy);
-      if(i<vis.length){let cnt=0;S.alumno.visitas=S.alumno.visitas.filter(v=>mesStr(v)!==hoy||(cnt++!==i));}
-      else if(i===vis.length){if(!S.alumno.visitas)S.alumno.visitas=[];S.alumno.visitas.push(nowISO());logEntry(S.alumno);}
-      await saveDB(); renderVisGrid(S.alumno);
-      document.getElementById('pf-cnt').textContent=getVisMes(S.alumno);
-      document.getElementById('pf-prog').style.width=Math.min(100,Math.round(getVisMes(S.alumno)/total*100))+'%';
-    });
+  var g    = document.getElementById('pf-vis');
+  var cnt  = document.getElementById('pf-cnt');
+  var prog = document.getElementById('pf-prog');
+  if(!g) return;
+
+  var hoy      = mesCur();
+  /* Use visLog (has discipline info) — filter by folio + current month */
+  var visLog   = (DB.visLog||[]).filter(function(v){
+    var vMes = v.fecha ? mesStr(v.fecha + 'T00:00:00') : mesStr(v.ts ? new Date(v.ts).toISOString() : '');
+    return v.folio === a.folio && vMes === hoy;
   });
-  document.getElementById('pf-cnt').textContent=vis.length;
-  document.getElementById('pf-prog').style.width=Math.min(100,Math.round(vis.length/total*100))+'%';
+
+  /* Also count plain visitas for backwards compat */
+  var visRaw   = (a.visitas||[]).filter(function(v){ return mesStr(typeof v==='string'?v:(v.ts||'')) === hoy; });
+  var totalVis = Math.max(visLog.length, visRaw.length);
+
+  /* Group visLog by discipline */
+  var byDisc = {};
+  visLog.forEach(function(v){
+    var d = v.disc || '—';
+    if(!byDisc[d]) byDisc[d] = [];
+    byDisc[d].push(v);
+  });
+
+  var discs = Object.keys(byDisc);
+
+  /* If no visLog data yet, show legacy flat grid */
+  if(!visLog.length && visRaw.length){
+    /* Legacy: plain timestamps */
+    var total = 20;
+    g.innerHTML = Array.from({length:total}, function(_,i){
+      var done  = i < visRaw.length;
+      var fecha = done ? new Date(typeof visRaw[i]==='string'?visRaw[i]:(visRaw[i].ts||'')).toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit'}) : '';
+      return '<div class="vbox' + (done?' done':'') + '" title="' + fecha + '" data-i="' + i + '">' +
+        '<span>' + (i+1) + '</span>' + (done ? '<span class="vdate">' + fecha + '</span>' : '') + '</div>';
+    }).join('');
+    attachVboxListeners(a);
+    if(cnt)  cnt.textContent  = visRaw.length;
+    if(prog) prog.style.width = Math.min(100, Math.round(visRaw.length/total*100)) + '%';
+    return;
+  }
+
+  /* No visits yet */
+  if(!visLog.length){
+    g.innerHTML = '<p style="font-size:12px;color:var(--muted);padding:.5rem 0">Sin visitas este mes.</p>';
+    if(cnt)  cnt.textContent  = '0';
+    if(prog) prog.style.width = '0%';
+    return;
+  }
+
+  /* Build grouped view by discipline */
+  var html = '';
+  discs.forEach(function(disc){
+    var entries = byDisc[disc];
+    html += '<div style="margin-bottom:1rem">';
+    /* Discipline label */
+    html += '<div style="font-size:10px;font-weight:700;color:var(--rosa);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">' +
+      disc + ' <span style="color:var(--muted);font-weight:400">(' + entries.length + ' visita' + (entries.length!==1?'s':'') + ')</span></div>';
+    /* Visit boxes */
+    html += '<div style="display:flex;flex-wrap:wrap;gap:5px">';
+    entries.forEach(function(v, i){
+      var fecha = v.hora || (v.fecha||'').substring(5);
+      html += '<div class="vbox done" title="' + (v.fecha||'') + ' ' + (v.hora||'') + '" style="width:38px;height:38px">' +
+        '<span>' + (i+1) + '</span>' +
+        '<span class="vdate">' + fecha + '</span>' +
+        '</div>';
+    });
+    html += '</div></div>';
+  });
+
+  g.innerHTML = html;
+
+  if(cnt)  cnt.textContent  = totalVis;
+  if(prog) prog.style.width = Math.min(100, Math.round(totalVis/20*100)) + '%';
+}
+
+function attachVboxListeners(a){
+  var g = document.getElementById('pf-vis');
+  if(!g) return;
+  g.querySelectorAll('.vbox').forEach(function(el){
+    el.onclick = async function(){
+      var i   = parseInt(this.dataset.i);
+      var hoy = mesCur();
+      var vis = (S.alumno.visitas||[]).filter(function(v){ return mesStr(typeof v==='string'?v:(v.ts||''))===hoy; });
+      if(i < vis.length){
+        /* Remove this visit */
+        var cnt2 = 0;
+        S.alumno.visitas = S.alumno.visitas.filter(function(v){
+          if(mesStr(typeof v==='string'?v:(v.ts||''))!==hoy) return true;
+          return cnt2++ !== i;
+        });
+      } else if(i === vis.length){
+        if(!S.alumno.visitas) S.alumno.visitas = [];
+        S.alumno.visitas.push(nowISO());
+        logEntry(S.alumno);
+      }
+      S.writeLock = true;
+      saveLocal();
+      try{ await saveDB(); } finally{ setTimeout(function(){S.writeLock=false;},2000); }
+      renderVisGrid(S.alumno);
+      document.getElementById('pf-cnt').textContent = getVisMes(S.alumno);
+      document.getElementById('pf-prog').style.width = Math.min(100,Math.round(getVisMes(S.alumno)/20*100))+'%';
+    };
+  });
 }
 function getVisMes(a){return(a.visitas||[]).filter(v=>mesStr(v)===mesCur()).length;}
 function renderPagosHist(a){
