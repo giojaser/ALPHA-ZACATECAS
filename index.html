@@ -455,6 +455,20 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
     <div id="cam-status" style="font-size:12px;color:var(--muted);margin-top:.4rem;display:none"></div>
   </div>
   <div id="qr-result"></div>
+
+  <!-- Discipline picker shown when alumno has multiple disciplines -->
+  <div id="disc-picker" style="display:none">
+    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:1.25rem;margin-bottom:.75rem">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem">
+        <div id="dp-avatar" style="width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,var(--rosa),var(--rosa-d));display:flex;align-items:center;justify-content:center;font-family:Bebas Neue,sans-serif;font-size:17px;color:#fff;flex-shrink:0"></div>
+        <div>
+          <div id="dp-nombre" style="font-weight:600;font-size:15px"></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">¿A qué clase viene hoy?</div>
+        </div>
+      </div>
+      <div id="dp-btns" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+  </div>
   <div class="card">
     <div class="ct">Entradas de hoy</div>
     <div id="log-hoy"><p style="font-size:12px;color:var(--muted)">Ninguna entrada aún.</p></div>
@@ -1421,18 +1435,57 @@ function renderPagosHist(a){
 }
 async function marcarVisita(){
   if(!S.alumno) return;
+  var discs = s_alumno_discs();
+  if(discs.length > 1){
+    /* Show inline picker in profile */
+    var existing = document.getElementById('manual-disc-picker');
+    if(existing){ existing.remove(); return; }
+    var div = document.createElement('div');
+    div.id = 'manual-disc-picker';
+    div.style.cssText = 'background:var(--bg3);border-radius:var(--r2);padding:.75rem;margin-top:.5rem';
+    div.innerHTML = '<p style="font-size:12px;color:var(--muted);margin-bottom:.5rem">¿A qué clase viene hoy?</p>' +
+      discs.map(function(d){
+        return '<button class="btn-s" style="width:100%;text-align:left;margin-bottom:6px;padding:10px 12px;font-size:13px" data-disc="' + d + '">' + d + ' →</button>';
+      }).join('');
+    div.querySelectorAll('[data-disc]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var disc = this.dataset.disc;
+        div.remove();
+        confirmarVisitaManual(disc);
+      });
+    });
+    var btnRow = document.querySelector('.btn-row');
+    if(btnRow) btnRow.parentNode.insertBefore(div, btnRow);
+    else document.getElementById('pf-body') && document.getElementById('pf-body').appendChild(div);
+  } else {
+    confirmarVisitaManual(discs[0] || '—');
+  }
+}
+function s_alumno_discs(){ return S.alumno ? (S.alumno.disciplinas||[]) : []; }
+async function confirmarVisitaManual(discElegida){
+  if(!S.alumno) return;
   S.writeLock = true;
   if(!S.alumno.visitas) S.alumno.visitas = [];
   S.alumno.visitas.push(nowISO());
+  if(!DB.visLog) DB.visLog = [];
+  DB.visLog.push({
+    folio: S.alumno.folio,
+    nom:   S.alumno.nombre + ' ' + S.alumno.apellidos,
+    disc:  discElegida,
+    hora:  new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}),
+    fecha: new Date().toISOString().split('T')[0],
+    ts:    Date.now()
+  });
+  if(DB.visLog.length > 500) DB.visLog = DB.visLog.slice(-500);
   saveLocal();
-  logEntry(S.alumno);
   renderVisGrid(S.alumno);
+  renderLogHoy();
   try{
     await saveDB();
   } catch(e){
-    setCloudStatus('err', 'Error al guardar visita: ' + e.message);
+    setCloudStatus('err','Error: ' + e.message);
   } finally{
-    setTimeout(function(){ S.writeLock = false; }, 2000);
+    setTimeout(function(){ S.writeLock=false; },2000);
   }
 }
 function cerrarPerfil(){S.alumno=null;document.getElementById('pf-wrap').style.display='none';document.getElementById('als-list').style.display='';renderAls();}
@@ -1633,33 +1686,93 @@ async function regVisita(){
     return;
   }
 
-  /* Pause SSE listener during write to avoid race condition */
+  var discs = a.disciplinas || [];
+
+  /* If more than one discipline → ask which one */
+  if(discs.length > 1){
+    mostrarPickerDisc(a);
+    return;
+  }
+
+  /* Single discipline or none → register immediately */
+  var discElegida = discs[0] || '—';
+  confirmarVisita(a, discElegida);
+}
+
+function mostrarPickerDisc(a){
+  var picker  = document.getElementById('disc-picker');
+  var avatar  = document.getElementById('dp-avatar');
+  var nombre  = document.getElementById('dp-nombre');
+  var btnsDiv = document.getElementById('dp-btns');
+  var discs   = a.disciplinas || [];
+
+  avatar.textContent = ((a.nombre[0]||'') + (a.apellidos[0]||'')).toUpperCase();
+  nombre.textContent = a.nombre + ' ' + a.apellidos;
+
+  btnsDiv.innerHTML = discs.map(function(d){
+    return '<button class="btn-s" style="width:100%;padding:12px 14px;text-align:left;font-size:14px;font-weight:500;display:flex;justify-content:space-between;align-items:center" data-disc="' + d + '" data-folio="' + a.folio + '">' +
+      '<span>' + d + '</span>' +
+      '<span style="color:var(--rosa);font-size:18px">→</span>' +
+      '</button>';
+  }).join('') +
+  '<button onclick="cerrarPickerDisc()" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;margin-top:4px;font-family:var(--font);padding:6px">Cancelar</button>';
+
+  btnsDiv.querySelectorAll('[data-disc]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var disc  = this.dataset.disc;
+      var folio = this.dataset.folio;
+      var alumno = DB.alumnos.find(function(x){ return x.folio===folio; });
+      cerrarPickerDisc();
+      if(alumno) confirmarVisita(alumno, disc);
+    });
+  });
+
+  picker.style.display = 'block';
+  picker.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function cerrarPickerDisc(){
+  var picker = document.getElementById('disc-picker');
+  if(picker) picker.style.display = 'none';
+}
+
+async function confirmarVisita(a, discElegida){
+  var res = document.getElementById('qr-result');
+
   S.writeLock = true;
   if(!a.visitas) a.visitas = [];
   a.visitas.push(nowISO());
   saveLocal();
 
-  /* Show confirmation immediately — don't wait for cloud */
   var v = getVisMes(a);
   res.innerHTML =
     '<div class="alert ok" style="display:block;text-align:left">' +
-    '<div style="font-size:22px">&#x2705;</div>' +
-    '<strong>' + a.nombre + ' ' + a.apellidos + '</strong>' +
-    '<div style="font-size:12px;color:#aaa;margin-top:2px">' + (a.disciplinas||[]).join(', ') + ' &middot; ' + a.folio + '</div>' +
-    '<div style="margin-top:5px">Visita <strong>#' + v + '</strong> de este mes registrada</div>' +
+    '<div style="font-size:24px">&#x2705;</div>' +
+    '<strong style="font-size:15px">' + a.nombre + ' ' + a.apellidos + '</strong>' +
+    '<div style="font-size:12px;color:var(--rosa);margin-top:3px;font-weight:600">' + discElegida + '</div>' +
+    '<div style="font-size:12px;color:#aaa;margin-top:2px">' + a.folio + '</div>' +
+    '<div style="margin-top:6px;font-size:13px">Visita <strong>#' + v + '</strong> del mes registrada ✓</div>' +
     '</div>';
   setTimeout(function(){ res.innerHTML = ''; }, 7000);
 
-  logEntry(a);
+  /* Log with chosen discipline */
+  if(!DB.visLog) DB.visLog = [];
+  DB.visLog.push({
+    folio: a.folio,
+    nom:   a.nombre + ' ' + a.apellidos,
+    disc:  discElegida,
+    hora:  new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}),
+    fecha: new Date().toISOString().split('T')[0],
+    ts:    Date.now()
+  });
+  if(DB.visLog.length > 500) DB.visLog = DB.visLog.slice(-500);
   renderLogHoy();
 
-  /* Now push to cloud */
   try{
     await saveDB();
   } catch(e){
     setCloudStatus('err', 'Error al guardar visita: ' + e.message);
   } finally{
-    /* Release write lock after 2s so SSE can resume */
     setTimeout(function(){ S.writeLock = false; }, 2000);
   }
 }
