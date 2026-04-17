@@ -443,6 +443,7 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
         <button class="btn-s" onclick="abrirQRModal()">QR</button>
         <button class="btn-s" onclick="enviarWA()">WhatsApp</button>
         <button class="btn-s" onclick="abrirEdit()">Editar</button>
+        <button class="btn-p" style="margin:0;padding:9px 14px;font-size:12px" onclick="abrirPagoModal()">💳 Pagar / Renovar</button>
         <button class="btn-danger" onclick="eliminar()">Eliminar</button>
         <button class="btn-s" onclick="cerrarPerfil()">← Volver</button>
       </div>
@@ -616,6 +617,60 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
 </div>
 
 <!-- QR MODAL -->
+<div class="modal-bg" id="pago-modal">
+  <div class="modal" style="max-width:480px;text-align:left;max-height:90vh;overflow-y:auto;padding:1.25rem">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;color:var(--rosa)">Registrar pago</div>
+        <p id="pm-alumno-info" style="font-size:12px;color:var(--muted);margin-top:2px"></p>
+      </div>
+      <button onclick="cerrarPagoModal()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer">&#x2715;</button>
+    </div>
+    <div style="margin-bottom:.75rem">
+      <div class="ct" style="margin-bottom:.4rem">Plan</div>
+      <div class="toggle-row" style="margin-bottom:.6rem">
+        <button class="tpill on" id="pm-tp-paq" onclick="pmSetTipo('paq')">Paquetes</button>
+        <button class="tpill" id="pm-tp-mem" onclick="pmSetTipo('mem')">Membresías</button>
+        <button class="tpill" id="pm-tp-cl" onclick="pmSetTipo('cl')">Clase suelta</button>
+        <button class="tpill" id="pm-tp-otro" onclick="pmSetTipo('otro')">Taller/Otro</button>
+      </div>
+      <div class="pkg-scroll" id="pm-pkg-grid" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))"></div>
+    </div>
+    <div style="margin-bottom:.75rem">
+      <div class="ct" style="margin-bottom:.4rem">Disciplinas</div>
+      <div class="disc-grid" id="pm-disc-grid"></div>
+      <div id="pm-disc-extra"></div>
+    </div>
+    <div style="background:var(--bg3);border-radius:var(--r2);padding:.75rem;margin-bottom:.75rem">
+      <div class="ct" style="margin-bottom:.4rem">Descuento / Promoción (opcional)</div>
+      <div class="g2">
+        <div class="field"><label>Descuento $</label><input type="number" id="pm-desc-monto" min="0" placeholder="0" oninput="pmCalcTotal()"></div>
+        <div class="field"><label>Descuento %</label><input type="number" id="pm-desc-pct" min="0" max="100" placeholder="0" oninput="pmCalcTotal()"></div>
+        <div class="field full"><label>Motivo</label><input type="text" id="pm-desc-nota" placeholder="Ej: Promo especial, descuento estudiante..."></div>
+      </div>
+    </div>
+    <div style="background:var(--bg3);border-radius:var(--r2);padding:.75rem;margin-bottom:.75rem">
+      <div class="ct" style="margin-bottom:.4rem">Pago</div>
+      <div class="g2">
+        <div class="field"><label>Fecha</label><input type="date" id="pm-fecha"></div>
+        <div class="field"><label>Método</label>
+          <select id="pm-metodo"><option value="">Seleccionar</option><option>Efectivo</option><option>Transferencia</option><option>Tarjeta</option></select>
+        </div>
+        <div class="field"><label>Referencia</label><input type="text" id="pm-ref" placeholder="Opcional"></div>
+        <div class="field"><label>Notas</label><input type="text" id="pm-notas" placeholder=""></div>
+      </div>
+    </div>
+    <div style="background:var(--rosa-xl);border:1px solid var(--rosa);border-radius:var(--r2);padding:.85rem;margin-bottom:.75rem">
+      <div style="display:flex;justify-content:space-between"><span style="font-size:12px;color:var(--muted)">Subtotal</span><span id="pm-subtotal" style="font-weight:600">$0</span></div>
+      <div id="pm-desc-row" style="display:none;justify-content:space-between;margin-top:3px"><span style="font-size:12px;color:var(--muted)">Descuento</span><span id="pm-desc-display" style="color:#fabd75">-$0</span></div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px solid rgba(212,83,126,.3)"><span style="font-weight:700">Total</span><span id="pm-total" style="font-size:20px;font-weight:700;color:var(--rosa)">$0</span></div>
+      <input type="number" id="pm-monto-manual" placeholder="O escribe monto manual..." min="0" oninput="pmSetManual(this.value)" style="width:100%;margin-top:.5rem;background:var(--bg2);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:7px 10px;color:var(--blanco);font-size:13px;outline:none">
+    </div>
+    <button class="btn-p" style="margin:0" onclick="pmGuardar()">Registrar pago</button>
+    <div class="alert" id="al-pm" style="margin-top:.5rem"></div>
+  </div>
+</div>
+
 <div class="modal-bg" id="qr-modal">
   <div class="modal">
     <h3 id="qrm-nom">—</h3>
@@ -1930,6 +1985,223 @@ function enviarWARenovacion(){
   window.open('https://wa.me/52' + tel + '?text=' + encodeURIComponent(msg), '_blank');
 }
 
+
+/* ══════════════════════ PAGO RÁPIDO MODAL ══════════════════════ */
+var pmAlumno     = null;
+var pmTipo       = 'paq';
+var pmPlan       = null;
+var pmDiscs      = [];
+var pmSubtotal   = 0;
+var pmManual     = false;
+
+function abrirPagoModal(){
+  var a = S.alumno;
+  if(!a) return;
+  pmAlumno  = a;
+  pmTipo    = 'paq';
+  pmPlan    = null;
+  pmDiscs   = [...(a.disciplinas||[])];
+  pmManual  = false;
+
+  document.getElementById('pm-alumno-info').textContent =
+    a.nombre + ' ' + a.apellidos + ' · ' + a.folio + ' · Plan actual: ' + (a.planActual||'—');
+  document.getElementById('pm-fecha').value = today();
+  document.getElementById('pm-metodo').value = '';
+  document.getElementById('pm-ref').value    = '';
+  document.getElementById('pm-notas').value  = '';
+  document.getElementById('pm-desc-monto').value = '';
+  document.getElementById('pm-desc-pct').value   = '';
+  document.getElementById('pm-desc-nota').value  = '';
+  document.getElementById('pm-monto-manual').value = '';
+
+  pmRenderPkgs();
+  pmRenderDiscs();
+  pmCalcTotal();
+
+  document.getElementById('pago-modal').classList.add('on');
+}
+
+function cerrarPagoModal(){
+  document.getElementById('pago-modal').classList.remove('on');
+  pmAlumno = null;
+}
+
+function pmSetTipo(t){
+  pmTipo = t; pmPlan = null; pmManual = false;
+  ['paq','mem','cl','otro'].forEach(function(x){
+    var el = document.getElementById('pm-tp-'+x);
+    if(el) el.classList.toggle('on', x===t);
+  });
+  pmRenderPkgs();
+  pmCalcTotal();
+}
+
+function pmRenderPkgs(){
+  var g = document.getElementById('pm-pkg-grid');
+  if(!g) return;
+  var list = PLANES.filter(function(p){ return p.tipo === pmTipo; });
+  g.innerHTML = list.map(function(p){
+    return '<div class="pkg' + (pmPlan===p.id?' on':'') + '" data-pid="' + p.id + '" style="cursor:pointer">' +
+      (p.vip?'<div class="pkg-vip">VIP</div>':'') +
+      '<div class="pkg-name">' + p.n + '</div>' +
+      '<div class="pkg-time">' + p.t + '</div>' +
+      '<div class="pkg-desc">' + p.d + '</div>' +
+      (p.libre
+        ? '<input type="number" placeholder="$ Libre" min="0" onclick="event.stopPropagation()" oninput="pmSetLibre(this.value)" style="width:100%;background:var(--bg2);border:1px solid var(--rosa);border-radius:6px;padding:5px 8px;color:var(--rosa);font-size:15px;font-weight:700;text-align:center;margin-top:4px">'
+        : '<div class="pkg-price">$' + p.p.toLocaleString('es-MX') + '</div>') +
+      '</div>';
+  }).join('');
+  g.querySelectorAll('.pkg').forEach(function(el){
+    el.addEventListener('click', function(){
+      pmPlan = this.dataset.pid;
+      pmManual = false;
+      document.getElementById('pm-monto-manual').value = '';
+      pmRenderPkgs();
+      pmCalcTotal();
+    });
+  });
+}
+
+function pmSetLibre(val){
+  pmPlan    = 'OT';
+  pmManual  = true;
+  pmSubtotal = parseFloat(val)||0;
+  pmCalcTotal();
+}
+
+function pmSetManual(val){
+  pmManual  = true;
+  pmSubtotal = parseFloat(val)||0;
+  pmCalcTotal();
+}
+
+function pmRenderDiscs(){
+  var g = document.getElementById('pm-disc-grid');
+  if(!g) return;
+  g.innerHTML = DISCS_KEYS.map(function(d,i){
+    return '<button class="disc-btn' + (pmDiscs.includes(d)?' on':'') + '" data-i="' + i + '">' + d + '</button>';
+  }).join('');
+  g.querySelectorAll('.disc-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var d = DISCS_KEYS[parseInt(this.dataset.i)];
+      var idx = pmDiscs.indexOf(d);
+      if(idx>=0) pmDiscs.splice(idx,1); else pmDiscs.push(d);
+      this.classList.toggle('on', pmDiscs.includes(d));
+      /* Show extra fields for Otra disciplina */
+      var extra = document.getElementById('pm-disc-extra');
+      if(d === 'Otra disciplina'){
+        if(pmDiscs.includes(d)){
+          extra.innerHTML =
+            '<div style="display:flex;gap:8px;margin-top:6px">' +
+            '<input type="text" id="pm-otra-nombre" placeholder="Nombre de la disciplina" style="flex:1;background:var(--bg3);border:1px solid var(--rosa);border-radius:var(--r2);padding:8px 11px;color:var(--blanco);font-size:13px;outline:none">' +
+            '</div>';
+        } else {
+          extra.innerHTML = '';
+        }
+      }
+    });
+  });
+}
+
+function pmCalcTotal(){
+  if(pmManual){ pmRenderTotal(); return; }
+  var plan = PLANES.find(function(p){ return p.id === pmPlan; });
+  pmSubtotal = plan ? (plan.libre ? pmSubtotal : plan.p) : 0;
+  pmRenderTotal();
+}
+
+function pmRenderTotal(){
+  var descMonto = parseFloat(document.getElementById('pm-desc-monto').value)||0;
+  var descPct   = parseFloat(document.getElementById('pm-desc-pct').value)||0;
+  var descTotal = descMonto + Math.round(pmSubtotal * descPct / 100);
+  var total     = Math.max(0, pmSubtotal - descTotal);
+
+  var subEl  = document.getElementById('pm-subtotal');
+  var dRow   = document.getElementById('pm-desc-row');
+  var dDisp  = document.getElementById('pm-desc-display');
+  var totEl  = document.getElementById('pm-total');
+
+  if(subEl) subEl.textContent = '$' + pmSubtotal.toLocaleString('es-MX');
+  if(dRow)  dRow.style.display = descTotal > 0 ? 'flex' : 'none';
+  if(dDisp) dDisp.textContent  = '-$' + descTotal.toLocaleString('es-MX');
+  if(totEl) totEl.textContent  = '$' + total.toLocaleString('es-MX');
+}
+
+async function pmGuardar(){
+  if(!pmAlumno){ cerrarPagoModal(); return; }
+
+  var plan      = PLANES.find(function(p){ return p.id === pmPlan; });
+  var descMonto = parseFloat(document.getElementById('pm-desc-monto').value)||0;
+  var descPct   = parseFloat(document.getElementById('pm-desc-pct').value)||0;
+  var descNota  = document.getElementById('pm-desc-nota').value.trim();
+  var manualVal = parseFloat(document.getElementById('pm-monto-manual').value)||0;
+  var subtotal  = pmManual ? manualVal : (plan ? (plan.libre ? pmSubtotal : plan.p) : 0);
+  var descTotal = descMonto + Math.round(subtotal * descPct / 100);
+  var total     = Math.max(0, subtotal - descTotal);
+  var fecha     = document.getElementById('pm-fecha').value || today();
+  var metodo    = document.getElementById('pm-metodo').value;
+
+  if(!plan && !pmManual){
+    showAlert('al-pm','Selecciona un plan para continuar.','err'); return;
+  }
+  if(total === 0 && !pmManual){
+    showAlert('al-pm','El monto es 0. Selecciona un plan o escribe el monto.','err'); return;
+  }
+
+  /* Get nombre de disciplina libre si aplica */
+  var otraNombreEl = document.getElementById('pm-otra-nombre');
+  if(pmDiscs.includes('Otra disciplina') && otraNombreEl && otraNombreEl.value.trim()){
+    var otraIdx = pmDiscs.indexOf('Otra disciplina');
+    pmDiscs[otraIdx] = otraNombreEl.value.trim();
+  }
+
+  var pago = {
+    fecha:   fecha,
+    plan:    plan ? plan.n : 'Pago manual',
+    monto:   total,
+    subtotal: subtotal,
+    descuento: descTotal > 0 ? descTotal : undefined,
+    descNota:  descNota || undefined,
+    metodo:  metodo,
+    ref:     document.getElementById('pm-ref').value,
+    notas:   document.getElementById('pm-notas').value
+  };
+
+  /* Update alumno */
+  pmAlumno.pagos = pmAlumno.pagos || [];
+  pmAlumno.pagos.push(pago);
+  if(pmDiscs.length > 0) pmAlumno.disciplinas = pmDiscs;
+  if(plan) pmAlumno.planActual = plan.n;
+
+  /* Reset this month's visits on new payment */
+  var mesReset = mesCur();
+  pmAlumno.visitas = (pmAlumno.visitas||[]).filter(function(v){
+    return mesStr(typeof v==='string'?v:(v.ts||'')) !== mesReset;
+  });
+  DB.visLog = (DB.visLog||[]).filter(function(v){
+    var vMes = v.fecha ? mesStr(v.fecha+'T00:00:00') : '';
+    return !(v.folio === pmAlumno.folio && vMes === mesReset);
+  });
+
+  S.writeLock = true;
+  saveLocal();
+  try{
+    await saveDB();
+    showAlert('al-pm',
+      String.fromCharCode(10003)+' Pago registrado \u00b7 $'+total.toLocaleString('es-MX')+
+      (descTotal>0?' (desc. $'+descTotal.toLocaleString('es-MX')+')':'')+
+      ' \u00b7 Asistencias reiniciadas','ok');
+    /* Refresh profile */
+    S.alumno = pmAlumno;
+    verPerfil(pmAlumno.folio);
+    setTimeout(function(){ cerrarPagoModal(); }, 1800);
+  } catch(e){
+    showAlert('al-pm','Error al guardar: '+e.message,'err');
+  } finally{
+    setTimeout(function(){ S.writeLock=false; },2000);
+  }
+}
+
 /* ══════════════════════ REGISTRAR VISITA ══════════════════════ */
 async function regVisita(){
   var folio = (document.getElementById('qr-in').value || '').trim().toUpperCase();
@@ -2219,27 +2491,7 @@ setInterval(function(){
   if(CFG.proveedor === 'jsonbin' && CFG.jbKey && CFG.jbBin) syncNow();
 }, 8000);
 /* Refresh active view after remote update */
-function refreshActiveView(){
-  if(S.writeLock) return;
-  var activePage = document.querySelector('.page.on');
-  if(!activePage) return;
-  var id = activePage.id;
-  if(id === 'p-als'){
-    var pfWrap = document.getElementById('pf-wrap');
-    if(pfWrap && pfWrap.style.display !== 'none' && S.alumno){
-      var fresh = DB.alumnos.find(function(a){ return a.folio === S.alumno.folio; });
-      if(fresh){ S.alumno = fresh; verPerfil(fresh.folio); }
-    } else {
-      renderAls();
-    }
-  } else if(id === 'p-dash'){
-    renderDash();
-  } else if(id === 'p-cita'){
-    renderCitas();
-  } else if(id === 'p-qr'){
-    renderLogHoy();
-  }
-}
+
 </script>
 </body>
 </html>
