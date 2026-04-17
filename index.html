@@ -157,6 +157,19 @@ body{padding-bottom:70px}
 .vis-title{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--rosa);font-weight:700;margin:.9rem 0 .45rem}
 .vis-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;margin-bottom:.6rem}
 @media(max-width:360px){.vis-grid{grid-template-columns:repeat(8,1fr)}}
+.vrow{margin-bottom:1rem}
+.vrow-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.vrow-disc{font-size:10px;font-weight:700;color:var(--rosa);text-transform:uppercase;letter-spacing:.08em}
+.vrow-count{font-size:11px;font-weight:600}
+.vrow-count.ok{color:#7ec445}
+.vrow-count.warn{color:#fabd75}
+.vrow-count.full{color:#f09595}
+.vrow-prog{height:4px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-bottom:6px}
+.vrow-prog-f{height:100%;border-radius:3px;transition:width .3s}
+.vrow-prog-f.ok{background:#7ec445}
+.vrow-prog-f.warn{background:#fabd75}
+.vrow-prog-f.full{background:#f09595}
+.vboxes{display:flex;flex-wrap:wrap;gap:4px}
 .vbox{aspect-ratio:1;border-radius:5px;border:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--muted);background:var(--bg3);cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent}
 .vbox.done{background:var(--rosa);border-color:var(--rosa);color:#fff}
 .vbox .vdate{font-size:7px;line-height:1;opacity:.8}
@@ -643,21 +656,7 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
     <div class="card" style="background:var(--bg3)">
       <div class="ct">Plan y estado</div>
       <div class="g2">
-        <div class="field"><label>Plan activo</label><input type="text" id="e-plan"></div>
-        <div class="field"><label>Estado</label>
-          <select id="e-estado"><option>Activo</option><option>Inactivo</option><option>Becado</option><option>Suspendido</option></select>
-        </div>
-        <div class="field full"><label>Notas</label><textarea id="e-notas"></textarea></div>
-      </div>
-    </div>
-    <div class="btn-row">
-      <button class="btn-p" style="flex:1;margin:0" onclick="guardarEdit()">Guardar cambios</button>
-      <button class="btn-s" onclick="cerrarEdit()">Cancelar</button>
-    </div>
-    <div class="alert" id="al-edit"></div>
-  </div>
-</div>
-
+     
 <script>
 /* ══════════════════════ DATOS DE DISCIPLINAS ══════════════════════ */
 const DISCS_KEYS = ['Pole Sport','Pole Exotic','Pole Espiral',"Pole Kid's",'Danza Aérea Telas','Elementos Aéreos','Enlogación/Flex','Yoga','Twerk','Jumping y Baile','Ritmos Latinos','Defensa Personal','Música/Vocalización','Heels','Otra disciplina'];
@@ -679,20 +678,45 @@ const DISCS = {
   'Otra disciplina':{precio:0,libre:1,hors:[]}
 };
 const PLANES=[
-  {id:'P1',n:'Paquete #1',t:'1 mes',d:'1 disciplina · 2 clases/sem · 8 hrs',p:500,tipo:'paq'},
-  {id:'P2',n:'Paquete #2',t:'1 mes',d:'2 disciplinas · intensivas 2 hrs c/u',p:700,tipo:'paq'},
-  {id:'P3',n:'Paquete #3',t:'1 mes',d:'2 disciplinas · 4 clases/sem · 16 hrs',p:800,tipo:'paq'},
-  {id:'P4',n:'Paquete #4',t:'1 mes',d:'3 disciplinas · 6 clases/sem · 24 hrs',p:1000,tipo:'paq'},
-  {id:'PV',n:'Paquete VIP',t:'1 mes',d:'Clases ilimitadas',p:1100,tipo:'paq',vip:1},
-  {id:'M1',n:'Membresía #1',t:'6 meses',d:'1 disciplina · 2 clases/sem · 8 hrs/mes',p:2500,tipo:'mem'},
-  {id:'M2',n:'Membresía #2',t:'6 meses',d:'2 disciplinas · intensivas 2 hrs c/u',p:3500,tipo:'mem'},
-  {id:'M3',n:'Membresía #3',t:'6 meses',d:'2 disciplinas · 4 clases/sem · 16 hrs',p:4000,tipo:'mem'},
-  {id:'M4',n:'Membresía #4',t:'6 meses',d:'3 disciplinas · 6 clases/sem · 24 hrs',p:5000,tipo:'mem'},
-  {id:'M5',n:'Membresía #5',t:'12 meses',d:'Anualidad · 2 hrs por semana',p:4800,tipo:'mem'},
-  {id:'CL',n:'Clase suelta',t:'Por hora',d:'$100 por hora',p:100,tipo:'cl'},
-  {id:'OT',n:'Otro / Taller',t:'Libre',d:'Taller, curso, evento especial — precio libre',p:0,tipo:'otro',libre:1}
+  /* clases_mes = max clases por disciplina por mes
+     num_discs  = numero de disciplinas incluidas
+     horas      = duracion de clase en horas
+     vip        = sin limite */
+  {id:'P1',n:'Paquete #1',  t:'1 mes',  tipo:'paq', p:500,
+   d:'1 disciplina · 1 hr · 8 clases/mes',
+   num_discs:1, clases_mes:8,  horas:1,   meses:1},
+  {id:'P2',n:'Paquete #2',  t:'1 mes',  tipo:'paq', p:700,
+   d:'2 disciplinas intensivas · 2 hrs · 8 clases/mes c/u',
+   num_discs:2, clases_mes:8,  horas:2,   meses:1},
+  {id:'P3',n:'Paquete #3',  t:'1 mes',  tipo:'paq', p:800,
+   d:'2 disciplinas · 1 hr · 8 clases/mes c/u',
+   num_discs:2, clases_mes:8,  horas:1,   meses:1},
+  {id:'P4',n:'Paquete #4',  t:'1 mes',  tipo:'paq', p:1000,
+   d:'3 disciplinas · 1 hr · 8 clases/mes c/u',
+   num_discs:3, clases_mes:8,  horas:1,   meses:1},
+  {id:'PV',n:'Paquete VIP', t:'1 mes',  tipo:'paq', p:1100,
+   d:'Clases ilimitadas',
+   num_discs:99,clases_mes:99, horas:1,   meses:1, vip:1},
+  {id:'M1',n:'Membresía #1',t:'6 meses',tipo:'mem', p:2500,
+   d:'1 disciplina · 1 hr · 8 clases/mes · 6 meses',
+   num_discs:1, clases_mes:8,  horas:1,   meses:6},
+  {id:'M2',n:'Membresía #2',t:'6 meses',tipo:'mem', p:3500,
+   d:'2 disciplinas intensivas · 2 hrs · 8 clases/mes c/u · 6 meses',
+   num_discs:2, clases_mes:8,  horas:2,   meses:6},
+  {id:'M3',n:'Membresía #3',t:'6 meses',tipo:'mem', p:4000,
+   d:'2 disciplinas · 1 hr · 8 clases/mes c/u · 6 meses',
+   num_discs:2, clases_mes:8,  horas:1,   meses:6},
+  {id:'M4',n:'Membresía #4',t:'6 meses',tipo:'mem', p:5000,
+   d:'3 disciplinas · 1 hr · 8 clases/mes c/u · 6 meses',
+   num_discs:3, clases_mes:8,  horas:1,   meses:6},
+  {id:'M5',n:'Membresía #5',t:'12 meses',tipo:'mem',p:4800,
+   d:'1 disciplina · 1 hr · 8 clases/mes · 1 año',
+   num_discs:1, clases_mes:8,  horas:1,   meses:12},
+  {id:'CL',n:'Clase suelta', t:'Por hora',tipo:'cl', p:100,
+   d:'$100 por hora'},
+  {id:'OT',n:'Otro / Taller',t:'Libre',  tipo:'otro',p:0,
+   d:'Taller, curso, evento especial — precio libre', libre:1}
 ];
-
 /* ══════════════════════ ESTADO GLOBAL ══════════════════════ */
 let DB={alumnos:[],citas:[],visLog:[]};
 let logHoy=[];
@@ -1298,11 +1322,20 @@ async function guardar(){
       if(S.rHors.length)  editExist.horarios=S.rHors;
       if(S.rPlan) editExist.planActual=pl?pl.n:editExist.planActual;
       editExist.pagos.push(pago);
+      /* Reset this month's visits when payment is registered */
+      var mesReset = mesCur();
+      editExist.visitas = (editExist.visitas||[]).filter(function(v){
+        return mesStr(typeof v==='string'?v:(v.ts||'')) !== mesReset;
+      });
+      DB.visLog = (DB.visLog||[]).filter(function(v){
+        var vMes = v.fecha ? mesStr(v.fecha+'T00:00:00') : '';
+        return !(v.folio === editExist.folio && vMes === mesReset);
+      });
       S.writeLock=true;
       saveLocal();
       await saveDB();
       setTimeout(function(){S.writeLock=false;},2000);
-      showAlert('al-reg','✓ Pago actualizado · '+nom+' '+ap+' · '+editExist.folio,'ok');
+      showAlert('al-reg','✓ Pago registrado · Asistencias reiniciadas · '+editExist.folio,'ok');
       abrirQRDatos(editExist);
       return;
     }
@@ -1455,16 +1488,30 @@ function renderVisGrid(a){
   var prog = document.getElementById('pf-prog');
   if(!g) return;
 
-  var hoy      = mesCur();
-  /* Use visLog (has discipline info) — filter by folio + current month */
-  var visLog   = (DB.visLog||[]).filter(function(v){
-    var vMes = v.fecha ? mesStr(v.fecha + 'T00:00:00') : mesStr(v.ts ? new Date(v.ts).toISOString() : '');
+  var hoy = mesCur();
+
+  /* Get this month's visits from DB.visLog (has discipline) */
+  var visLog = (DB.visLog||[]).filter(function(v){
+    var vMes = v.fecha
+      ? mesStr(v.fecha + 'T00:00:00')
+      : (v.ts ? mesStr(new Date(v.ts).toISOString()) : '');
     return v.folio === a.folio && vMes === hoy;
   });
 
-  /* Also count plain visitas for backwards compat */
-  var visRaw   = (a.visitas||[]).filter(function(v){ return mesStr(typeof v==='string'?v:(v.ts||'')) === hoy; });
-  var totalVis = Math.max(visLog.length, visRaw.length);
+  /* Legacy plain visitas (no discipline) */
+  var visRaw = (a.visitas||[]).filter(function(v){
+    return mesStr(typeof v==='string' ? v : (v.ts||'')) === hoy;
+  });
+
+  /* Total visits this month */
+  var totalVis = visLog.length || visRaw.length;
+
+  /* Get plan limits */
+  var planId  = (a.planActual||'').replace('Paquete ','P').replace('Membresía ','M')
+                  .replace('#','').replace(' ','');
+  var plan    = PLANES.find(function(p){ return p.n === a.planActual; });
+  var maxMes  = plan ? (plan.vip ? 999 : (plan.clases_mes || 8)) : 8;
+  var vip     = plan ? !!plan.vip : false;
 
   /* Group visLog by discipline */
   var byDisc = {};
@@ -1474,56 +1521,71 @@ function renderVisGrid(a){
     byDisc[d].push(v);
   });
 
-  var discs = Object.keys(byDisc);
-
-  /* If no visLog data yet, show legacy flat grid */
+  /* If no visLog yet but has legacy raw visits, show flat grid */
   if(!visLog.length && visRaw.length){
-    /* Legacy: plain timestamps */
-    var total = 20;
-    g.innerHTML = Array.from({length:total}, function(_,i){
-      var done  = i < visRaw.length;
-      var fecha = done ? new Date(typeof visRaw[i]==='string'?visRaw[i]:(visRaw[i].ts||'')).toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit'}) : '';
-      return '<div class="vbox' + (done?' done':'') + '" title="' + fecha + '" data-i="' + i + '">' +
-        '<span>' + (i+1) + '</span>' + (done ? '<span class="vdate">' + fecha + '</span>' : '') + '</div>';
-    }).join('');
+    g.innerHTML = buildFlatGrid(visRaw, maxMes);
     attachVboxListeners(a);
     if(cnt)  cnt.textContent  = visRaw.length;
-    if(prog) prog.style.width = Math.min(100, Math.round(visRaw.length/total*100)) + '%';
+    if(prog) prog.style.width = Math.min(100,Math.round(visRaw.length/maxMes*100))+'%';
     return;
   }
 
-  /* No visits yet */
   if(!visLog.length){
-    g.innerHTML = '<p style="font-size:12px;color:var(--muted);padding:.5rem 0">Sin visitas este mes.</p>';
+    g.innerHTML = '<p style="font-size:12px;color:var(--muted);padding:.4rem 0">Sin visitas registradas este mes.</p>';
     if(cnt)  cnt.textContent  = '0';
     if(prog) prog.style.width = '0%';
     return;
   }
 
-  /* Build grouped view by discipline */
+  /* Build per-discipline rows */
   var html = '';
-  discs.forEach(function(disc){
+  Object.keys(byDisc).forEach(function(disc){
     var entries = byDisc[disc];
-    html += '<div style="margin-bottom:1rem">';
-    /* Discipline label */
-    html += '<div style="font-size:10px;font-weight:700;color:var(--rosa);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">' +
-      disc + ' <span style="color:var(--muted);font-weight:400">(' + entries.length + ' visita' + (entries.length!==1?'s':'') + ')</span></div>';
+    var n       = entries.length;
+    var pct     = vip ? Math.min(100,Math.round(n/8*100)) : Math.min(100,Math.round(n/maxMes*100));
+    var state   = vip ? 'ok' : (n >= maxMes ? 'full' : (n >= maxMes-2 ? 'warn' : 'ok'));
+    var label   = vip ? (n+' vis') : (n+'/'+maxMes);
+
+    html += '<div class="vrow">';
+    /* Header: discipline name + counter */
+    html += '<div class="vrow-head">';
+    html += '<span class="vrow-disc">' + disc + '</span>';
+    html += '<span class="vrow-count ' + state + '">' + label +
+      (state==='full' ? ' — LÍMITE' : (state==='warn' ? ' — casi completo' : '')) + '</span>';
+    html += '</div>';
+    /* Progress bar */
+    html += '<div class="vrow-prog"><div class="vrow-prog-f ' + state + '" style="width:' + pct + '%"></div></div>';
     /* Visit boxes */
-    html += '<div style="display:flex;flex-wrap:wrap;gap:5px">';
+    html += '<div class="vboxes">';
     entries.forEach(function(v, i){
-      var fecha = v.hora || (v.fecha||'').substring(5);
-      html += '<div class="vbox done" title="' + (v.fecha||'') + ' ' + (v.hora||'') + '" style="width:38px;height:38px">' +
+      html += '<div class="vbox done" title="' + (v.fecha||'') + ' ' + (v.hora||'') + '">' +
         '<span>' + (i+1) + '</span>' +
-        '<span class="vdate">' + fecha + '</span>' +
+        '<span class="vdate">' + (v.hora||'') + '</span>' +
         '</div>';
     });
+    /* Empty slots up to maxMes */
+    if(!vip){
+      for(var s = n; s < maxMes; s++){
+        html += '<div class="vbox" style="opacity:.35"><span>' + (s+1) + '</span></div>';
+      }
+    }
     html += '</div></div>';
   });
 
   g.innerHTML = html;
-
   if(cnt)  cnt.textContent  = totalVis;
-  if(prog) prog.style.width = Math.min(100, Math.round(totalVis/20*100)) + '%';
+  if(prog) prog.style.width = Math.min(100,Math.round(totalVis/(maxMes*(Object.keys(byDisc).length||1))*100))+'%';
+}
+
+function buildFlatGrid(visRaw, maxMes){
+  var total = Math.max(maxMes, visRaw.length, 8);
+  return Array.from({length:total}, function(_,i){
+    var done  = i < visRaw.length;
+    var v     = done ? visRaw[i] : null;
+    var fecha = done ? new Date(typeof v==='string'?v:(v.ts||'')).toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit'}) : '';
+    return '<div class="vbox' + (done?' done':'') + '" data-i="' + i + '">' +
+      '<span>' + (i+1) + '</span>' + (done?'<span class="vdate">'+fecha+'</span>':'') + '</div>';
+  }).join('');
 }
 
 function attachVboxListeners(a){
@@ -1608,6 +1670,7 @@ async function confirmarVisitaManual(discElegida){
   saveLocal();
   renderVisGrid(S.alumno);
   renderLogHoy();
+  checkLimiteYRenovar(S.alumno, discElegida);
   try{
     await saveDB();
   } catch(e){
@@ -1800,6 +1863,73 @@ function startCam(){
 
 function scanLoop(){ /* not used — html5-qrcode handles scanning internally */ }
 
+
+/* ══════════════════════ RENOVACIÓN WHATSAPP ══════════════════════ */
+function checkLimiteYRenovar(a, discElegida){
+  var plan   = PLANES.find(function(p){ return p.n === a.planActual; });
+  if(!plan || plan.vip) return; /* VIP sin límite */
+
+  var maxMes = plan.clases_mes || 8;
+  var hoy    = mesCur();
+  var visLog = (DB.visLog||[]).filter(function(v){
+    var vMes = v.fecha ? mesStr(v.fecha+'T00:00:00') : '';
+    return v.folio === a.folio && vMes === hoy && v.disc === discElegida;
+  });
+
+  if(visLog.length >= maxMes){
+    /* Show renewal alert in the UI */
+    var res = document.getElementById('qr-result');
+    if(res){
+      res.innerHTML =
+        '<div style="background:rgba(133,79,11,.25);border:1px solid #fabd75;border-radius:var(--r);padding:1rem;margin-top:.5rem;text-align:left">' +
+        '<div style="font-size:16px;margin-bottom:6px">&#x26A0;&#xFE0F; Clases completadas</div>' +
+        '<strong>' + a.nombre + ' ' + a.apellidos + '</strong>' +
+        '<div style="font-size:12px;color:#fabd75;margin-top:4px">' + discElegida + ' — ' + maxMes + '/' + maxMes + ' clases del mes alcanzadas</div>' +
+        '<button onclick="enviarWARenovacion()" style="margin-top:.75rem;width:100%;padding:10px;background:#25D366;color:#fff;border:none;border-radius:var(--r2);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)">&#x1F4F2; Enviar recordatorio de renovación por WhatsApp</button>' +
+        '</div>';
+      res.style.display = 'block';
+    }
+    /* Store current alumno for WA function */
+    S.alumnoRenovar = a;
+  }
+}
+
+function enviarWARenovacion(){
+  var a = S.alumnoRenovar || S.alumno;
+  if(!a) return;
+  var plan    = PLANES.find(function(p){ return p.n === a.planActual; });
+  var planNom = plan ? plan.n : (a.planActual || 'su plan');
+  var maxMes  = plan ? (plan.clases_mes || 8) : 8;
+  var tel     = (a.tel||'').replace(/[^0-9]/g,'');
+  var discs   = (a.disciplinas||[]).join(', ');
+
+  var lines = [
+    'Estimado/a ' + a.nombre + ' ' + a.apellidos + ',',
+    '',
+    'Por medio del presente mensaje le informamos que ha completado el total de sus ' + maxMes + ' clases correspondientes a ' + planNom + ' en la disciplina de ' + discs + '.',
+    '',
+    'En ALPHA Centro de Desarrollo Artístico y Cultural valoramos enormemente su constancia y dedicación. Es un placer contar con su presencia en cada sesión.',
+    '',
+    'Para continuar disfrutando de sus clases sin interrupciones, le invitamos cordialmente a renovar su plan a la brevedad posible.',
+    '',
+    'Al realizar su renovación, sus asistencias se reiniciarán automáticamente para el nuevo periodo y podrá seguir tomando sus clases con normalidad.',
+    '',
+    'Puede acercarse a nuestras instalaciones o comunicarse con nosotros para realizar su pago:',
+    '',
+    String.fromCharCode(128205) + ' Av. Universidad 252 Int B, Zacatecas Centro',
+    String.fromCharCode(128241) + ' 492 493 8392',
+    String.fromCharCode(128248) + ' @alpha_danceart',
+    '',
+    'Quedamos a sus órdenes y esperamos verle pronto.',
+    '',
+    'Atentamente,',
+    'ALPHA Centro de Desarrollo Artístico y Cultural'
+  ];
+
+  var msg = lines.join('\n');
+  window.open('https://wa.me/52' + tel + '?text=' + encodeURIComponent(msg), '_blank');
+}
+
 /* ══════════════════════ REGISTRAR VISITA ══════════════════════ */
 async function regVisita(){
   var folio = (document.getElementById('qr-in').value || '').trim().toUpperCase();
@@ -1896,6 +2026,7 @@ async function confirmarVisita(a, discElegida){
   if(DB.visLog.length > 500) DB.visLog = DB.visLog.slice(-500);
   renderLogHoy();
 
+  checkLimiteYRenovar(a, discElegida);
   try{
     await saveDB();
   } catch(e){
@@ -2087,6 +2218,28 @@ function refreshActiveView(){
 setInterval(function(){
   if(CFG.proveedor === 'jsonbin' && CFG.jbKey && CFG.jbBin) syncNow();
 }, 8000);
+/* Refresh active view after remote update */
+function refreshActiveView(){
+  if(S.writeLock) return;
+  var activePage = document.querySelector('.page.on');
+  if(!activePage) return;
+  var id = activePage.id;
+  if(id === 'p-als'){
+    var pfWrap = document.getElementById('pf-wrap');
+    if(pfWrap && pfWrap.style.display !== 'none' && S.alumno){
+      var fresh = DB.alumnos.find(function(a){ return a.folio === S.alumno.folio; });
+      if(fresh){ S.alumno = fresh; verPerfil(fresh.folio); }
+    } else {
+      renderAls();
+    }
+  } else if(id === 'p-dash'){
+    renderDash();
+  } else if(id === 'p-cita'){
+    renderCitas();
+  } else if(id === 'p-qr'){
+    renderLogHoy();
+  }
+}
 </script>
 </body>
 </html>
