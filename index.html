@@ -436,15 +436,20 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
       <div class="vis-grid" id="pf-vis"></div>
       <div class="vis-count">Total este mes: <span id="pf-cnt">0</span> visitas</div>
       <div class="prog"><div class="prog-f" id="pf-prog" style="width:0%"></div></div>
+      <div id="pf-wa-renovar" style="display:none;background:rgba(133,79,11,.2);border:1px solid #fabd75;border-radius:var(--r2);padding:.65rem;margin-bottom:.5rem">
+        <div style="font-size:11px;color:#fabd75;font-weight:600;margin-bottom:5px">&#x26A0; Límite de clases alcanzado en <span id="pf-wa-disc">—</span></div>
+        <button onclick="enviarWARenovacion()" style="width:100%;padding:9px;background:#25D366;color:#fff;border:none;border-radius:var(--r2);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font)">&#x1F4F2; Enviar recordatorio de renovación por WhatsApp</button>
+      </div>
       <div class="ct" style="margin-bottom:.4rem">Historial de pagos</div>
       <div id="pf-pagos"></div>
       <div class="btn-row">
         <button class="btn-s" onclick="marcarVisita()">+ Visita hoy</button>
         <button class="btn-s" onclick="abrirQRModal()">QR</button>
         <button class="btn-s" onclick="enviarWA()">WhatsApp</button>
-        <button class="btn-s" onclick="abrirEdit()">Editar</button>
-        <button class="btn-s" onclick="abrirEditVis()">&#x1F4C5; Editar visitas</button>
-        <button class="btn-p" style="margin:0;padding:9px 14px;font-size:12px" onclick="abrirPagoModal()">💳 Pagar / Renovar</button>
+        <button class="btn-s" onclick="abrirEdit()">&#x270F; Editar</button>
+        <button class="btn-s" onclick="abrirEditVis()">&#x1F4C5; Visitas</button>
+        <button class="btn-s" style="background:rgba(0,212,255,.1);border-color:var(--cyan);color:var(--cyan)" onclick="abrirPagoModal('pagar')">&#x1F4B0; Pagar</button>
+        <button class="btn-p" style="margin:0;padding:9px 14px;font-size:12px;background:#3b6d11;border-color:#3b6d11" onclick="abrirPagoModal('renovar')">&#x1F504; Renovar / Renovar</button>
         <button class="btn-danger" onclick="eliminar()">Eliminar</button>
         <button class="btn-s" onclick="cerrarPerfil()">← Volver</button>
       </div>
@@ -499,7 +504,14 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
     <div class="stat"><div class="stat-n" id="d-ing">$0</div><div class="stat-l">Ingresos mes</div></div>
     <div class="stat"><div class="stat-n" id="d-vis">0</div><div class="stat-l">Visitas hoy</div></div>
   </div>
-  <div class="card"><div class="ct">Por disciplina</div><div id="d-discs"></div></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin-bottom:.7rem">
+    <div class="stat" style="border:1px solid #fabd75;background:rgba(133,79,11,.12)"><div class="stat-n" id="d-saldo-cnt" style="color:#fabd75">0</div><div class="stat-l" style="color:#fabd75">Saldos pend.</div></div>
+    <div class="stat"><div class="stat-n" id="d-citas-cnt" style="color:var(--cyan)">0</div><div class="stat-l">Citas hoy</div></div>
+  </div>
+  <div class="card"><div class="ct">Alumnos por disciplina</div><div id="d-discs"></div></div>
+  <div class="card" style="margin-top:.7rem"><div class="ct">Ingresos del mes por plan</div><div id="d-ingr-plan"></div></div>
+  <div class="card" style="margin-top:.7rem"><div class="ct">&#x26A0; Saldos pendientes</div><div id="d-pendientes"></div></div>
+  <div class="card" style="margin-top:.7rem"><div class="ct">Visitas de hoy por disciplina</div><div id="d-vis-disc"></div></div>
   <div class="card" style="margin-top:.7rem"><div class="ct">Últimos registros</div><div id="d-ults"></div></div>
   <div class="card" style="margin-top:.7rem"><div class="ct">Citas pendientes</div><div id="d-citas"></div></div>
 </div>
@@ -1828,33 +1840,59 @@ async function eliminar(){
 
 /* ══════════════════════ EDIT OVERLAY ══════════════════════ */
 function abrirEdit(){
-  const a=S.alumno;if(!a)return;
-  S.editFolio=a.folio; S.eDiscs=[...(a.disciplinas||[])]; S.eHors=[...(a.horarios||[])];
-  document.getElementById('e-nom').value=a.nombre; document.getElementById('e-ap').value=a.apellidos;
-  document.getElementById('e-tel').value=a.tel; document.getElementById('e-email').value=a.email||'';
-  document.getElementById('e-fnac').value=a.fnac||''; document.getElementById('e-emer').value=a.emergencia||'';
-  document.getElementById('e-plan').value=a.planActual||''; document.getElementById('e-estado').value=a.estado||'Activo';
-  document.getElementById('e-notas').value=a.notas||'';
-  buildDiscGrid('e-disc-grid',S.eDiscs,handleDiscEdit);
-  buildHorsMulti('e-hors-cont','e-hors-disp','e-hors-card',S.eDiscs,S.eHors);
-  document.getElementById('edit-ov').classList.add('on');
+  var a = S.alumno; if(!a) return;
+  S.editFolio = a.folio;
+  S.eDiscs = [...(a.disciplinas||[])];
+  S.eHors  = [...(a.horarios||[])];
+  var fields = {
+    'e-nom':   a.nombre,      'e-ap':    a.apellidos,
+    'e-tel':   a.tel,         'e-email': a.email||'',
+    'e-fnac':  a.fnac||'',    'e-emer':  a.emergencia||'',
+    'e-plan':  a.planActual||'', 'e-notas': a.notas||''
+  };
+  Object.keys(fields).forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.value = fields[id];
+  });
+  var estadoEl = document.getElementById('e-estado');
+  if(estadoEl) estadoEl.value = a.estado||'Activo';
+  buildDiscGrid('e-disc-grid', S.eDiscs, handleDiscEdit);
+  buildHorsMulti('e-hors-cont','e-hors-disp','e-hors-card', S.eDiscs, S.eHors);
+  var ov = document.getElementById('edit-ov');
+  if(ov){ ov.classList.add('on'); ov.scrollTop=0; }
   window.scrollTo(0,0);
 }
 async function guardarEdit(){
-  const a=DB.alumnos.find(x=>x.folio===S.editFolio);if(!a)return;
-  a.nombre=document.getElementById('e-nom').value.trim();
-  a.apellidos=document.getElementById('e-ap').value.trim();
-  a.tel=document.getElementById('e-tel').value.trim();
-  a.email=document.getElementById('e-email').value;
-  a.fnac=document.getElementById('e-fnac').value;
-  a.emergencia=document.getElementById('e-emer').value;
-  a.planActual=document.getElementById('e-plan').value;
-  a.estado=document.getElementById('e-estado').value;
-  a.notas=document.getElementById('e-notas').value;
-  if(S.eDiscs.length) a.disciplinas=S.eDiscs;
-  if(S.eHors.length) a.horarios=S.eHors;
-  await saveDB(); S.alumno=a; showAlert('al-edit','✓ Cambios guardados','ok');
-  cerrarEdit(); verPerfil(a.folio);
+  var a = DB.alumnos.find(function(x){ return x.folio===S.editFolio; });
+  if(!a) return;
+  var nom = document.getElementById('e-nom').value.trim();
+  var ap  = document.getElementById('e-ap').value.trim();
+  var tel = document.getElementById('e-tel').value.trim();
+  if(!nom||!ap||!tel){ showAlert('al-edit','Completa nombre, apellidos y teléfono.','err'); return; }
+  a.nombre     = nom;
+  a.apellidos  = ap;
+  a.tel        = tel;
+  a.email      = document.getElementById('e-email').value;
+  a.fnac       = document.getElementById('e-fnac').value;
+  a.emergencia = document.getElementById('e-emer').value;
+  a.planActual = document.getElementById('e-plan').value;
+  a.estado     = document.getElementById('e-estado').value;
+  a.notas      = document.getElementById('e-notas').value;
+  if(S.eDiscs.length) a.disciplinas = S.eDiscs;
+  if(S.eHors.length)  a.horarios    = S.eHors;
+  S.writeLock = true;
+  saveLocal();
+  try{
+    await saveDB();
+    S.alumno = a;
+    showAlert('al-edit','✓ Cambios guardados correctamente','ok');
+    cerrarEdit();
+    verPerfil(a.folio);
+  } catch(e){
+    showAlert('al-edit','Error al guardar: '+e.message,'err');
+  } finally{
+    setTimeout(function(){ S.writeLock=false; },2000);
+  }
 }
 function cerrarEdit(){document.getElementById('edit-ov').classList.remove('on');}
 
@@ -2003,30 +2041,29 @@ function scanLoop(){ /* not used — html5-qrcode handles scanning internally */
 /* ══════════════════════ RENOVACIÓN WHATSAPP ══════════════════════ */
 function checkLimiteYRenovar(a, discElegida){
   var plan   = PLANES.find(function(p){ return p.n === a.planActual; });
-  if(!plan || plan.vip) return; /* VIP sin límite */
-
+  if(!plan || plan.vip) return;
   var maxMes = plan.clases_mes || 8;
   var hoy    = mesCur();
   var visLog = (DB.visLog||[]).filter(function(v){
     var vMes = v.fecha ? mesStr(v.fecha+'T00:00:00') : '';
     return v.folio === a.folio && vMes === hoy && v.disc === discElegida;
   });
-
   if(visLog.length >= maxMes){
-    /* Show renewal alert in the UI */
+    S.alumnoRenovar = a;
+    /* Show in QR result area */
     var res = document.getElementById('qr-result');
     if(res){
       res.innerHTML =
-        '<div style="background:rgba(133,79,11,.25);border:1px solid #fabd75;border-radius:var(--r);padding:1rem;margin-top:.5rem;text-align:left">' +
-        '<div style="font-size:16px;margin-bottom:6px">&#x26A0;&#xFE0F; Clases completadas</div>' +
-        '<strong>' + a.nombre + ' ' + a.apellidos + '</strong>' +
-        '<div style="font-size:12px;color:#fabd75;margin-top:4px">' + discElegida + ' — ' + maxMes + '/' + maxMes + ' clases del mes alcanzadas</div>' +
-        '<button onclick="enviarWARenovacion()" style="margin-top:.75rem;width:100%;padding:10px;background:#25D366;color:#fff;border:none;border-radius:var(--r2);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)">&#x1F4F2; Enviar recordatorio de renovación por WhatsApp</button>' +
+        '<div style="background:rgba(133,79,11,.25);border:1px solid #fabd75;border-radius:var(--r);padding:1rem;text-align:left">' +
+        '<div style="font-size:15px;font-weight:600;color:#fabd75;margin-bottom:4px">&#x26A0; L\u00edmite de clases alcanzado</div>' +
+        '<strong>'+a.nombre+' '+a.apellidos+'</strong>' +
+        '<div style="font-size:12px;color:#fabd75;margin-top:3px">'+discElegida+' &mdash; '+maxMes+'/'+maxMes+' clases del mes</div>' +
+        '<button onclick="enviarWARenovacion()" style="margin-top:.6rem;width:100%;padding:10px;background:#25D366;color:#fff;border:none;border-radius:var(--r2);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)">&#x1F4F2; Enviar recordatorio de renovaci\u00f3n</button>' +
         '</div>';
-      res.style.display = 'block';
     }
-    /* Store current alumno for WA function */
-    S.alumnoRenovar = a;
+    /* Also update profile WA button if profile is open */
+    var waBtn = document.getElementById('pf-wa-renovar');
+    if(waBtn){ waBtn.style.display='block'; var wdEl=document.getElementById('pf-wa-disc'); if(wdEl) wdEl.textContent=discElegida; }
   }
 }
 
@@ -2188,36 +2225,56 @@ async function evBorrarTodas(){
 
 /* ══════════════════════ PAGO RÁPIDO MODAL ══════════════════════ */
 var pmAlumno     = null;
+var pmModo       = 'pagar';
 var pmTipo       = 'paq';
 var pmPlan       = null;
 var pmDiscs      = [];
 var pmSubtotal   = 0;
 var pmManual     = false;
 
-function abrirPagoModal(){
+function abrirPagoModal(modo){
   var a = S.alumno;
   if(!a) return;
   pmAlumno  = a;
-  pmTipo    = 'paq';
+  pmModo    = modo || 'pagar'; /* 'pagar' | 'renovar' */
+  pmTipo    = pmModo === 'renovar' ? 'paq' : 'cl';
   pmPlan    = null;
   pmDiscs   = [...(a.disciplinas||[])];
   pmManual  = false;
 
-  document.getElementById('pm-alumno-info').textContent =
-    a.nombre + ' ' + a.apellidos + ' · ' + a.folio + ' · Plan actual: ' + (a.planActual||'—');
+  /* Update modal title based on mode */
+  var titleEl = document.querySelector('#pago-modal .modal > div:first-child > div > div:first-child');
+  if(titleEl){
+    titleEl.textContent = pmModo === 'renovar' ? 'Renovar plan' : 'Registrar pago';
+    titleEl.style.color = pmModo === 'renovar' ? '#7ec445' : 'var(--rosa)';
+  }
+
+  var infoEl = document.getElementById('pm-alumno-info');
+  if(infoEl){
+    infoEl.textContent = a.nombre+' '+a.apellidos+' · '+a.folio+' · Plan: '+(a.planActual||'—');
+    if(pmModo === 'renovar'){
+      infoEl.textContent += ' — Renovación reiniciará asistencias';
+      infoEl.style.color = '#7ec445';
+    } else {
+      infoEl.textContent += ' — Pago de adeudo / artículo / extra';
+      infoEl.style.color = 'var(--muted)';
+    }
+  }
+
   document.getElementById('pm-fecha').value = today();
-  document.getElementById('pm-metodo').value = '';
-  document.getElementById('pm-ref').value    = '';
-  document.getElementById('pm-notas').value  = '';
-  document.getElementById('pm-desc-monto').value = '';
-  document.getElementById('pm-desc-pct').value   = '';
-  document.getElementById('pm-desc-nota').value  = '';
-  document.getElementById('pm-monto-manual').value = '';
+  ['pm-metodo','pm-ref','pm-notas','pm-desc-monto','pm-desc-pct','pm-desc-nota','pm-monto-manual'].forEach(function(id){
+    var el = document.getElementById(id); if(el) el.value='';
+  });
+
+  /* For renovar, show paquetes/membresias first */
+  ['paq','mem','cl','otro'].forEach(function(t){
+    var btn = document.getElementById('pm-tp-'+t);
+    if(btn) btn.classList.toggle('on', t===pmTipo);
+  });
 
   pmRenderPkgs();
   pmRenderDiscs();
   pmCalcTotal();
-
   document.getElementById('pago-modal').classList.add('on');
 }
 
@@ -2389,9 +2446,10 @@ async function pmGuardar(){
     });
   }
 
-  /* ONLY reset visits when full paquete/membresia payment */
+  /* Reset visits ONLY on full renovacion (mensualidad/paquete) */
   var reinicioMsg = '';
-  if(esPagoCompleto && esPaqueteOMem){
+  var esRenovacion = pmModo === 'renovar';
+  if(esRenovacion && esPagoCompleto && esPaqueteOMem){
     var mesReset = mesCur();
     pmAlumno.visitas = (pmAlumno.visitas||[]).filter(function(v){
       return mesStr(typeof v==='string'?v:(v.ts||'')) !== mesReset;
@@ -2400,7 +2458,7 @@ async function pmGuardar(){
       var vMes = v.fecha ? mesStr(v.fecha+'T00:00:00') : '';
       return !(v.folio === pmAlumno.folio && vMes === mesReset);
     });
-    reinicioMsg = ' \u00b7 Asistencias reiniciadas';
+    reinicioMsg = ' \u00b7 \u2705 Asistencias reiniciadas';
   } else if(saldoPendiente > 0){
     reinicioMsg = ' \u00b7 Saldo pendiente: $' + saldoPendiente.toLocaleString('es-MX');
   }
@@ -2561,20 +2619,113 @@ function renderLogHoy(){
 
 /* ══════════════════════ DASHBOARD ══════════════════════ */
 function renderDash(){
-  document.getElementById('d-tot').textContent=DB.alumnos.length;
-  const hoy=mesCur();
-  const act=(DB.alumnos||[]).filter(a=>(a.pagos||[]).some(p=>mesStr(p.fecha)===hoy)).length;
-  document.getElementById('d-act').textContent=act;
-  const ing=(DB.alumnos||[]).reduce((s,a)=>(a.pagos||[]).filter(p=>mesStr(p.fecha)===hoy).reduce((ss,p)=>ss+p.monto,s),0);
-  document.getElementById('d-ing').textContent='$'+ing.toLocaleString('es-MX');
-  var todayDate = new Date().toISOString().split('T')[0];
-  var visHoy = (DB.visLog||[]).filter(function(v){ return v.fecha===todayDate; });
+  var hoy     = mesCur();
+  var todayD  = new Date().toISOString().split('T')[0];
+  var alumnos = DB.alumnos||[];
+  var citas   = DB.citas||[];
+  var visLog  = DB.visLog||[];
+
+  /* ── KPIs ── */
+  document.getElementById('d-tot').textContent = alumnos.length;
+  var activos = alumnos.filter(function(a){
+    return (a.pagos||[]).some(function(p){ return mesStr(p.fecha)===hoy; });
+  });
+  document.getElementById('d-act').textContent = activos.length;
+  var ing = alumnos.reduce(function(s,a){
+    return (a.pagos||[]).filter(function(p){ return mesStr(p.fecha)===hoy; })
+      .reduce(function(ss,p){ return ss+p.monto; },s);
+  },0);
+  document.getElementById('d-ing').textContent = '$'+ing.toLocaleString('es-MX');
+  var visHoy = visLog.filter(function(v){ return v.fecha===todayD; });
   document.getElementById('d-vis').textContent = visHoy.length;
-  const pd={};(DB.alumnos||[]).forEach(a=>(a.disciplinas||[]).forEach(d=>{pd[d]=(pd[d]||0)+1;}));
-  document.getElementById('d-discs').innerHTML=Object.entries(pd).sort((a,b)=>b[1]-a[1]).map(([d,n])=>`<div style="display:flex;align-items:center;gap:9px;margin-bottom:6px"><span style="font-size:12px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d}</span><div style="flex:1.5;height:4px;background:var(--bg3);border-radius:3px;overflow:hidden"><div style="width:${Math.min(100,Math.round(n/Math.max(1,DB.alumnos.length)*100))}%;height:100%;background:var(--rosa);border-radius:3px"></div></div><span style="font-size:11px;color:var(--muted);width:16px;text-align:right">${n}</span></div>`).join('')||'<p style="font-size:12px;color:var(--muted)">Sin datos.</p>';
-  document.getElementById('d-ults').innerHTML=[...(DB.alumnos||[])].slice(-5).reverse().map(a=>`<div class="arow" data-f="${a.folio}" style="cursor:default"><div style="flex:1;min-width:0"><div class="arow-name">${a.nombre} ${a.apellidos}</div><div class="arow-disc">${(a.disciplinas||[]).join(', ')}</div></div><div style="text-align:right;flex-shrink:0"><div class="arow-folio">${a.folio}</div><div class="arow-vis">${a.fechaAlta}</div></div></div>`).join('')||'<p style="font-size:12px;color:var(--muted)">Sin registros.</p>';
-  const cp=(DB.citas||[]).filter(c=>c.estado==='Pendiente').slice(0,4);
-  document.getElementById('d-citas').innerHTML=cp.map(c=>`<div class="cita-card"><div class="cita-nombre">${c.nombre}</div><div class="cita-disc">${(c.disciplinas||[]).join(', ')}</div><div class="cita-meta">📅 ${c.fecha}${c.hora?' · '+c.hora:''}</div></div>`).join('')||'<p style="font-size:12px;color:var(--muted)">Sin citas pendientes.</p>';
+
+  /* ── By discipline ── */
+  var pd={};
+  alumnos.forEach(function(a){ (a.disciplinas||[]).forEach(function(d){ pd[d]=(pd[d]||0)+1; }); });
+  document.getElementById('d-discs').innerHTML = Object.entries(pd).sort(function(a,b){return b[1]-a[1];})
+    .map(function(entry){
+      var d=entry[0], n=entry[1];
+      return '<div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">' +
+        '<span style="font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+d+'</span>' +
+        '<div style="flex:1.5;height:4px;background:var(--bg3);border-radius:3px;overflow:hidden">' +
+        '<div style="width:'+Math.min(100,Math.round(n/Math.max(1,alumnos.length)*100))+'%;height:100%;background:var(--rosa);border-radius:3px"></div></div>' +
+        '<span style="font-size:11px;color:var(--muted);width:18px;text-align:right">'+n+'</span></div>';
+    }).join('')||'<p style="font-size:12px;color:var(--muted)">Sin datos.</p>';
+
+  /* ── Ingresos por plan ── */
+  var porPlan={};
+  alumnos.forEach(function(a){
+    (a.pagos||[]).filter(function(p){ return mesStr(p.fecha)===hoy; }).forEach(function(p){
+      var pl=p.plan||'Otro'; porPlan[pl]=(porPlan[pl]||0)+p.monto;
+    });
+  });
+  var dIngrPlan = document.getElementById('d-ingr-plan');
+  if(dIngrPlan){
+    dIngrPlan.innerHTML = Object.entries(porPlan).sort(function(a,b){return b[1]-a[1];})
+      .map(function(e){
+        return '<div class="pago-row"><span>'+e[0]+'</span><span class="pago-monto">$'+e[1].toLocaleString('es-MX')+'</span></div>';
+      }).join('')||'<p style="font-size:12px;color:var(--muted)">Sin ingresos este mes.</p>';
+    /* Total */
+    dIngrPlan.innerHTML += '<div class="pago-row" style="border-top:2px solid var(--rosa);font-weight:700;font-size:14px;margin-top:4px">' +
+      '<span>TOTAL MES</span><span class="pago-monto" style="font-size:16px">$'+ing.toLocaleString('es-MX')+'</span></div>';
+  }
+
+  /* ── Saldos pendientes ── */
+  var pendientes = [];
+  alumnos.forEach(function(a){
+    (a.saldos||[]).filter(function(s){ return !s.pagado; }).forEach(function(s){
+      pendientes.push({nom:a.nombre+' '+a.apellidos, folio:a.folio, monto:s.monto, plan:s.plan, fecha:s.fecha});
+    });
+  });
+  var dPend = document.getElementById('d-pendientes');
+  if(dPend){
+    if(pendientes.length){
+      var totPend = pendientes.reduce(function(t,p){return t+p.monto;},0);
+      dPend.innerHTML = pendientes.map(function(p){
+        return '<div class="arow" style="cursor:default">' +
+          '<div style="flex:1"><div class="arow-name">'+p.nom+'</div><div class="arow-disc">'+p.plan+' · '+p.fecha+'</div></div>' +
+          '<span style="color:#fabd75;font-weight:700">$'+p.monto.toLocaleString('es-MX')+'</span></div>';
+      }).join('') +
+        '<div style="text-align:right;padding:.4rem 0;font-size:13px;font-weight:700;color:#fabd75">Total pendiente: $'+totPend.toLocaleString('es-MX')+'</div>';
+    } else {
+      dPend.innerHTML = '<p style="font-size:12px;color:#7ec445">Sin saldos pendientes ✓</p>';
+    }
+  }
+
+  /* ── Visitas por disciplina hoy ── */
+  var visDisciplinaHoy={};
+  visHoy.forEach(function(v){ visDisciplinaHoy[v.disc||'—']=(visDisciplinaHoy[v.disc||'—']||0)+1; });
+  var dVisDisc = document.getElementById('d-vis-disc');
+  if(dVisDisc){
+    dVisDisc.innerHTML = Object.entries(visDisciplinaHoy).sort(function(a,b){return b[1]-a[1];})
+      .map(function(e){
+        return '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px">' +
+          '<span>'+e[0]+'</span><span style="font-weight:600;color:var(--rosa)">'+e[1]+'</span></div>';
+      }).join('')||'<p style="font-size:12px;color:var(--muted)">Ninguna visita hoy.</p>';
+  }
+
+  /* ── Alumnos con saldo pendiente count ── */
+  var dSaldoCnt = document.getElementById('d-saldo-cnt');
+  if(dSaldoCnt) dSaldoCnt.textContent = pendientes.length;
+
+  /* ── Últimos registros ── */
+  document.getElementById('d-ults').innerHTML = [...alumnos].slice(-6).reverse()
+    .map(function(a){
+      return '<div class="arow" style="cursor:default">' +
+        '<div style="flex:1;min-width:0"><div class="arow-name">'+a.nombre+' '+a.apellidos+'</div>' +
+        '<div class="arow-disc">'+(a.disciplinas||[]).join(', ')+'</div></div>' +
+        '<div style="text-align:right;flex-shrink:0"><div class="arow-folio">'+a.folio+'</div>' +
+        '<div class="arow-vis">'+a.fechaAlta+'</div></div></div>';
+    }).join('')||'<p style="font-size:12px;color:var(--muted)">Sin registros.</p>';
+
+  /* ── Citas pendientes ── */
+  var cp = citas.filter(function(c){ return c.estado==='Pendiente'; }).slice(0,5);
+  document.getElementById('d-citas').innerHTML = cp.map(function(c){
+    return '<div class="cita-card">' +
+      '<div class="cita-nombre">'+c.nombre+' <span style="font-size:11px;color:var(--muted)">\u00b7 '+c.tel+'</span></div>' +
+      '<div class="cita-disc">'+(c.disciplinas||[]).join(', ')+'</div>' +
+      '<div class="cita-meta">&#x1F4C5; '+c.fecha+(c.hora?' \u00b7 '+c.hora:'')+'</div></div>';
+  }).join('')||'<p style="font-size:12px;color:var(--muted)">Sin citas pendientes.</p>';
 }
 
 /* ══════════════════════ INIT ══════════════════════ */
