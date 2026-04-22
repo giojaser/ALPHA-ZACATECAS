@@ -718,6 +718,66 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
   </div>
 </div>
 
+<!-- ═══ EDITAR CITA OVERLAY ═══ -->
+<div class="edit-overlay" id="editcita-ov">
+  <div class="edit-inner">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <div class="edit-title" style="margin:0">Editar cita</div>
+      <button onclick="cerrarEditCita()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1">&#x2715;</button>
+    </div>
+
+    <div class="card" style="background:var(--bg3)">
+      <div class="ct">Datos del interesado</div>
+      <div class="g2">
+        <div class="field"><label>Nombre completo *</label><input type="text" id="ec-nom"></div>
+        <div class="field"><label>Teléfono *</label><input type="tel" id="ec-tel"></div>
+        <div class="field"><label>Correo</label><input type="email" id="ec-email"></div>
+        <div class="field"><label>¿Cómo nos conoció?</label>
+          <select id="ec-como">
+            <option value="">—</option>
+            <option>Instagram</option><option>Facebook</option><option>TikTok</option>
+            <option>Recomendación</option><option>Pasando por el lugar</option><option>Otro</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="background:var(--bg3)">
+      <div class="ct">Disciplinas de interés</div>
+      <div class="disc-grid" id="ec-disc-grid"></div>
+    </div>
+
+    <div class="card" id="ec-hors-card" style="background:var(--bg3)">
+      <div class="ct">Horario de preferencia</div>
+      <div id="ec-hors-cont"></div>
+      <div style="margin-top:.5rem" id="ec-hors-disp"></div>
+    </div>
+
+    <div class="card" style="background:var(--bg3)">
+      <div class="ct">Datos de la cita</div>
+      <div class="g2">
+        <div class="field"><label>Fecha *</label><input type="date" id="ec-fecha"></div>
+        <div class="field"><label>Hora</label><input type="time" id="ec-hora"></div>
+        <div class="field"><label>Estado</label>
+          <select id="ec-estado">
+            <option>Pendiente</option>
+            <option>Confirmada</option>
+            <option>Cancelada</option>
+            <option>Reagendada</option>
+          </select>
+        </div>
+        <div class="field"><label>Notas</label><input type="text" id="ec-notas-edit" placeholder="Observaciones..."></div>
+      </div>
+    </div>
+
+    <div class="btn-row" style="padding-top:.75rem">
+      <button class="btn-p" style="flex:1;margin:0" onclick="guardarEditCita()">Guardar cambios</button>
+      <button class="btn-s" onclick="cerrarEditCita()">Cancelar</button>
+    </div>
+    <div class="alert" id="al-editcita" style="margin-top:.5rem"></div>
+  </div>
+</div>
+
 <div class="modal-bg" id="qr-modal">
   <div class="modal">
     <h3 id="qrm-nom">—</h3>
@@ -1504,22 +1564,29 @@ async function agendarCita(){
   document.getElementById('c-hors-card').style.display='none'; renderCitas();
 }
 function renderCitas(){
-  const c=document.getElementById('citas-lista');
-  const arr=DB.citas||[];
-  if(!arr.length){c.innerHTML='<p style="font-size:12px;color:var(--muted)">Sin citas.</p>';return;}
-  c.innerHTML=[...arr].reverse().map(ct=>`
-    <div class="cita-card">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-        <div><div class="cita-nombre">${ct.nombre} <span style="font-size:11px;color:var(--muted)">· ${ct.tel}</span></div>
-        <div class="cita-disc">${(ct.disciplinas||[]).join(', ')}</div>
-        <div class="cita-meta">📅 ${ct.fecha}${ct.hora?' · '+ct.hora:''}</div></div>
-        <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0">
-          <span class="cita-badge ${ct.estado==='Confirmada'?'conf':'pend'}">${ct.estado}</span>
-          <button class="btn-s" style="font-size:10px;padding:4px 8px" data-cid="${ct.id}" onclick="confCita(this.dataset.cid)">Confirmar</button>
-          <button class="btn-danger" style="font-size:10px;padding:4px 8px" data-cid="${ct.id}" onclick="delCita(this.dataset.cid)">Borrar</button>
-        </div>
-      </div>
-    </div>`).join('');
+  var c = document.getElementById('citas-lista');
+  var arr = DB.citas||[];
+  if(!arr.length){ c.innerHTML='<p style="font-size:12px;color:var(--muted)">Sin citas.</p>'; return; }
+  c.innerHTML = [...arr].reverse().map(function(ct){
+    var badgeCls = ct.estado==='Confirmada' ? 'conf' : ct.estado==='Cancelada' ? 'full' : 'pend';
+    var notas = ct.notas ? '<div class="cita-meta" style="margin-top:2px">&#x1F4DD; '+ct.notas+'</div>' : '';
+    var hors  = (ct.horarios||[]).length ? '<div class="cita-meta">&#x23F0; '+(ct.horarios||[]).map(function(k){return k.split('|||')[1]||k;}).join(', ')+'</div>' : '';
+    return '<div class="cita-card">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
+      '<div style="flex:1;min-width:0">' +
+        '<div class="cita-nombre">'+ct.nombre+' <span style="font-size:11px;color:var(--muted)">&middot; '+ct.tel+'</span></div>' +
+        '<div class="cita-disc">'+(ct.disciplinas||[]).join(', ')+'</div>' +
+        '<div class="cita-meta">&#x1F4C5; '+ct.fecha+(ct.hora?' &middot; '+ct.hora:'')+'</div>' +
+        hors + notas +
+        (ct.como ? '<div class="cita-meta" style="color:var(--muted)">&#x1F4AC; '+ct.como+'</div>' : '') +
+      '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0">' +
+        '<span class="cita-badge '+badgeCls+'">'+ct.estado+'</span>' +
+        '<button class="btn-s" style="font-size:10px;padding:5px 9px;white-space:nowrap" data-cid="'+ct.id+'" onclick="abrirEditCita(this.dataset.cid)">&#x270F; Editar</button>' +
+        '<button class="btn-s" style="font-size:10px;padding:5px 9px" data-cid="'+ct.id+'" onclick="confCita(this.dataset.cid)">&#x2713; Confirmar</button>' +
+        '<button class="btn-danger" style="font-size:10px;padding:5px 9px" data-cid="'+ct.id+'" onclick="delCita(this.dataset.cid)">Borrar</button>' +
+      '</div></div></div>';
+  }).join('');
 }
 async function confCita(id){
   var c = DB.citas.find(function(x){ return x.id===id; });
@@ -2477,6 +2544,88 @@ async function pmGuardar(){
   } finally{
     setTimeout(function(){ S.writeLock=false; },2000);
   }
+}
+
+
+/* ══════════════════════ EDITAR CITA ══════════════════════ */
+var editCitaId = null;
+var editCitaDiscs = [];
+var editCitaHors  = [];
+
+function abrirEditCita(id){
+  var ct = (DB.citas||[]).find(function(x){ return x.id===id; });
+  if(!ct) return;
+  editCitaId   = id;
+  editCitaDiscs = [...(ct.disciplinas||[])];
+  editCitaHors  = [...(ct.horarios||[])];
+
+  /* Fill fields */
+  var fields = {
+    'ec-nom':   ct.nombre||'',
+    'ec-tel':   ct.tel||'',
+    'ec-email': ct.email||'',
+    'ec-fecha': ct.fecha||'',
+    'ec-hora':  ct.hora||'',
+    'ec-notas': ct.notas||''
+  };
+  Object.keys(fields).forEach(function(id){
+    var el = document.getElementById(id); if(el) el.value = fields[id];
+  });
+  var comoEl = document.getElementById('ec-como');
+  if(comoEl) comoEl.value = ct.como||'';
+  var estadoEl = document.getElementById('ec-estado');
+  if(estadoEl) estadoEl.value = ct.estado||'Pendiente';
+
+  /* Disciplines */
+  buildDiscGrid('ec-disc-grid', editCitaDiscs, function(btn,d){
+    var i = editCitaDiscs.indexOf(d);
+    if(i>=0) editCitaDiscs.splice(i,1); else editCitaDiscs.push(d);
+    btn.classList.toggle('on', editCitaDiscs.includes(d));
+    buildHorsMulti('ec-hors-cont','ec-hors-disp','ec-hors-card', editCitaDiscs, editCitaHors);
+  });
+  buildHorsMulti('ec-hors-cont','ec-hors-disp','ec-hors-card', editCitaDiscs, editCitaHors);
+
+  var ov = document.getElementById('editcita-ov');
+  if(ov){ ov.classList.add('on'); ov.scrollTop=0; }
+}
+
+async function guardarEditCita(){
+  var ct = (DB.citas||[]).find(function(x){ return x.id===editCitaId; });
+  if(!ct) return;
+  var nom   = (document.getElementById('ec-nom').value||'').trim();
+  var tel   = (document.getElementById('ec-tel').value||'').trim();
+  var fecha = document.getElementById('ec-fecha').value||'';
+  if(!nom||!tel||!fecha){ showAlert('al-editcita','Completa nombre, teléfono y fecha.','err'); return; }
+
+  ct.nombre  = nom;
+  ct.tel     = tel;
+  ct.email   = document.getElementById('ec-email').value;
+  ct.como    = document.getElementById('ec-como').value;
+  ct.fecha   = fecha;
+  ct.hora    = document.getElementById('ec-hora').value;
+  ct.notas   = document.getElementById('ec-notas-edit').value;
+  ct.estado  = document.getElementById('ec-estado').value;
+  if(editCitaDiscs.length) ct.disciplinas = editCitaDiscs;
+  if(editCitaHors.length)  ct.horarios    = editCitaHors;
+
+  S.writeLock = true;
+  saveLocal();
+  try{
+    await saveDB();
+    showAlert('al-editcita','✓ Cita actualizada correctamente','ok');
+    cerrarEditCita();
+    renderCitas();
+  } catch(e){
+    showAlert('al-editcita','Error: '+e.message,'err');
+  } finally{
+    setTimeout(function(){ S.writeLock=false; },2000);
+  }
+}
+
+function cerrarEditCita(){
+  var ov = document.getElementById('editcita-ov');
+  if(ov) ov.classList.remove('on');
+  editCitaId = null;
 }
 
 /* ══════════════════════ REGISTRAR VISITA ══════════════════════ */
