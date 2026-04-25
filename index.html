@@ -818,7 +818,23 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
     <div class="card" style="background:var(--bg3)">
       <div class="ct">Plan y estado</div>
       <div class="g2">
-     
+        <div class="field"><label>Plan activo</label><input type="text" id="e-plan"></div>
+        <div class="field"><label>Estado</label>
+          <select id="e-estado">
+            <option>Activo</option><option>Inactivo</option><option>Becado</option><option>Suspendido</option>
+          </select>
+        </div>
+        <div class="field full"><label>Notas</label><textarea id="e-notas" style="min-height:60px"></textarea></div>
+      </div>
+    </div>
+    <div class="btn-row" style="padding-top:.75rem;margin-top:.5rem">
+      <button class="btn-p" style="flex:1;margin:0" onclick="guardarEdit()">&#x2713; Guardar cambios</button>
+      <button class="btn-s" onclick="cerrarEdit()">Cancelar</button>
+    </div>
+    <div class="alert" id="al-edit" style="margin-top:.5rem"></div>
+  </div>
+</div>
+
 <script>
 /* ══════════════════════ DATOS DE DISCIPLINAS ══════════════════════ */
 const DISCS_KEYS = ['Pole Sport','Pole Exotic','Pole Espiral',"Pole Kid's",'Danza Aérea Telas','Elementos Aéreos','Enlogación/Flex','Yoga','Twerk','Jumping y Baile','Ritmos Latinos','Defensa Personal','Música/Vocalización','Heels','Otra disciplina'];
