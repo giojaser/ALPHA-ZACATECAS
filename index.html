@@ -909,7 +909,18 @@ let S={
 // Cloud config
 let CFG={proveedor:'local',jbKey:'',jbBin:'',fbUrl:''};
 
-function saveLocal(){localStorage.setItem('alpha_v3',JSON.stringify({DB,CFG}))}
+function saveLocal(){
+  try{
+    localStorage.setItem('alpha_v3', JSON.stringify({DB:DB, CFG:CFG}));
+  } catch(e){
+    /* Storage quota exceeded - trim visLog */
+    if(e.name==='QuotaExceededError'||e.name==='NS_ERROR_DOM_QUOTA_REACHED'){
+      DB.visLog = (DB.visLog||[]).slice(-200);
+      try{ localStorage.setItem('alpha_v3', JSON.stringify({DB:DB, CFG:CFG})); }
+      catch(e2){ console.error('Storage full even after trim:', e2); }
+    }
+  }
+}
 function loadLocal(){
   try{const d=JSON.parse(localStorage.getItem('alpha_v3')||'{}');if(d.DB){DB=d.DB;if(!DB.visLog)DB.visLog=[];}if(d.CFG)CFG=d.CFG;}catch(e){}
 }
@@ -1285,20 +1296,27 @@ async function saveDB(){
       setCloudStatus('ok','Guardado ' + new Date().toLocaleTimeString('es-MX'));
     } catch(e){
       setCloudStatus('err','Error Firebase: ' + e.message);
+      console.error('saveDB Firebase error:', e);
     }
   }
 }
 
 /* ══════════════════════ NAV ══════════════════════ */
 function goPage(id,btn){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
-  document.querySelectorAll('.nb,.bn').forEach(b=>b.classList.remove('on'));
-  document.getElementById('p-'+id).classList.add('on');
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('on'); });
+  document.querySelectorAll('.nb,.bn').forEach(function(b){ b.classList.remove('on'); });
+  var pg = document.getElementById('p-'+id);
+  if(pg) pg.classList.add('on');
   if(btn) btn.classList.add('on');
+  /* Close any open overlays/modals when navigating */
+  ['edit-ov','editcita-ov','editvis-modal'].forEach(function(oid){
+    var el = document.getElementById(oid);
+    if(el) el.classList.remove('on');
+  });
   if(id==='als') renderAls();
   if(id==='dash') renderDash();
   if(id==='cita') renderCitas();
-  if(id==='qr') stopCam();
+  if(id==='qr'){ stopCam(); renderLogHoy(); }
   window.scrollTo(0,0);
 }
 
@@ -1668,6 +1686,7 @@ function verPerfil(f){
   window.scrollTo(0,0);
 }
 function renderVisGrid(a){
+  if(!a) return;
   var g    = document.getElementById('pf-vis');
   var cnt  = document.getElementById('pf-cnt');
   var prog = document.getElementById('pf-prog');
@@ -2190,19 +2209,29 @@ function enviarWARenovacion(){
 
 /* ══════════════════════ EDITAR VISITAS MANUAL ══════════════════════ */
 function abrirEditVis(){
-  if(!S.alumno) return;
-  document.getElementById('editvis-modal').classList.add('on');
+  if(!S.alumno){ alert('Abre el perfil de un alumno primero.'); return; }
   /* Populate disc selector */
   var sel = document.getElementById('ev-disc');
-  var discs = S.alumno.disciplinas || ['—'];
-  sel.innerHTML = discs.map(function(d){
-    return '<option value="'+d+'">'+d+'</option>';
-  }).join('');
-  /* Default date = today */
-  document.getElementById('ev-fecha').value = today();
-  document.getElementById('ev-hora').value  =
-    new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}).replace(' ','').substring(0,5);
+  var discs = (S.alumno.disciplinas&&S.alumno.disciplinas.length) ? S.alumno.disciplinas : ['—'];
+  if(sel){
+    sel.innerHTML = discs.map(function(d){
+      return '<option value="'+d+'">'+d+'</option>';
+    }).join('');
+  }
+  /* Default date and time */
+  var fechaEl = document.getElementById('ev-fecha');
+  var horaEl  = document.getElementById('ev-hora');
+  if(fechaEl) fechaEl.value = today();
+  if(horaEl){
+    /* Use HH:MM format directly */
+    var now = new Date();
+    var hh  = String(now.getHours()).padStart(2,'0');
+    var mm  = String(now.getMinutes()).padStart(2,'0');
+    horaEl.value = hh + ':' + mm;
+  }
   evRenderVisitas();
+  var modal = document.getElementById('editvis-modal');
+  if(modal) modal.classList.add('on');
 }
 
 function cerrarEditVis(){
@@ -2249,42 +2278,87 @@ function evRenderVisitas(){
 
 async function evBorrarVisita(ts){
   if(!S.alumno) return;
+  if(!confirm('¿Eliminar esta visita?')) return;
   var tsNum = parseInt(ts);
-  /* Remove from visLog */
-  DB.visLog = (DB.visLog||[]).filter(function(v){ return v.ts !== tsNum; });
-  /* Remove from alumno.visitas (by timestamp match) */
+  DB.visLog = (DB.visLog||[]).filter(function(v){ return String(v.ts) !== String(ts); });
   S.alumno.visitas = (S.alumno.visitas||[]).filter(function(v){
     var vts = typeof v==='string' ? new Date(v).getTime() : (v.ts ? parseInt(v.ts) : 0);
-    return Math.abs(vts - tsNum) > 2000;
+    return Math.abs(vts - tsNum) > 3000;
   });
-  S.writeLock = true;
   saveLocal();
-  try{ await saveDB(); } catch(e){}
-  finally{ setTimeout(function(){S.writeLock=false;},2000); }
   evRenderVisitas();
   renderVisGrid(S.alumno);
+  S.writeLock = true;
+  try{ await saveDB(); } catch(e){}
+  finally{ setTimeout(function(){ S.writeLock=false; },2000); }
 }
 
 async function evAgregarVisita(){
-  if(!S.alumno) return;
-  var disc  = document.getElementById('ev-disc').value;
-  var fecha = document.getElementById('ev-fecha').value || today();
-  var hora  = document.getElementById('ev-hora').value  ||
-    new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
-  var ts    = new Date(fecha + 'T' + (hora||'00:00') + ':00').getTime() || Date.now();
+  /* Guard: alumno must be set */
+  var a = S.alumno;
+  if(!a){ alert('Error: no hay alumno seleccionado. Cierra y vuelve a abrir desde el perfil.'); return; }
 
+  var discEl  = document.getElementById('ev-disc');
+  var fechaEl = document.getElementById('ev-fecha');
+  var horaEl  = document.getElementById('ev-hora');
+  if(!discEl||!fechaEl||!horaEl){ alert('Error: campos no encontrados.'); return; }
+
+  var disc  = discEl.value || (a.disciplinas&&a.disciplinas[0]) || '—';
+  var fecha = fechaEl.value || today();
+  var hora  = horaEl.value  || new Date().toTimeString().substring(0,5);
+
+  /* Robust timestamp: combine fecha + hora */
+  var ts = Date.now();
+  try{
+    var combined = fecha + 'T' + hora + ':00';
+    var d = new Date(combined);
+    if(!isNaN(d.getTime())) ts = d.getTime();
+  } catch(e){}
+
+  /* Safe ISO string */
+  var isoStr = new Date(ts).toISOString();
+
+  /* Add to DB.visLog */
   if(!DB.visLog) DB.visLog = [];
-  DB.visLog.push({ folio:S.alumno.folio, nom:S.alumno.nombre+' '+S.alumno.apellidos, disc:disc, hora:hora, fecha:fecha, ts:ts });
-  if(!S.alumno.visitas) S.alumno.visitas = [];
-  S.alumno.visitas.push(new Date(ts).toISOString());
+  DB.visLog.push({
+    folio: a.folio,
+    nom:   a.nombre + ' ' + a.apellidos,
+    disc:  disc,
+    hora:  hora,
+    fecha: fecha,
+    ts:    ts
+  });
   if(DB.visLog.length > 500) DB.visLog = DB.visLog.slice(-500);
 
-  S.writeLock = true;
+  /* Add to a.visitas */
+  if(!a.visitas) a.visitas = [];
+  a.visitas.push(isoStr);
+
+  /* Save locally first for immediate feedback */
   saveLocal();
-  try{ await saveDB(); } catch(e){}
-  finally{ setTimeout(function(){S.writeLock=false;},2000); }
+
+  /* Update UI immediately */
   evRenderVisitas();
-  renderVisGrid(S.alumno);
+  renderVisGrid(a);
+
+  /* Show success */
+  var btnAg = document.querySelector('#editvis-modal .btn-p');
+  if(btnAg){
+    var orig = btnAg.textContent;
+    btnAg.textContent = '✓ Visita agregada';
+    btnAg.style.background = '#3b6d11';
+    setTimeout(function(){ btnAg.textContent=orig; btnAg.style.background=''; }, 2000);
+  }
+
+  /* Push to cloud */
+  S.writeLock = true;
+  try{
+    await saveDB();
+  } catch(e){
+    console.error('saveDB error:', e);
+  } finally{
+    setTimeout(function(){ S.writeLock=false; }, 2000);
+  }
 }
 
 async function evBorrarTodas(){
