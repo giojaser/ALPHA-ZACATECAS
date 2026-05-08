@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Alpha — Centro de Desarrollo Artístico y Cultural</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Alpha">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="description" content="Alpha Centro de Desarrollo Artístico y Cultural — Registro de alumnos y control de clases">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
@@ -423,6 +428,7 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
         </div>
       </div>
     </div>
+    <div id="pf-vigencia-bar" style="display:none;padding:7px 1rem;font-size:12px;font-weight:600;border-radius:0;border-left:none;border-right:none;border-top:none"></div>
     <div class="pf-body">
       <div class="info-grid">
         <div><div class="ig-lbl">Teléfono</div><div class="ig-val" id="pf-tel">—</div></div>
@@ -507,13 +513,34 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin-bottom:.7rem">
     <div class="stat" style="border:1px solid #fabd75;background:rgba(133,79,11,.12)"><div class="stat-n" id="d-saldo-cnt" style="color:#fabd75">0</div><div class="stat-l" style="color:#fabd75">Saldos pend.</div></div>
     <div class="stat"><div class="stat-n" id="d-citas-cnt" style="color:var(--cyan)">0</div><div class="stat-l">Citas hoy</div></div>
+    <div class="stat" style="border:1px solid #f09595;background:rgba(163,45,45,.1)"><div class="stat-n" id="d-expira-cnt" style="color:#f09595">0</div><div class="stat-l" style="color:#f09595">Vencidos</div></div>
+    <div class="stat" style="border:1px solid #fabd75;background:rgba(133,79,11,.1)"><div class="stat-n" id="d-warn-cnt" style="color:#fabd75">0</div><div class="stat-l" style="color:#fabd75">Por vencer</div></div>
   </div>
   <div class="card"><div class="ct">Alumnos por disciplina</div><div id="d-discs"></div></div>
   <div class="card" style="margin-top:.7rem"><div class="ct">Ingresos del mes por plan</div><div id="d-ingr-plan"></div></div>
   <div class="card" style="margin-top:.7rem"><div class="ct">&#x26A0; Saldos pendientes</div><div id="d-pendientes"></div></div>
   <div class="card" style="margin-top:.7rem"><div class="ct">Visitas de hoy por disciplina</div><div id="d-vis-disc"></div></div>
+  <div class="card" style="margin-top:.7rem"><div class="ct">&#x23F0; Vigencias por vencer (7 días)</div><div id="d-expira"></div></div>
   <div class="card" style="margin-top:.7rem"><div class="ct">Últimos registros</div><div id="d-ults"></div></div>
   <div class="card" style="margin-top:.7rem"><div class="ct">Citas pendientes</div><div id="d-citas"></div></div>
+</div>
+
+
+<!-- ═══ PAGE: CALENDARIO ═══ -->
+<div id="p-cal" class="page">
+  <div class="pt">Calendario</div>
+  <div class="ps">Asistencias del mes por disciplina y alumno</div>
+  <div class="card" style="padding:.7rem .9rem;margin-bottom:.7rem">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input type="search" id="cal-search" placeholder="Buscar alumno..."
+        style="flex:1;min-width:150px;background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 12px;color:var(--blanco);font-size:13px;outline:none"
+        oninput="renderCal()">
+      <input type="month" id="cal-month"
+        style="background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:13px;outline:none"
+        oninput="renderCal()">
+    </div>
+  </div>
+  <div id="cal-content"></div>
 </div>
 
 <!-- ═══ PAGE: NUBE CONFIG ═══ -->
@@ -835,8 +862,7 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
   </div>
 </div>
 
-<script>
-/* ══════════════════════ DATOS DE DISCIPLINAS ══════════════════════ */
+<script>/* ══════════════════════ DATOS DE DISCIPLINAS ══════════════════════ */
 const DISCS_KEYS = ['Pole Sport','Pole Exotic','Pole Espiral',"Pole Kid's",'Danza Aérea Telas','Elementos Aéreos','Enlogación/Flex','Yoga','Twerk','Jumping y Baile','Ritmos Latinos','Defensa Personal','Música/Vocalización','Heels','Otra disciplina'];
 const DISCS = {
   'Pole Sport':{precio:500,hors:[{g:'Lunes y Miércoles',h:['6:00–7:00 pm','7:00–8:00 pm']},{g:'Martes y Jueves',h:['6:00–7:00 am','7:00–8:00 am','5:00–6:00 pm','6:00–7:00 pm','7:00–8:00 pm']},{g:'Intensivo – Sábado',h:['2:00–4:00 pm'],it:1},{g:'Domingos',h:['2:00–4:00 pm']}]},
@@ -1301,6 +1327,36 @@ async function saveDB(){
   }
 }
 
+
+/* ══════════════════════ VIGENCIA / EXPIRACIÓN ══════════════════════ */
+function calcFechaExpira(fechaAlta, planId){
+  var plan  = PLANES.find(function(p){ return p.id===planId || p.n===planId; });
+  var meses = plan ? (plan.meses||1) : 1;
+  if(!fechaAlta) return null;
+  var d = new Date(fechaAlta);
+  if(isNaN(d.getTime())) return null;
+  d.setMonth(d.getMonth() + meses);
+  return d.toISOString().split('T')[0];
+}
+
+function diasRestantes(fechaExpira){
+  if(!fechaExpira) return null;
+  var hoy   = new Date(); hoy.setHours(0,0,0,0);
+  var exp   = new Date(fechaExpira); exp.setHours(0,0,0,0);
+  return Math.round((exp - hoy) / 86400000);
+}
+
+function vigenciaLabel(a){
+  if(!a.fechaExpira) return null;
+  var dias = diasRestantes(a.fechaExpira);
+  if(dias === null) return null;
+  if(dias < 0)  return {txt: 'Vencido hace '+Math.abs(dias)+' día'+(Math.abs(dias)!==1?'s':''), cls:'full'};
+  if(dias === 0) return {txt: 'Vence hoy', cls:'full'};
+  if(dias <= 3)  return {txt: 'Vence en '+dias+' día'+(dias!==1?'s':''), cls:'full'};
+  if(dias <= 7)  return {txt: 'Vence en '+dias+' días', cls:'warn'};
+  return {txt: 'Vigente hasta '+a.fechaExpira+' ('+dias+' días)', cls:'ok'};
+}
+
 /* ══════════════════════ NAV ══════════════════════ */
 function goPage(id,btn){
   document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('on'); });
@@ -1316,6 +1372,7 @@ function goPage(id,btn){
   if(id==='als') renderAls();
   if(id==='dash') renderDash();
   if(id==='cita') renderCitas();
+  if(id==='cal'){ renderCal(); }
   if(id==='qr'){ stopCam(); renderLogHoy(); }
   window.scrollTo(0,0);
 }
@@ -1552,7 +1609,9 @@ async function guardar(){
       horarios:[...S.rHors],
       planActual:pl?pl.n:'Clase suelta',
       notas:document.getElementById('r-notas').value,
-      fechaAlta:fpago, estado:'Activo',
+      fechaAlta:fpago,
+      fechaExpira:pl?calcFechaExpira(fpago,pl.id):null,
+      estado:'Activo',
       pagos:[pago], visitas:[]
     };
 
@@ -1576,6 +1635,9 @@ function limpiarForm(){
   ['r-nom','r-ap','r-tel','r-email','r-fnac','r-emer','r-notas','r-ref','r-monto'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   S.rDiscs=[];S.rHors=[];S.rPlan=null;editExist=null;
   document.getElementById('r-fpago').value=today();
+var _cmEl=document.getElementById('cal-month');
+if(_cmEl){var _n=new Date();_cmEl.value=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0');}
+  S.saving=false;
   buildDiscGrid('r-disc-grid',S.rDiscs,handleDiscReg);
   ['r-hors-card','pkg-card','sum-card'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});
 }
@@ -1677,9 +1739,29 @@ function verPerfil(f){
   document.getElementById('pf-hor').textContent=(a.horarios||[]).map(k=>k.split('|||')[1]).join(', ')||'—';
   document.getElementById('pf-plan').textContent=a.planActual||'—';
   const ul=(a.pagos||[]).slice(-1)[0];
-  document.getElementById('pf-vig').textContent=ul?ul.plan:a.planActual||'—';
+  var vigInfo = vigenciaLabel(a);
+  document.getElementById('pf-vig').textContent = ul?ul.plan:a.planActual||'—';
+  /* Show expiry info */
+  var vigEl = document.getElementById('pf-vigencia-bar');
+  if(vigEl){
+    if(vigInfo){
+      vigEl.style.display='block';
+      vigEl.textContent = vigInfo.txt;
+      vigEl.style.background = vigInfo.cls==='full'?'rgba(163,45,45,.25)':vigInfo.cls==='warn'?'rgba(133,79,11,.25)':'rgba(59,109,17,.15)';
+      vigEl.style.color = vigInfo.cls==='full'?'#f09595':vigInfo.cls==='warn'?'#fabd75':'#7ec445';
+      vigEl.style.border = '1px solid '+(vigInfo.cls==='full'?'rgba(163,45,45,.4)':vigInfo.cls==='warn'?'rgba(133,79,11,.4)':'rgba(59,109,17,.3)');
+    } else { vigEl.style.display='none'; }
+  }
   document.getElementById('pf-monto').textContent=ul?'$'+ul.monto.toLocaleString('es-MX'):'—';
   document.getElementById('pf-alta').textContent=a.fechaAlta;
+  var _venc=calcVencimiento(a); var _dias=diasRestantes(a);
+  var _vigEl=document.getElementById('pf-vig');
+  if(_vigEl&&_venc){
+    var _vs=_venc.toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'});
+    if(_dias!==null&&_dias<0){ _vigEl.innerHTML=_vs+' <span style="color:#f09595;font-size:10px;font-weight:700">VENCIDO</span>'; S.alumnoRenovar=a; var _wb=document.getElementById('pf-wa-renovar'); if(_wb)_wb.style.display='block'; }
+    else if(_dias!==null&&_dias<=5){ _vigEl.innerHTML=_vs+' <span style="color:#fabd75;font-size:10px;font-weight:700">Vence en '+_dias+'d</span>'; }
+    else{ _vigEl.textContent=_vs+(_dias!==null?' ('+_dias+' días)':''); }
+  }
   renderVisGrid(a); renderPagosHist(a);
   const qm=document.getElementById('pf-qr-mini');qm.innerHTML='';
   new QRCode(qm,{text:a.folio,width:72,height:72,colorDark:'#d4537e',colorLight:'#141414'});
@@ -2590,7 +2672,7 @@ async function pmGuardar(){
   pmAlumno.pagos = pmAlumno.pagos || [];
   pmAlumno.pagos.push(pago);
   if(pmDiscs.length > 0) pmAlumno.disciplinas = pmDiscs;
-  if(plan) pmAlumno.planActual = plan.n;
+  if(plan){ pmAlumno.planActual = plan.n; pmAlumno.fechaExpira = calcFechaExpira(fecha, plan.id); }
 
   /* Track pending balance on alumno */
   if(!pmAlumno.saldos) pmAlumno.saldos = [];
@@ -2946,8 +3028,57 @@ function renderDash(){
   /* ── Alumnos con saldo pendiente count ── */
   var dSaldoCnt = document.getElementById('d-saldo-cnt');
   if(dSaldoCnt) dSaldoCnt.textContent = pendientes.length;
+  /* Expiry counts */
+  var expCnt  = alumnos.filter(function(a){ var d=diasRestantes(a.fechaExpira); return d!==null&&d<0; }).length;
+  var warnCnt = alumnos.filter(function(a){ var d=diasRestantes(a.fechaExpira); return d!==null&&d>=0&&d<=7; }).length;
+  var dExpiraCnt = document.getElementById('d-expira-cnt');
+  var dWarnCnt   = document.getElementById('d-warn-cnt');
+  var dCitasCnt  = document.getElementById('d-citas-cnt');
+  if(dExpiraCnt) dExpiraCnt.textContent = expCnt;
+  if(dWarnCnt)   dWarnCnt.textContent   = warnCnt;
+  if(dCitasCnt)  dCitasCnt.textContent  = citas.filter(function(c){ return c.fecha===todayD; }).length;
+
+  /* ── Expiring / expired ── */
+  var dExpira = document.getElementById('d-expira');
+  if(dExpira){
+    var expiring = alumnos.filter(function(a){
+      if(!a.fechaExpira) return false;
+      var dias = diasRestantes(a.fechaExpira);
+      return dias !== null && dias <= 7;
+    }).sort(function(a,b){ return diasRestantes(a.fechaExpira)-diasRestantes(b.fechaExpira); });
+    if(expiring.length){
+      dExpira.innerHTML = expiring.map(function(a){
+        var v = vigenciaLabel(a);
+        return '<div class="arow" style="cursor:default">' +
+          '<div style="flex:1;min-width:0"><div class="arow-name">'+a.nombre+' '+a.apellidos+'</div>' +
+          '<div class="arow-disc">'+a.planActual+'</div></div>' +
+          '<span style="font-size:11px;font-weight:600;color:'+(v&&v.cls==='full'?'#f09595':'#fabd75')+'">'+
+          (v?v.txt:'—')+'</span></div>';
+      }).join('');
+    } else {
+      dExpira.innerHTML='<p style="font-size:12px;color:#7ec445">Ningún plan por vencer esta semana ✓</p>';
+    }
+  }
 
   /* ── Últimos registros ── */
+  /* Vencidos / por vencer */
+  var _venc0=alumnos.filter(function(a){var d=diasRestantes(a);return d!==null&&d<0;});
+  var _venc5=alumnos.filter(function(a){var d=diasRestantes(a);return d!==null&&d>=0&&d<=5;});
+  var _dvEl=document.getElementById('d-vencidos');
+  if(_dvEl){
+    if(_venc0.length||_venc5.length){
+      _dvEl.innerHTML=
+        (_venc0.length?'<div style="color:#f09595;font-size:12px;font-weight:600;margin-bottom:4px">'+_venc0.length+' membresía(s) VENCIDA(S)</div>':'')+
+        (_venc5.length?'<div style="color:#fabd75;font-size:12px;font-weight:600;margin-bottom:6px">'+_venc5.length+' vence(n) en ≤5 días</div>':'')+
+        [..._venc0,..._venc5].slice(0,8).map(function(a){
+          return '<div class="arow" style="cursor:default;margin-bottom:4px"><div style="flex:1;min-width:0"><div class="arow-name">'+esc(a.nombre)+' '+esc(a.apellidos)+'</div><div class="arow-disc">'+esc(a.planActual||'—')+'</div></div>'+badgeVigencia(a)+'</div>';
+        }).join('');
+    } else {
+      _dvEl.innerHTML='<p style="font-size:12px;color:#7ec445">Todos los planes vigentes ✓</p>';
+    }
+  }
+  var _citasCnt=document.getElementById('d-citas-cnt');
+  if(_citasCnt) _citasCnt.textContent=(citas.filter(function(c){return c.estado==='Pendiente';}).length);
   document.getElementById('d-ults').innerHTML = [...alumnos].slice(-6).reverse()
     .map(function(a){
       return '<div class="arow" style="cursor:default">' +
@@ -2969,6 +3100,8 @@ function renderDash(){
 
 /* ══════════════════════ INIT ══════════════════════ */
 document.getElementById('r-fpago').value=today();
+var _cmEl=document.getElementById('cal-month');
+if(_cmEl){var _n=new Date();_cmEl.value=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0');}
 document.getElementById('c-fecha').value=today();
 buildDiscGrid('r-disc-grid',S.rDiscs,handleDiscReg);
 buildDiscGrid('c-disc-grid',S.cDiscs,handleDiscCita);
@@ -3094,6 +3227,93 @@ function refreshActiveView(){
   } else if(id === 'p-qr'){
     renderLogHoy();
   }
+}
+
+
+/* ══════════════════════ UTILIDADES ══════════════════════ */
+function esc(s){
+  if(s===undefined||s===null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function calcVencimiento(a){
+  var plan = PLANES.find(function(p){ return p.n===a.planActual; });
+  if(!plan||!plan.meses) return null;
+  var pagos = (a.pagos||[]).filter(function(p){ return p.tipo==='paq'||p.tipo==='mem'||p.completo; });
+  var base  = pagos.length ? new Date(pagos[pagos.length-1].fecha) : new Date(a.fechaAlta);
+  if(isNaN(base.getTime())) return null;
+  var v = new Date(base); v.setMonth(v.getMonth()+plan.meses); return v;
+}
+function diasRestantes(a){
+  var v=calcVencimiento(a); if(!v) return null;
+  return Math.ceil((v.getTime()-Date.now())/86400000);
+}
+function badgeVigencia(a){
+  var d=diasRestantes(a); if(d===null) return '';
+  if(d<0)   return '<span style="background:rgba(163,45,45,.25);color:#f09595;font-size:9px;padding:2px 7px;border-radius:5px;font-weight:700;margin-left:4px">VENCIDO</span>';
+  if(d<=5)  return '<span style="background:rgba(133,79,11,.25);color:#fabd75;font-size:9px;padding:2px 7px;border-radius:5px;font-weight:700;margin-left:4px">Vence en '+d+'d</span>';
+  if(d<=10) return '<span style="background:rgba(0,153,187,.15);color:var(--cyan);font-size:9px;padding:2px 7px;border-radius:5px;font-weight:600;margin-left:4px">'+d+' días</span>';
+  return '<span style="background:rgba(59,109,17,.15);color:#7ec445;font-size:9px;padding:2px 7px;border-radius:5px;font-weight:600;margin-left:4px">'+d+' días</span>';
+}
+
+
+/* ══════════════════════ CALENDARIO ══════════════════════ */
+function renderCal(){
+  var c = document.getElementById('cal-content'); if(!c) return;
+  var q = (document.getElementById('cal-search')||{value:''}).value.toLowerCase();
+  var monEl = document.getElementById('cal-month');
+  var now   = new Date(); var yr=now.getFullYear(); var mo=now.getMonth();
+  if(monEl&&monEl.value){ var pts=monEl.value.split('-'); yr=parseInt(pts[0]); mo=parseInt(pts[1])-1; }
+  var dim = new Date(yr,mo+1,0).getDate();
+  var mStr= String(yr)+'-'+String(mo+1).padStart(2,'0');
+  var isCur=(yr===now.getFullYear()&&mo===now.getMonth());
+  var alumnos=(DB.alumnos||[]).filter(function(a){
+    return !q||(a.nombre+' '+a.apellidos+' '+a.folio).toLowerCase().includes(q);
+  });
+  if(!alumnos.length){c.innerHTML='<div class="card" style="text-align:center;color:var(--muted);font-size:13px">Sin alumnos.</div>';return;}
+  var days=Array.from({length:dim},function(_,i){return i+1;});
+  var html='';
+  alumnos.forEach(function(a){
+    var log=(DB.visLog||[]).filter(function(v){return v.folio===a.folio&&v.fecha&&v.fecha.startsWith(mStr);});
+    var byDD={};
+    log.forEach(function(v){
+      var d=parseInt((v.fecha||'').split('-')[2])||0;
+      var disc=v.disc||'—';
+      if(!byDD[disc]) byDD[disc]={};
+      if(!byDD[disc][d]) byDD[disc][d]=[];
+      byDD[disc][d].push(v.hora||'');
+    });
+    var discs=Object.keys(byDD);
+    html+='<div class="card" style="margin-bottom:.75rem;overflow-x:auto">';
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;gap:5px">';
+    html+='<div><span style="font-weight:600;font-size:13px">'+esc(a.nombre)+' '+esc(a.apellidos)+'</span> <span style="font-size:11px;color:var(--muted)">'+esc(a.folio)+'</span>'+badgeVigencia(a)+'</div>';
+    html+='<span style="font-size:11px;color:var(--rosa);font-weight:600">'+log.length+' asistencias</span>';
+    html+='</div>';
+    if(!discs.length){html+='<p style="font-size:11px;color:var(--muted)">Sin asistencias este mes.</p>';}
+    else{
+      html+='<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:10px;min-width:100%">';
+      html+='<tr><th style="text-align:left;padding:3px 8px;color:var(--muted);white-space:nowrap">Disciplina</th>';
+      days.forEach(function(d){
+        var isT=isCur&&d===now.getDate();
+        html+='<th style="text-align:center;padding:2px 1px;width:20px;color:'+(isT?'var(--rosa)':'var(--muted)')+'"><small>'+(isT?'<b>'+d+'</b>':d)+'</small></th>';
+      });
+      html+='</tr>';
+      discs.forEach(function(disc){
+        html+='<tr><td style="padding:3px 8px;color:var(--rosa);font-weight:600;white-space:nowrap">'+esc(disc)+'</td>';
+        days.forEach(function(d){
+          var v=byDD[disc][d];
+          html+='<td style="text-align:center;padding:1px">';
+          if(v&&v.length) html+='<div style="width:16px;height:16px;background:var(--rosa);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:8px;font-weight:700;margin:auto" title="'+esc(v.join(', '))+'">'+v.length+'</div>';
+          else html+='<div style="width:16px;height:16px;background:var(--bg3);border-radius:50%;margin:auto;opacity:.25"></div>';
+          html+='</td>';
+        });
+        html+='</tr>';
+      });
+      html+='</table></div>';
+    }
+    html+='</div>';
+  });
+  c.innerHTML=html||'<div class="card" style="text-align:center;color:var(--muted)">Sin resultados.</div>';
 }
 
 setInterval(function(){
