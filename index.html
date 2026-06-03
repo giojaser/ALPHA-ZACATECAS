@@ -290,6 +290,10 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     Nube
   </button>
+  <button class="bn" onclick="goPage('admin',this)">
+    <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    Admin
+  </button>
 </nav>
 
 <!-- ═══ PAGE: REGISTRO ═══ -->
@@ -429,6 +433,7 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
       </div>
     </div>
     <div id="pf-vigencia-bar" style="display:none;padding:7px 1rem;font-size:12px;font-weight:600;border-radius:0;border-left:none;border-right:none;border-top:none"></div>
+    <div id="pf-proximo-pago" style="display:none;padding:7px 1rem;font-size:12px;background:rgba(0,212,255,.08);border-bottom:1px solid rgba(0,212,255,.15);color:var(--blanco)"></div>
     <div class="pf-body">
       <div class="info-grid">
         <div><div class="ig-lbl">Teléfono</div><div class="ig-val" id="pf-tel">—</div></div>
@@ -456,6 +461,7 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
         <button class="btn-s" onclick="abrirEditVis()">&#x1F4C5; Visitas</button>
         <button class="btn-s" style="background:rgba(0,212,255,.1);border-color:var(--cyan);color:var(--cyan)" onclick="abrirPagoModal('pagar')">&#x1F4B0; Pagar</button>
         <button class="btn-p" style="margin:0;padding:9px 14px;font-size:12px;background:#3b6d11;border-color:#3b6d11" onclick="abrirPagoModal('renovar')">&#x1F504; Renovar / Renovar</button>
+        <button id="pf-wa-pago-btn" style="padding:9px 14px;background:rgba(37,211,102,.15);color:#7ec445;border:1px solid rgba(37,211,102,.3);border-radius:var(--r2);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font)" onclick="enviarWAPagoActual()">📱 Aviso pago WA</button>
         <button class="btn-danger" onclick="eliminar()">Eliminar</button>
         <button class="btn-s" onclick="cerrarPerfil()">← Volver</button>
       </div>
@@ -541,6 +547,144 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
     </div>
   </div>
   <div id="cal-content"></div>
+</div>
+
+
+<!-- ═══ PAGE: ADMIN ═══ -->
+<div id="p-admin" class="page">
+  <div class="pt">Administrador</div>
+  <div class="ps">Configuración de disciplinas, planes y herramientas</div>
+
+  <!-- TABS -->
+  <div style="display:flex;gap:4px;margin-bottom:1rem;background:var(--bg2);border-radius:var(--r);padding:4px;border:1px solid var(--border2);flex-wrap:wrap">
+    <button class="tpill on" id="adm-t-disc" onclick="admTab('disc')">Disciplinas</button>
+    <button class="tpill" id="adm-t-plan" onclick="admTab('plan')">Planes</button>
+    <button class="tpill" id="adm-t-pagos" onclick="admTab('pagos')">💰 Pagos</button>
+    <button class="tpill" id="adm-t-wa"   onclick="admTab('wa')">WhatsApp</button>
+    <button class="tpill" id="adm-t-vis"  onclick="admTab('vis')">Visitas</button>
+  </div>
+
+  <!-- TAB: DISCIPLINAS -->
+  <div id="adm-disc">
+    <div class="card">
+      <div class="ct">Disciplinas activas</div>
+      <div id="adm-disc-list"></div>
+      <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">
+        <div class="ct" style="margin-bottom:.5rem" id="adm-disc-form-title">Agregar nueva disciplina</div>
+        <input type="hidden" id="adm-disc-edit-nombre">
+        <div class="g2">
+          <div class="field"><label>Nombre *</label><input type="text" id="adm-disc-nom" placeholder="Nombre de la disciplina"></div>
+          <div class="field"><label>Precio mensual ($MXN) *</label><input type="number" id="adm-disc-precio" placeholder="500" min="0"></div>
+        </div>
+        <div style="margin-top:.75rem">
+          <div class="ct" style="margin-bottom:.5rem">Horarios (uno por línea, formato: Días | Hora)</div>
+          <textarea id="adm-disc-hors" placeholder="Lunes y Miércoles | 6:00–7:00 pm&#10;Martes y Jueves | 5:00–6:00 pm&#10;Intensivo Sábado | 10:00–12:00 pm" style="background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:13px;outline:none;width:100%;min-height:90px;resize:vertical;font-family:var(--font)"></textarea>
+        </div>
+        <div style="display:flex;gap:7px;margin-top:.5rem;flex-wrap:wrap">
+          <button class="btn-p" style="flex:1;margin:0" onclick="admAgregarDisc()">+ Guardar disciplina</button>
+          <button class="btn-s" id="adm-disc-cancel-edit" style="display:none" onclick="admCancelarEditDisc()">Cancelar</button>
+        </div>
+        <div class="alert" id="al-adm-disc" style="margin-top:.5rem"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: PLANES -->
+  <div id="adm-plan" style="display:none">
+    <div class="card">
+      <div class="ct">Planes actuales</div>
+      <div id="adm-plan-list"></div>
+      <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">
+        <div class="ct" style="margin-bottom:.5rem" id="adm-plan-form-title">Agregar / modificar plan</div>
+        <input type="hidden" id="adm-plan-edit-id">
+        <div class="g2">
+          <div class="field"><label>Nombre *</label><input type="text" id="adm-plan-nom" placeholder="Ej: Paquete #5"></div>
+          <div class="field"><label>Tipo</label>
+            <select id="adm-plan-tipo" style="background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:13px;outline:none;width:100%">
+              <option value="paq">Paquete</option>
+              <option value="mem">Membresía</option>
+              <option value="cl">Clase suelta</option>
+              <option value="otro">Taller / Otro</option>
+            </select>
+          </div>
+          <div class="field"><label>Precio ($MXN) *</label><input type="number" id="adm-plan-precio" placeholder="500" min="0"></div>
+          <div class="field"><label>Vigencia (meses)</label><input type="number" id="adm-plan-meses" placeholder="1" min="1"></div>
+          <div class="field"><label>Clases por mes (por disciplina)</label><input type="number" id="adm-plan-clases" placeholder="8" min="1"></div>
+          <div class="field"><label>Núm. disciplinas incluidas</label><input type="number" id="adm-plan-ndiscs" placeholder="1" min="1"></div>
+          <div class="field full"><label>Descripción</label><input type="text" id="adm-plan-desc" placeholder="Descripción breve del plan"></div>
+        </div>
+        <div style="display:flex;gap:7px;margin-top:.5rem;flex-wrap:wrap">
+          <button class="btn-p" style="flex:1;margin:0" onclick="admAgregarPlan()">+ Guardar plan</button>
+          <button class="btn-s" id="adm-plan-cancel-edit" style="display:none" onclick="admCancelarEditPlan()">Cancelar edición</button>
+        </div>
+        <div class="alert" id="al-adm-plan" style="margin-top:.5rem"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: PAGOS AUTOMÁTICOS -->
+  <div id="adm-pagos" style="display:none">
+    <div class="card">
+      <div class="ct">💰 Control de mensualidades</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:1rem">La mensualidad se calcula automáticamente según la fecha de registro de cada alumno, independientemente de si asiste o no. El día de pago es el mismo día del mes en que se registró.</p>
+      <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
+        <button class="tpill on" id="pg-f-todos" onclick="admPagosFiltro('todos')">Todos</button>
+        <button class="tpill" id="pg-f-vence7" onclick="admPagosFiltro('vence7')">Vencen en 7 días</button>
+        <button class="tpill" id="pg-f-vencido" onclick="admPagosFiltro('vencido')">Vencidos</button>
+        <button class="tpill" id="pg-f-vigente" onclick="admPagosFiltro('vigente')">Vigentes</button>
+      </div>
+      <div id="adm-pagos-list"></div>
+    </div>
+  </div>
+
+  <!-- TAB: WHATSAPP -->
+  <div id="adm-wa" style="display:none">
+    <div class="card">
+      <div class="ct">Estado de mensajes de pago este mes</div>
+      <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
+        <button class="tpill on" id="wa-f-pend" onclick="admWaFiltro('pend')">Pendientes</button>
+        <button class="tpill" id="wa-f-env"  onclick="admWaFiltro('env')">Ya enviados</button>
+        <button class="tpill" id="wa-f-all"  onclick="admWaFiltro('all')">Todos</button>
+      </div>
+      <div id="adm-wa-list"></div>
+    </div>
+    <div class="card" style="margin-top:.75rem">
+      <div class="ct">Envío masivo</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:.75rem">Envía el recordatorio de pago a todos los alumnos pendientes de este mes de forma individual (se abre WhatsApp por cada uno).</p>
+      <button class="btn-p" style="margin:0;background:linear-gradient(135deg,#25D366,#128C7E)" onclick="admEnviarMasivo()">📱 Enviar a todos los pendientes</button>
+      <div class="alert" id="al-adm-wa" style="margin-top:.5rem"></div>
+    </div>
+  </div>
+
+  <!-- TAB: VISITAS -->
+  <div id="adm-vis" style="display:none">
+    <div class="card">
+      <div class="ct">Editar visitas de cualquier alumno</div>
+      <div class="field" style="margin-bottom:.75rem">
+        <label>Buscar alumno</label>
+        <input type="search" id="adm-vis-search" placeholder="Nombre o folio..."
+          style="background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:13px;outline:none;width:100%"
+          oninput="admVisBuscar()">
+      </div>
+      <div id="adm-vis-list"></div>
+    </div>
+    <div id="adm-vis-editor" style="display:none">
+      <div class="card">
+        <div class="ct">Visitas de: <span id="adm-vis-nombre" style="color:var(--blanco);text-transform:none;font-size:12px"></span></div>
+        <div id="adm-vis-content"></div>
+        <div style="margin-top:1rem;padding-top:.75rem;border-top:1px solid var(--border)">
+          <div class="ct" style="margin-bottom:.5rem">Agregar visita</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <select id="adm-vis-disc" style="flex:2;min-width:130px;background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:13px;outline:none"></select>
+            <input type="date" id="adm-vis-fecha" style="flex:1;min-width:120px;background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:13px;outline:none">
+            <input type="time" id="adm-vis-hora" style="flex:1;min-width:90px;background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:13px;outline:none">
+            <button class="btn-p" style="margin:0;white-space:nowrap" onclick="admVisAgregar()">+ Agregar</button>
+          </div>
+        </div>
+        <button class="btn-s" style="margin-top:.75rem" onclick="document.getElementById('adm-vis-editor').style.display='none'">← Volver</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ═══ PAGE: NUBE CONFIG ═══ -->
@@ -862,7 +1006,7 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
   </div>
 </div>
 
-<script>/* ══════════════════════ DATOS DE DISCIPLINAS ══════════════════════ */
+<script>/* ═════/* ══════════════════════ DATOS DE DISCIPLINAS ══════════════════════ */
 const DISCS_KEYS = ['Pole Sport','Pole Exotic','Pole Espiral',"Pole Kid's",'Danza Aérea Telas','Elementos Aéreos','Enlogación/Flex','Yoga','Twerk','Jumping y Baile','Ritmos Latinos','Defensa Personal','Música/Vocalización','Heels','Otra disciplina'];
 const DISCS = {
   'Pole Sport':{precio:500,hors:[{g:'Lunes y Miércoles',h:['6:00–7:00 pm','7:00–8:00 pm']},{g:'Martes y Jueves',h:['6:00–7:00 am','7:00–8:00 am','5:00–6:00 pm','6:00–7:00 pm','7:00–8:00 pm']},{g:'Intensivo – Sábado',h:['2:00–4:00 pm'],it:1},{g:'Domingos',h:['2:00–4:00 pm']}]},
@@ -930,7 +1074,7 @@ let S={
   cDiscs:[],cHors:[],
   eDiscs:[],eHors:[],editFolio:null,
   alumno:null,camActive:false,camStream:null,camAF:null,
-  scanCanvas:null,scanCtx:null,writeLock:false,saving:false
+  scanCanvas:null,scanCtx:null,writeLock:false,saving:false,evAlumno:null
 };
 // Cloud config
 let CFG={proveedor:'local',jbKey:'',jbBin:'',fbUrl:''};
@@ -951,6 +1095,27 @@ function loadLocal(){
   try{const d=JSON.parse(localStorage.getItem('alpha_v3')||'{}');if(d.DB){DB=d.DB;if(!DB.visLog)DB.visLog=[];}if(d.CFG)CFG=d.CFG;}catch(e){}
 }
 loadLocal();
+/* Restore custom disciplines and plans from DB */
+function restoreCustomData(){
+  if(DB.customDiscs){
+    DB.customDiscs.forEach(function(d){
+      if(!DISCS_KEYS.includes(d.nombre)) DISCS_KEYS.push(d.nombre);
+      DISCS[d.nombre] = {precio:d.precio, hors:d.hors||[]};
+    });
+  }
+  if(DB.customPlanes){
+    DB.customPlanes.forEach(function(p){
+      var existing = PLANES.find(function(x){ return x.id===p.id; });
+      if(existing){
+        /* Override default plan values */
+        Object.assign(existing, p);
+      } else {
+        PLANES.push(p);
+      }
+    });
+  }
+}
+restoreCustomData();
 updateCloudUI();
 
 /* ══════════════════════ CLOUD ══════════════════════ */
@@ -1138,8 +1303,11 @@ async function pullJSONBin(){
     DB.citas   = rec.citas   || [];
     DB.visLog  = rec.visLog  || [];
     if(rec._v) DB._v = rec._v;
+    if(rec.customDiscs)  DB.customDiscs  = rec.customDiscs;
+    if(rec.customPlanes) DB.customPlanes = rec.customPlanes;
   }
   saveLocal();
+  restoreCustomData();
 }
 
 async function pushJSONBin(){
@@ -1187,10 +1355,10 @@ async function conectarFirebase(){
     var r = await fetch(CFG.fbUrl + '/alpha.json');
     if(!r.ok) throw new Error('Firebase GET ' + r.status);
     var d = await r.json();
-    if(d && d.alumnos){ DB.alumnos = d.alumnos||[]; DB.citas = d.citas||[]; DB.visLog = d.visLog||[]; if(d._v) DB._v=d._v; }
+    if(d && d.alumnos){ DB.alumnos = d.alumnos||[]; DB.citas = d.citas||[]; DB.visLog = d.visLog||[]; if(d._v) DB._v=d._v; if(d.customDiscs) DB.customDiscs=d.customDiscs; if(d.customPlanes) DB.customPlanes=d.customPlanes; }
     if(!DB.alumnos) DB.alumnos = [];
     if(!DB.citas)   DB.citas   = [];
-    saveLocal(); updateCloudUI();
+    saveLocal(); restoreCustomData(); updateCloudUI();
     showAlert('al-cfg', 'Conectado a Firebase. ' + DB.alumnos.length + ' alumnos cargados.', 'ok');
     setCloudStatus('ok','Firebase conectado');
     startFirebaseListener();
@@ -1289,7 +1457,14 @@ function borrarTodo(){
 /* ══════════════════════ HELPERS ══════════════════════ */
 const today=()=>new Date().toISOString().split('T')[0];
 const nowISO=()=>new Date().toISOString();
-const mesStr=d=>{const x=new Date(d);return x.getMonth()+'-'+x.getFullYear()};
+const mesStr=function(d){
+  /* Parse date string without timezone shift to avoid off-by-one day */
+  if(typeof d === 'string'){
+    var pts=d.split('T')[0].split('-');
+    if(pts.length>=2) return (parseInt(pts[1])-1)+'-'+parseInt(pts[0]);
+  }
+  var x=new Date(d); return x.getMonth()+'-'+x.getFullYear();
+};
 const mesCur=()=>mesStr(new Date());
 const mkFolio=()=>'ALF-'+String(Math.floor(Math.random()*9000)+1000);
 const initials=(a,b)=>((a[0]||'')+(b[0]||'')).toUpperCase();
@@ -1341,8 +1516,16 @@ function calcFechaExpira(fechaAlta, planId){
 
 function diasRestantes(fechaExpira){
   if(!fechaExpira) return null;
-  var hoy   = new Date(); hoy.setHours(0,0,0,0);
-  var exp   = new Date(fechaExpira); exp.setHours(0,0,0,0);
+  /* Accept both a date string (YYYY-MM-DD) and an alumno object */
+  if(typeof fechaExpira === 'object' && fechaExpira !== null && fechaExpira.folio){
+    var v = calcVencimiento(fechaExpira); if(!v) return null;
+    return Math.ceil((v.getTime() - Date.now()) / 86400000);
+  }
+  var hoy = new Date(); hoy.setHours(0,0,0,0);
+  /* Parse date without timezone shift */
+  var pts = String(fechaExpira).split('T')[0].split('-');
+  if(pts.length < 3) return null;
+  var exp = new Date(parseInt(pts[0]), parseInt(pts[1])-1, parseInt(pts[2]));
   return Math.round((exp - hoy) / 86400000);
 }
 
@@ -1373,6 +1556,7 @@ function goPage(id,btn){
   if(id==='dash') renderDash();
   if(id==='cita') renderCitas();
   if(id==='cal'){ renderCal(); }
+  if(id==='admin'){ admTab('disc'); }
   if(id==='qr'){ stopCam(); renderLogHoy(); }
   window.scrollTo(0,0);
 }
@@ -1721,8 +1905,27 @@ function renderAls(){
   if(q) arr=arr.filter(a=>(a.nombre+' '+a.apellidos+' '+a.folio+' '+(a.disciplinas||[]).join(' ')).toLowerCase().includes(q));
   if(!arr.length){lst.innerHTML='<div class="card" style="text-align:center;color:var(--muted);font-size:13px">Sin alumnos registrados aún.</div>';return;}
   const hoy=mesCur();
-  lst.innerHTML=arr.map(a=>{const v=(a.visitas||[]).filter(x=>mesStr(x)===hoy).length;return `<div class="arow" data-f="${a.folio}"><div style="flex:1;min-width:0"><div class="arow-name">${a.nombre} ${a.apellidos}</div><div class="arow-disc">${(a.disciplinas||[]).join(', ')}</div></div><div style="text-align:right;flex-shrink:0"><div class="arow-folio">${a.folio}</div><div class="arow-vis">${v} vis.</div></div></div>`;}).join('');
-  lst.querySelectorAll('.arow').forEach(function(el){ el.onclick=function(){verPerfil(this.dataset.f);}; });
+  lst.innerHTML=arr.map(a=>{
+    const v=(a.visitas||[]).filter(x=>mesStr(x)===hoy).length;
+    const waEnv = waEnviadoEsteMes(a);
+    const dp = diasParaPago(a);
+    const dpColor = dp===null?'var(--muted)':dp<0?'#f09595':dp<=7?'#fabd75':'#7ec445';
+    const dpStr = dp===null?'':dp<0?'Atrasado':dp===0?'Paga hoy':'Paga en '+dp+'d';
+    return `<div class="arow" style="flex-wrap:wrap;gap:4px" data-f="${a.folio}">
+      <div style="flex:1;min-width:0;cursor:pointer" onclick="verPerfil('${a.folio}')">
+        <div class="arow-name">${a.nombre} ${a.apellidos}</div>
+        <div class="arow-disc">${(a.disciplinas||[]).join(', ')}</div>
+        ${dpStr?`<div style="font-size:10px;color:${dpColor};font-weight:600;margin-top:1px">${dpStr}</div>`:''}
+      </div>
+      <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+        <div class="arow-folio" onclick="verPerfil('${a.folio}')">${a.folio}</div>
+        <div class="arow-vis" onclick="verPerfil('${a.folio}')">${v} vis.</div>
+        <button onclick="event.stopPropagation();enviarWAPago('${a.folio}')" style="padding:3px 8px;background:${waEnv?'var(--bg4)':'rgba(37,211,102,.15)'};color:${waEnv?'var(--muted)':'#7ec445'};border:1px solid ${waEnv?'rgba(255,255,255,.08)':'rgba(37,211,102,.3)'};border-radius:6px;font-size:9px;font-weight:600;cursor:pointer;font-family:var(--font);white-space:nowrap">
+          ${waEnv?'↻ WA':'📱 WA'}
+        </button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 /* ══════════════════════ PERFIL ══════════════════════ */
@@ -1754,7 +1957,7 @@ function verPerfil(f){
   }
   document.getElementById('pf-monto').textContent=ul?'$'+ul.monto.toLocaleString('es-MX'):'—';
   document.getElementById('pf-alta').textContent=a.fechaAlta;
-  var _venc=calcVencimiento(a); var _dias=diasRestantes(a);
+  var _venc=calcVencimiento(a); var _dias=diasRestantes(a.fechaExpira);
   var _vigEl=document.getElementById('pf-vig');
   if(_vigEl&&_venc){
     var _vs=_venc.toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'});
@@ -1765,6 +1968,33 @@ function verPerfil(f){
   renderVisGrid(a); renderPagosHist(a);
   const qm=document.getElementById('pf-qr-mini');qm.innerHTML='';
   new QRCode(qm,{text:a.folio,width:72,height:72,colorDark:'#d4537e',colorLight:'#141414'});
+  /* Update WA button state */
+  var waBtn = document.getElementById('pf-wa-pago-btn');
+  if(waBtn){
+    var waEnv = waEnviadoEsteMes(a);
+    if(waEnv){
+      waBtn.textContent = '📱 ↻ Reenviar WA';
+      waBtn.style.color = '#fabd75';
+      waBtn.style.background = 'rgba(133,79,11,.15)';
+      waBtn.style.borderColor = 'rgba(133,79,11,.3)';
+    } else {
+      waBtn.textContent = '📱 Aviso pago WA';
+      waBtn.style.color = '#7ec445';
+      waBtn.style.background = 'rgba(37,211,102,.15)';
+      waBtn.style.borderColor = 'rgba(37,211,102,.3)';
+    }
+  }
+  /* Show próximo pago info */
+  var dp = diasParaPago(a);
+  var np = calcProximoPago(a);
+  var diaPagoEl = document.getElementById('pf-proximo-pago');
+  if(diaPagoEl && np){
+    var npStr = np.toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+    var dpColor = dp===null?'var(--muted)':dp<0?'#f09595':dp<=7?'#fabd75':'#7ec445';
+    var dpStr = dp===null?'Sin plan':dp<0?'Pago atrasado '+Math.abs(dp)+'d':dp===0?'Paga HOY':'En '+dp+' días';
+    diaPagoEl.style.display='block';
+    diaPagoEl.innerHTML = '💰 Próximo pago: <strong>'+npStr+'</strong> · <span style="color:'+dpColor+'">'+dpStr+'</span>';
+  }
   window.scrollTo(0,0);
 }
 function renderVisGrid(a){
@@ -2010,6 +2240,13 @@ async function confirmarVisitaManual(discElegida){
   } finally{
     setTimeout(function(){ S.writeLock=false; },2000);
   }
+}
+function enviarWAPagoActual(){
+  if(!S.alumno) return;
+  enviarWAPago(S.alumno.folio);
+  /* Update button to show sent */
+  var btn = document.getElementById('pf-wa-pago-btn');
+  if(btn){ btn.textContent='📱 ↻ Reenviar WA'; btn.style.color='#fabd75'; }
 }
 function cerrarPerfil(){S.alumno=null;document.getElementById('pf-wrap').style.display='none';document.getElementById('als-list').style.display='';renderAls();}
 async function eliminar(){
@@ -2291,29 +2528,16 @@ function enviarWARenovacion(){
 
 /* ══════════════════════ EDITAR VISITAS MANUAL ══════════════════════ */
 function abrirEditVis(){
-  if(!S.alumno){ alert('Abre el perfil de un alumno primero.'); return; }
-  /* Populate disc selector */
-  var sel = document.getElementById('ev-disc');
+  if(!S.alumno){ showAlert && showAlert('al-reg','Abre el perfil de un alumno primero.','err'); return; }
+  S.evAlumno = S.alumno; /* store ref so modal can always access it */
   var discs = (S.alumno.disciplinas&&S.alumno.disciplinas.length) ? S.alumno.disciplinas : ['—'];
-  if(sel){
-    sel.innerHTML = discs.map(function(d){
-      return '<option value="'+d+'">'+d+'</option>';
-    }).join('');
-  }
-  /* Default date and time */
-  var fechaEl = document.getElementById('ev-fecha');
-  var horaEl  = document.getElementById('ev-hora');
-  if(fechaEl) fechaEl.value = today();
-  if(horaEl){
-    /* Use HH:MM format directly */
-    var now = new Date();
-    var hh  = String(now.getHours()).padStart(2,'0');
-    var mm  = String(now.getMinutes()).padStart(2,'0');
-    horaEl.value = hh + ':' + mm;
-  }
+  var sel = document.getElementById('ev-disc');
+  if(sel) sel.innerHTML = discs.map(function(d){ return '<option value="'+esc(d)+'">'+esc(d)+'</option>'; }).join('');
+  var fEl=document.getElementById('ev-fecha'); if(fEl) fEl.value=today();
+  var hEl=document.getElementById('ev-hora');
+  if(hEl){ var n=new Date(); hEl.value=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0'); }
   evRenderVisitas();
-  var modal = document.getElementById('editvis-modal');
-  if(modal) modal.classList.add('on');
+  var m=document.getElementById('editvis-modal'); if(m) m.classList.add('on');
 }
 
 function cerrarEditVis(){
@@ -2323,9 +2547,10 @@ function cerrarEditVis(){
 function evRenderVisitas(){
   var c   = document.getElementById('ev-content');
   var hoy = mesCur();
+  var _ea = S.evAlumno||S.alumno; if(!_ea||!c) return;
   var log = (DB.visLog||[]).filter(function(v){
     var vMes = v.fecha ? mesStr(v.fecha+'T00:00:00') : '';
-    return v.folio === S.alumno.folio && vMes === hoy;
+    return v.folio === _ea.folio && vMes === hoy;
   });
 
   if(!log.length){
@@ -2376,71 +2601,30 @@ async function evBorrarVisita(ts){
 }
 
 async function evAgregarVisita(){
-  /* Guard: alumno must be set */
-  var a = S.alumno;
-  if(!a){ alert('Error: no hay alumno seleccionado. Cierra y vuelve a abrir desde el perfil.'); return; }
-
-  var discEl  = document.getElementById('ev-disc');
-  var fechaEl = document.getElementById('ev-fecha');
-  var horaEl  = document.getElementById('ev-hora');
-  if(!discEl||!fechaEl||!horaEl){ alert('Error: campos no encontrados.'); return; }
-
-  var disc  = discEl.value || (a.disciplinas&&a.disciplinas[0]) || '—';
-  var fecha = fechaEl.value || today();
-  var hora  = horaEl.value  || new Date().toTimeString().substring(0,5);
-
-  /* Robust timestamp: combine fecha + hora */
+  var a = S.evAlumno || S.alumno;
+  if(!a){ alert('Error: no hay alumno. Cierra y vuelve a abrir desde el perfil.'); return; }
+  var discEl=document.getElementById('ev-disc');
+  var fechaEl=document.getElementById('ev-fecha');
+  var horaEl=document.getElementById('ev-hora');
+  var disc  = discEl ? discEl.value : ((a.disciplinas||[])[0]||'—');
+  var fecha = (fechaEl&&fechaEl.value) ? fechaEl.value : today();
+  var hora  = (horaEl&&horaEl.value)  ? horaEl.value  : (function(){ var n=new Date(); return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0'); })();
   var ts = Date.now();
-  try{
-    var combined = fecha + 'T' + hora + ':00';
-    var d = new Date(combined);
-    if(!isNaN(d.getTime())) ts = d.getTime();
-  } catch(e){}
-
-  /* Safe ISO string */
-  var isoStr = new Date(ts).toISOString();
-
-  /* Add to DB.visLog */
-  if(!DB.visLog) DB.visLog = [];
-  DB.visLog.push({
-    folio: a.folio,
-    nom:   a.nombre + ' ' + a.apellidos,
-    disc:  disc,
-    hora:  hora,
-    fecha: fecha,
-    ts:    ts
-  });
-  if(DB.visLog.length > 500) DB.visLog = DB.visLog.slice(-500);
-
-  /* Add to a.visitas */
-  if(!a.visitas) a.visitas = [];
-  a.visitas.push(isoStr);
-
-  /* Save locally first for immediate feedback */
+  try{ var d2=new Date(fecha+'T'+hora+':00'); if(!isNaN(d2.getTime())) ts=d2.getTime(); }catch(e){}
+  if(!DB.visLog) DB.visLog=[];
+  DB.visLog.push({folio:a.folio,nom:a.nombre+' '+a.apellidos,disc:disc,hora:hora,fecha:fecha,ts:ts});
+  if(DB.visLog.length>500) DB.visLog=DB.visLog.slice(-500);
+  if(!a.visitas) a.visitas=[];
+  a.visitas.push(new Date(ts).toISOString());
   saveLocal();
-
-  /* Update UI immediately */
   evRenderVisitas();
-  renderVisGrid(a);
-
-  /* Show success */
-  var btnAg = document.querySelector('#editvis-modal .btn-p');
-  if(btnAg){
-    var orig = btnAg.textContent;
-    btnAg.textContent = '✓ Visita agregada';
-    btnAg.style.background = '#3b6d11';
-    setTimeout(function(){ btnAg.textContent=orig; btnAg.style.background=''; }, 2000);
-  }
-
-  /* Push to cloud */
-  S.writeLock = true;
-  try{
-    await saveDB();
-  } catch(e){
-    console.error('saveDB error:', e);
-  } finally{
-    setTimeout(function(){ S.writeLock=false; }, 2000);
-  }
+  if(S.alumno&&S.alumno.folio===a.folio) renderVisGrid(a);
+  /* Visual feedback */
+  var btn=document.querySelector('#editvis-modal .btn-p');
+  if(btn){ var orig=btn.textContent; btn.textContent='✓ Visita agregada!'; btn.style.background='#3b6d11'; setTimeout(function(){ btn.textContent=orig; btn.style.background=''; },2000); }
+  S.writeLock=true;
+  try{ await saveDB(); }catch(e){ console.error(e); }
+  finally{ setTimeout(function(){ S.writeLock=false; },2000); }
 }
 
 async function evBorrarTodas(){
@@ -2800,6 +2984,65 @@ function cerrarEditCita(){
   editCitaId = null;
 }
 
+
+/* ══════════════════════ WA PAGO MENSUAL ══════════════════════ */
+function enviarWAPago(folio){
+  var a = DB.alumnos.find(function(x){ return x.folio===folio; });
+  if(!a) return;
+  var tel   = (a.tel||'').replace(/[^0-9]/g,'');
+  var plan  = PLANES.find(function(p){ return p.n===a.planActual; });
+  var monto = plan ? plan.p : 0;
+  var venc  = calcVencimiento(a);
+  var dias  = diasRestantes(a);
+  var vencStr = venc ? venc.toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'}) : 'próximamente';
+  var urgencia = dias!==null&&dias<=0 ? 'Su membresía ya ha VENCIDO.' : (dias!==null&&dias<=5 ? 'Su membresía vence en '+dias+' día(s).' : 'Su membresía vence el '+vencStr+'.');
+
+  var lines = [
+    'Estimado/a '+a.nombre+' '+a.apellidos+',',
+    '',
+    'Le recordamos cordialmente que tiene pendiente el pago de su mensualidad en ALPHA Centro de Desarrollo Artístico y Cultural.',
+    '',
+    urgencia,
+    '',
+    'Detalles de su plan:',
+    '• Disciplinas: '+((a.disciplinas||[]).join(', ')||'—'),
+    '• Plan: '+(a.planActual||'—'),
+    '• Monto mensual: $'+monto.toLocaleString('es-MX')+' MXN',
+    '',
+    'Para continuar disfrutando de sus clases sin interrupciones, le invitamos a realizar su pago a la brevedad.',
+    '',
+    'Puede acercarse a nuestras instalaciones o comunicarse con nosotros.',
+    '',
+    String.fromCharCode(128205)+' Av. Universidad 252 Int B, Zacatecas Centro',
+    String.fromCharCode(128241)+' 492 493 8392  |  @alpha_danceart',
+    '',
+    'Atentamente,',
+    'ALPHA Centro de Desarrollo Artístico y Cultural'
+  ];
+
+  /* Mark as sent this month */
+  var mes = mesCur();
+  if(!a.waMsgSent) a.waMsgSent={};
+  a.waMsgSent[mes] = new Date().toISOString();
+  saveLocal();
+  saveDB().catch(function(){});
+
+  if(!tel){ alert('El alumno no tiene teléfono registrado.'); return; }
+  window.open('https://wa.me/52'+tel+'?text='+encodeURIComponent(lines.join('\n')),'_blank');
+
+  /* Refresh UI */
+  if(document.getElementById('p-als').classList.contains('on')) renderAls();
+  if(document.getElementById('p-dash').classList.contains('on')) renderDash();
+  /* Refresh admin WA and pagos tabs if visible */
+  var admWaEl = document.getElementById('adm-wa'); if(admWaEl && admWaEl.style.display!=='none') admRenderWA();
+  var admPagosEl = document.getElementById('adm-pagos'); if(admPagosEl && admPagosEl.style.display!=='none') admRenderPagos();
+}
+
+function waEnviadoEsteMes(a){
+  var mes = mesCur();
+  return a.waMsgSent && a.waMsgSent[mes];
+}
+
 /* ══════════════════════ REGISTRAR VISITA ══════════════════════ */
 async function regVisita(){
   var folio = (document.getElementById('qr-in').value || '').trim().toUpperCase();
@@ -3062,8 +3305,8 @@ function renderDash(){
 
   /* ── Últimos registros ── */
   /* Vencidos / por vencer */
-  var _venc0=alumnos.filter(function(a){var d=diasRestantes(a);return d!==null&&d<0;});
-  var _venc5=alumnos.filter(function(a){var d=diasRestantes(a);return d!==null&&d>=0&&d<=5;});
+  var _venc0=alumnos.filter(function(a){var d=diasRestantes(a.fechaExpira);return d!==null&&d<0;});
+  var _venc5=alumnos.filter(function(a){var d=diasRestantes(a.fechaExpira);return d!==null&&d>=0&&d<=5;});
   var _dvEl=document.getElementById('d-vencidos');
   if(_dvEl){
     if(_venc0.length||_venc5.length){
@@ -3226,6 +3469,9 @@ function refreshActiveView(){
     renderCitas();
   } else if(id === 'p-qr'){
     renderLogHoy();
+  } else if(id === 'p-admin'){
+    var admWaEl = document.getElementById('adm-wa'); if(admWaEl && admWaEl.style.display!=='none') admRenderWA();
+    var admPagosEl = document.getElementById('adm-pagos'); if(admPagosEl && admPagosEl.style.display!=='none') admRenderPagos();
   }
 }
 
@@ -3239,17 +3485,80 @@ function esc(s){
 function calcVencimiento(a){
   var plan = PLANES.find(function(p){ return p.n===a.planActual; });
   if(!plan||!plan.meses) return null;
-  var pagos = (a.pagos||[]).filter(function(p){ return p.tipo==='paq'||p.tipo==='mem'||p.completo; });
-  var base  = pagos.length ? new Date(pagos[pagos.length-1].fecha) : new Date(a.fechaAlta);
+  /* Use latest full pago date, or fechaAlta */
+  var pagos = (a.pagos||[]).filter(function(p){ return p.completo||p.tipo==='paq'||p.tipo==='mem'; });
+  var baseFecha = pagos.length ? pagos[pagos.length-1].fecha : a.fechaAlta;
+  if(!baseFecha) return null;
+  /* Parse date parts to avoid timezone shift */
+  var pts = String(baseFecha).split('T')[0].split('-');
+  if(pts.length<3) return null;
+  var base = new Date(parseInt(pts[0]), parseInt(pts[1])-1, parseInt(pts[2]));
   if(isNaN(base.getTime())) return null;
   var v = new Date(base); v.setMonth(v.getMonth()+plan.meses); return v;
+}
+
+/* Calcula la fecha de próximo pago para un alumno basándose en su fecha de registro.
+   Si tiene pagos, el próximo pago se calcula a partir del último pago.
+   Independientemente de si ha asistido o no. */
+function calcProximoPago(a){
+  var plan = PLANES.find(function(p){ return p.n===a.planActual; });
+  if(!plan || !plan.meses) return null;
+  var pagos = (a.pagos||[]).filter(function(p){ return p.tipo==='paq'||p.tipo==='mem'||p.completo; });
+  var baseFecha;
+  if(pagos.length){
+    baseFecha = pagos[pagos.length-1].fecha;
+  } else {
+    baseFecha = a.fechaAlta;
+  }
+  if(!baseFecha) return null;
+  var pts = String(baseFecha).split('T')[0].split('-');
+  if(pts.length<3) return null;
+  var base = new Date(parseInt(pts[0]), parseInt(pts[1])-1, parseInt(pts[2]));
+  if(isNaN(base.getTime())) return null;
+  /* Advance by meses until we find the next future payment date */
+  var now = new Date(); now.setHours(0,0,0,0);
+  var next = new Date(base);
+  while(next <= now){
+    next = new Date(next);
+    next.setMonth(next.getMonth() + plan.meses);
+  }
+  return next;
+}
+
+/* Returns días until next payment (always positive or 0) */
+function diasParaPago(a){
+  var np = calcProximoPago(a);
+  if(!np) return null;
+  var now = new Date(); now.setHours(0,0,0,0);
+  return Math.ceil((np.getTime() - now.getTime()) / 86400000);
+}
+
+/* Returns the day of month the alumno's payment is due (based on registration) */
+function diaDepago(a){
+  var baseFecha = a.fechaAlta;
+  if((a.pagos||[]).length){
+    var pagos = a.pagos.filter(function(p){ return p.tipo==='paq'||p.tipo==='mem'||p.completo; });
+    if(pagos.length) baseFecha = pagos[pagos.length-1].fecha;
+  }
+  if(!baseFecha) return null;
+  var pts = String(baseFecha).split('T')[0].split('-');
+  if(pts.length<3) return null;
+  return parseInt(pts[2]);
+}
+
+function parseFechaLocal(f){
+  /* Parse YYYY-MM-DD without timezone shift */
+  if(!f) return null;
+  var s=String(f).split('T')[0]; var p=s.split('-');
+  if(p.length<3) return null;
+  return new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));
 }
 function diasRestantes(a){
   var v=calcVencimiento(a); if(!v) return null;
   return Math.ceil((v.getTime()-Date.now())/86400000);
 }
 function badgeVigencia(a){
-  var d=diasRestantes(a); if(d===null) return '';
+  var d=diasRestantes(a.fechaExpira); if(d===null) return '';
   if(d<0)   return '<span style="background:rgba(163,45,45,.25);color:#f09595;font-size:9px;padding:2px 7px;border-radius:5px;font-weight:700;margin-left:4px">VENCIDO</span>';
   if(d<=5)  return '<span style="background:rgba(133,79,11,.25);color:#fabd75;font-size:9px;padding:2px 7px;border-radius:5px;font-weight:700;margin-left:4px">Vence en '+d+'d</span>';
   if(d<=10) return '<span style="background:rgba(0,153,187,.15);color:var(--cyan);font-size:9px;padding:2px 7px;border-radius:5px;font-weight:600;margin-left:4px">'+d+' días</span>';
@@ -3277,7 +3586,9 @@ function renderCal(){
     var log=(DB.visLog||[]).filter(function(v){return v.folio===a.folio&&v.fecha&&v.fecha.startsWith(mStr);});
     var byDD={};
     log.forEach(function(v){
-      var d=parseInt((v.fecha||'').split('-')[2])||0;
+      /* Parse date parts directly to avoid timezone offset issues */
+    var _dp=(v.fecha||'').split('-');
+    var d=_dp.length>=3?parseInt(_dp[2])||0:0;
       var disc=v.disc||'—';
       if(!byDD[disc]) byDD[disc]={};
       if(!byDD[disc][d]) byDD[disc][d]=[];
@@ -3314,6 +3625,428 @@ function renderCal(){
     html+='</div>';
   });
   c.innerHTML=html||'<div class="card" style="text-align:center;color:var(--muted)">Sin resultados.</div>';
+}
+
+
+/* ══════════════════════ ADMIN ══════════════════════ */
+var admWaFiltroActual = 'pend';
+
+function admTab(t){
+  ['disc','plan','pagos','wa','vis'].forEach(function(x){
+    var el=document.getElementById('adm-'+x);
+    var btn=document.getElementById('adm-t-'+x);
+    if(el) el.style.display = x===t?'block':'none';
+    if(btn) btn.classList.toggle('on', x===t);
+  });
+  if(t==='disc') admRenderDiscs();
+  if(t==='plan') admRenderPlanes();
+  if(t==='pagos') admRenderPagos();
+  if(t==='wa')   admRenderWA();
+  if(t==='vis')  admVisBuscar();
+}
+
+/* ─── DISCIPLINAS ─── */
+function admRenderDiscs(){
+  var c = document.getElementById('adm-disc-list'); if(!c) return;
+  var customDiscs = DB.customDiscs||[];
+  var allDiscs = DISCS_KEYS.concat(customDiscs.filter(function(d){ return !DISCS_KEYS.includes(d.nombre); }).map(function(d){ return d.nombre; }));
+  if(!allDiscs.length){ c.innerHTML='<p style="font-size:12px;color:var(--muted)">Sin disciplinas.</p>'; return; }
+  c.innerHTML = allDiscs.map(function(nombre){
+    var custom = (customDiscs||[]).find(function(d){ return d.nombre===nombre; });
+    var precio = custom ? custom.precio : ((DISCS[nombre]||{}).precio||0);
+    var defaultDisc = DISCS[nombre];
+    var hors = custom ? (custom.hors||[]) : (defaultDisc ? (defaultDisc.hors||[]) : []);
+    var horasStr = hors.map(function(h){ return h.g; }).join(', ');
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">' +
+      '<div style="flex:1;min-width:0">' +
+        '<span style="font-size:13px;font-weight:500">'+esc(nombre)+'</span>' +
+        (horasStr ? '<div style="font-size:10px;color:var(--muted);margin-top:2px">'+esc(horasStr.substring(0,60))+'</div>' : '') +
+      '</div>' +
+      '<span style="color:var(--rosa);font-size:13px;font-weight:700;white-space:nowrap">$'+precio.toLocaleString('es-MX')+'/mes</span>' +
+      '<button onclick="admEditarDisc(\''+esc(nombre)+'\')" class="btn-s" style="font-size:10px;padding:4px 9px">✏️ Editar</button>' +
+      (!custom ? '' : '<button onclick="admBorrarDisc(\''+esc(nombre)+'\')" class="btn-danger" style="font-size:10px;padding:4px 8px">✕</button>') +
+      '</div>';
+  }).join('');
+}
+
+function admCancelarEditDisc(){
+  document.getElementById('adm-disc-nom').value='';
+  document.getElementById('adm-disc-precio').value='';
+  document.getElementById('adm-disc-hors').value='';
+  document.getElementById('adm-disc-edit-nombre').value='';
+  document.getElementById('adm-disc-form-title').textContent='Agregar nueva disciplina';
+  document.getElementById('adm-disc-cancel-edit').style.display='none';
+}
+
+async function admAgregarDisc(){
+  var nom    = (document.getElementById('adm-disc-nom').value||'').trim();
+  var precio = parseFloat(document.getElementById('adm-disc-precio').value)||0;
+  var horsRaw= (document.getElementById('adm-disc-hors').value||'').trim();
+  var editNom= (document.getElementById('adm-disc-edit-nombre').value||'').trim();
+  if(!nom||!precio){ showAlert('al-adm-disc','Nombre y precio son obligatorios.','err'); return; }
+  if(!DB.customDiscs) DB.customDiscs=[];
+  var hors = horsRaw.split('\n').filter(Boolean).map(function(line){
+    var pts = line.split('|'); return {g:(pts[0]||'').trim(), h:[(pts[1]||'').trim()]};
+  });
+  var disc = {nombre:nom, precio:precio, hors:hors};
+  /* If editing an existing discipline by different name, update references */
+  if(editNom && editNom !== nom){
+    /* rename: update all alumno records */
+    (DB.alumnos||[]).forEach(function(a){
+      if(a.disciplinas) a.disciplinas = a.disciplinas.map(function(d){ return d===editNom?nom:d; });
+    });
+    (DB.visLog||[]).forEach(function(v){ if(v.disc===editNom) v.disc=nom; });
+    /* remove old key */
+    var oi = DISCS_KEYS.indexOf(editNom); if(oi>=0) DISCS_KEYS.splice(oi,1);
+    delete DISCS[editNom];
+    DB.customDiscs = (DB.customDiscs||[]).filter(function(d){ return d.nombre!==editNom; });
+  }
+  var existing = DB.customDiscs.findIndex(function(d){ return d.nombre===nom; });
+  if(existing>=0) DB.customDiscs[existing]=disc; else DB.customDiscs.push(disc);
+  /* Add to DISCS_KEYS if not present */
+  if(!DISCS_KEYS.includes(nom)) DISCS_KEYS.push(nom);
+  DISCS[nom] = {precio:precio, hors:hors};
+  await saveDB();
+  showAlert('al-adm-disc','✓ Disciplina guardada: '+nom,'ok');
+  admCancelarEditDisc();
+  admRenderDiscs();
+}
+
+function admEditarDisc(nombre){
+  var custom=(DB.customDiscs||[]).find(function(x){ return x.nombre===nombre; });
+  var defaultD = DISCS[nombre];
+  var d = custom || (defaultD ? {nombre:nombre, precio:defaultD.precio, hors:defaultD.hors} : null);
+  if(!d) return;
+  document.getElementById('adm-disc-nom').value=d.nombre;
+  document.getElementById('adm-disc-precio').value=d.precio||'';
+  document.getElementById('adm-disc-hors').value=(d.hors||[]).map(function(h){ return h.g+' | '+(h.h||[]).join(', '); }).join('\n');
+  document.getElementById('adm-disc-edit-nombre').value=d.nombre;
+  document.getElementById('adm-disc-form-title').textContent='Editando: '+d.nombre;
+  document.getElementById('adm-disc-cancel-edit').style.display='inline-flex';
+  window.scrollTo(0,document.getElementById('adm-disc-nom').getBoundingClientRect().top+window.scrollY-80);
+}
+
+async function admBorrarDisc(nombre){
+  if(!confirm('¿Eliminar la disciplina "'+nombre+'"?')) return;
+  DB.customDiscs=(DB.customDiscs||[]).filter(function(d){ return d.nombre!==nombre; });
+  var idx=DISCS_KEYS.indexOf(nombre); if(idx>=0) DISCS_KEYS.splice(idx,1);
+  delete DISCS[nombre];
+  await saveDB(); admRenderDiscs();
+}
+
+/* ─── PLANES ─── */
+function admRenderPlanes(){
+  var c = document.getElementById('adm-plan-list'); if(!c) return;
+  var allPlanes = PLANES.concat((DB.customPlanes||[]).filter(function(cp){ return !PLANES.find(function(p){ return p.id===cp.id; }); }));
+  c.innerHTML = allPlanes.map(function(p){
+    var isCustom = !!(DB.customPlanes||[]).find(function(x){ return x.id===p.id; });
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">' +
+      '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">'+esc(p.n)+'</div>' +
+      '<div style="font-size:11px;color:var(--muted)">'+esc(p.d||'')+'</div>' +
+      '<div style="font-size:10px;color:var(--cyan);margin-top:1px">'+esc(p.t||'')+' · '+p.clases_mes+' clases/mes · '+p.num_discs+' disc.</div></div>' +
+      '<span style="color:var(--rosa);font-size:14px;font-weight:700">$'+p.p.toLocaleString('es-MX')+'</span>'+
+      '<button onclick="admEditarPlan(\''+p.id+'\')" class="btn-s" style="font-size:10px;padding:4px 9px">✏️ Editar</button>'+
+      (isCustom?'<button onclick="admBorrarPlan(\''+p.id+'\')" class="btn-danger" style="font-size:10px;padding:4px 8px">✕</button>':'') +
+      '</div>';
+  }).join('');
+}
+
+function admEditarPlan(id){
+  var p = PLANES.find(function(x){ return x.id===id; }) || (DB.customPlanes||[]).find(function(x){ return x.id===id; });
+  if(!p) return;
+  document.getElementById('adm-plan-nom').value=p.n;
+  document.getElementById('adm-plan-tipo').value=p.tipo||'paq';
+  document.getElementById('adm-plan-precio').value=p.p;
+  document.getElementById('adm-plan-meses').value=p.meses||1;
+  document.getElementById('adm-plan-clases').value=p.clases_mes||8;
+  document.getElementById('adm-plan-ndiscs').value=p.num_discs||1;
+  document.getElementById('adm-plan-desc').value=p.d||'';
+  document.getElementById('adm-plan-edit-id').value=p.id;
+  document.getElementById('adm-plan-form-title').textContent='Editando: '+p.n;
+  document.getElementById('adm-plan-cancel-edit').style.display='inline-flex';
+  window.scrollTo(0,document.getElementById('adm-plan-nom').getBoundingClientRect().top+window.scrollY-80);
+}
+
+function admCancelarEditPlan(){
+  ['adm-plan-nom','adm-plan-precio','adm-plan-meses','adm-plan-clases','adm-plan-ndiscs','adm-plan-desc'].forEach(function(id){ var e=document.getElementById(id); if(e)e.value=''; });
+  document.getElementById('adm-plan-edit-id').value='';
+  document.getElementById('adm-plan-form-title').textContent='Agregar / modificar plan';
+  document.getElementById('adm-plan-cancel-edit').style.display='none';
+}
+
+async function admAgregarPlan(){
+  var nom    = (document.getElementById('adm-plan-nom').value||'').trim();
+  var tipo   = document.getElementById('adm-plan-tipo').value||'paq';
+  var precio = parseFloat(document.getElementById('adm-plan-precio').value)||0;
+  var meses  = parseInt(document.getElementById('adm-plan-meses').value)||1;
+  var clases = parseInt(document.getElementById('adm-plan-clases').value)||8;
+  var ndiscs = parseInt(document.getElementById('adm-plan-ndiscs').value)||1;
+  var desc   = (document.getElementById('adm-plan-desc').value||'').trim();
+  var editId = (document.getElementById('adm-plan-edit-id').value||'').trim();
+  if(!nom||!precio){ showAlert('al-adm-plan','Nombre y precio son obligatorios.','err'); return; }
+
+  if(editId){
+    /* Edit existing plan */
+    var planIdx = PLANES.findIndex(function(p){ return p.id===editId; });
+    var updatedPlan = {id:editId, n:nom, t:(meses===1?'1 mes':meses===12?'1 año':meses+' meses'), tipo:tipo, p:precio,
+                d:desc||nom, num_discs:ndiscs, clases_mes:clases, horas:1, meses:meses};
+    if(planIdx>=0) PLANES[planIdx] = updatedPlan;
+    /* Also update in customPlanes */
+    if(!DB.customPlanes) DB.customPlanes=[];
+    var cpIdx = DB.customPlanes.findIndex(function(p){ return p.id===editId; });
+    if(cpIdx>=0) DB.customPlanes[cpIdx] = updatedPlan;
+    else DB.customPlanes.push(updatedPlan); /* store override of default */
+    showAlert('al-adm-plan','✓ Plan actualizado: '+nom,'ok');
+  } else {
+    /* New plan */
+    var newId = 'CUSTOM-'+Date.now();
+    var plan = {id:newId, n:nom, t:(meses===1?'1 mes':meses===12?'1 año':meses+' meses'), tipo:tipo, p:precio,
+                d:desc||nom, num_discs:ndiscs, clases_mes:clases, horas:1, meses:meses};
+    if(!DB.customPlanes) DB.customPlanes=[];
+    DB.customPlanes.push(plan);
+    PLANES.push(plan);
+    showAlert('al-adm-plan','✓ Plan guardado: '+nom,'ok');
+  }
+  await saveDB();
+  admCancelarEditPlan();
+  admRenderPlanes();
+}
+
+async function admBorrarPlan(id){
+  if(!confirm('¿Eliminar este plan?')) return;
+  DB.customPlanes=(DB.customPlanes||[]).filter(function(p){ return p.id!==id; });
+  var idx=PLANES.findIndex(function(p){ return p.id===id; }); if(idx>=0) PLANES.splice(idx,1);
+  await saveDB(); admRenderPlanes();
+}
+
+/* ─── PAGOS AUTOMÁTICOS ─── */
+var admPagosFiltroActual = 'todos';
+
+function admPagosFiltro(f){
+  admPagosFiltroActual = f;
+  ['todos','vence7','vencido','vigente'].forEach(function(x){
+    var b=document.getElementById('pg-f-'+x); if(b) b.classList.toggle('on',x===f);
+  });
+  admRenderPagos();
+}
+
+function admRenderPagos(){
+  var c = document.getElementById('adm-pagos-list'); if(!c) return;
+  var alumnos = (DB.alumnos||[]).filter(function(a){ return a.planActual; });
+
+  alumnos = alumnos.filter(function(a){
+    var dp = diasParaPago(a);
+    var dv = diasRestantes(a.fechaExpira);
+    if(admPagosFiltroActual === 'vence7')  return dv!==null && dv>=0 && dv<=7;
+    if(admPagosFiltroActual === 'vencido') return dv!==null && dv<0;
+    if(admPagosFiltroActual === 'vigente') return dv!==null && dv>=0;
+    return true;
+  });
+
+  alumnos.sort(function(a,b){
+    var da = diasParaPago(a); var db = diasParaPago(b);
+    if(da===null) return 1; if(db===null) return -1;
+    return da - db;
+  });
+
+  if(!alumnos.length){
+    c.innerHTML='<p style="font-size:12px;color:var(--muted)">Sin alumnos en esta categoría.</p>';
+    return;
+  }
+
+  c.innerHTML = alumnos.map(function(a){
+    var dp = diasParaPago(a);
+    var dv = diasRestantes(a.fechaExpira);
+    var np = calcProximoPago(a);
+    var diaPago = diaDepago(a);
+    var plan = PLANES.find(function(p){ return p.n===a.planActual; });
+    var monto = plan ? plan.p : 0;
+    var waEnv = waEnviadoEsteMes(a);
+
+    var npStr = np ? np.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+    var dpStr, dpColor;
+    if(dp===null){ dpStr='Sin plan'; dpColor='var(--muted)'; }
+    else if(dp<0){ dpStr='Pago atrasado '+Math.abs(dp)+'d'; dpColor='#f09595'; }
+    else if(dp===0){ dpStr='Pago hoy'; dpColor='#f09595'; }
+    else if(dp<=7){ dpStr='Pago en '+dp+'d ('+npStr+')'; dpColor='#fabd75'; }
+    else{ dpStr='Próx. pago: '+npStr; dpColor='#7ec445'; }
+
+    var vigStr, vigColor;
+    if(dv===null){ vigStr='—'; vigColor='var(--muted)'; }
+    else if(dv<0){ vigStr='VENCIDO hace '+Math.abs(dv)+'d'; vigColor='#f09595'; }
+    else if(dv===0){ vigStr='Vence HOY'; vigColor='#f09595'; }
+    else if(dv<=7){ vigStr='Vence en '+dv+'d'; vigColor='#fabd75'; }
+    else{ vigStr='Vigente '+dv+'d'; vigColor='#7ec445'; }
+
+    return '<div style="background:var(--bg3);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:.8rem;margin-bottom:7px">' +
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-weight:600;font-size:13px">'+esc(a.nombre)+' '+esc(a.apellidos)+'</div>' +
+          '<div style="font-size:11px;color:var(--muted);margin-top:1px">'+esc(a.folio)+' · '+esc(a.planActual||'—')+'</div>' +
+          '<div style="font-size:11px;color:var(--rosa);margin-top:1px">'+esc((a.disciplinas||[]).join(', '))+'</div>' +
+        '</div>' +
+        '<div style="text-align:right;flex-shrink:0">' +
+          '<div style="font-size:14px;font-weight:700;color:var(--rosa)">$'+monto.toLocaleString('es-MX')+'</div>' +
+          '<div style="font-size:10px;color:var(--muted)">Día '+( diaPago||'?' )+' de cada mes</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:6px;margin-top:.6rem;flex-wrap:wrap;align-items:center">' +
+        '<span style="font-size:11px;font-weight:600;color:'+dpColor+'">💰 '+dpStr+'</span>' +
+        '<span style="font-size:11px;color:'+vigColor+'"> · 📋 '+vigStr+'</span>' +
+      '</div>' +
+      '<div style="display:flex;gap:6px;margin-top:.6rem;flex-wrap:wrap">' +
+        '<button onclick="admPagoRegistrar(\''+esc(a.folio)+'\')" class="btn-s" style="font-size:11px;padding:5px 10px;background:rgba(0,212,255,.1);border-color:var(--cyan);color:var(--cyan)">💵 Registrar pago</button>' +
+        '<button onclick="enviarWAPago(\''+esc(a.folio)+'\')" style="padding:5px 10px;background:'+(waEnv?'var(--bg4)':'#25D366')+';color:'+(waEnv?'var(--muted)':'#fff')+';border:1px solid '+(waEnv?'rgba(255,255,255,.1)':'#25D366')+';border-radius:var(--r2);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font)">📱 '+(waEnv?'↻ Reenviar WA':'Enviar WA')+'</button>' +
+        (waEnv?'<span style="font-size:10px;color:#7ec445;align-self:center">✓ WA enviado</span>':'') +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function admPagoRegistrar(folio){
+  var a = DB.alumnos.find(function(x){ return x.folio===folio; });
+  if(!a) return;
+  S.alumno = a;
+  abrirPagoModal('renovar');
+}
+
+/* ─── WHATSAPP STATUS ─── */
+function admWaFiltro(f){
+  admWaFiltroActual=f;
+  ['pend','env','all'].forEach(function(x){
+    var b=document.getElementById('wa-f-'+x); if(b) b.classList.toggle('on',x===f);
+  });
+  admRenderWA();
+}
+
+function admRenderWA(){
+  var c=document.getElementById('adm-wa-list'); if(!c) return;
+  var alumnos=(DB.alumnos||[]).filter(function(a){
+    var sent=waEnviadoEsteMes(a);
+    if(admWaFiltroActual==='pend') return !sent;
+    if(admWaFiltroActual==='env')  return !!sent;
+    return true;
+  });
+  if(!alumnos.length){ c.innerHTML='<p style="font-size:12px;color:var(--muted)">'+(admWaFiltroActual==='pend'?'Sin pendientes este mes ✓':'Sin registros.')+'</p>'; return; }
+  c.innerHTML=alumnos.map(function(a){
+    var sent=waEnviadoEsteMes(a);
+    var dias=diasRestantes(a.fechaExpira);
+    var dp=diasParaPago(a);
+    var urgStr=dias===null?'Sin plan':dias<0?'VENCIDO':dias===0?'Vence hoy':dias<=5?'Vence en '+dias+'d':dias+' días';
+    var urgColor=dias===null?'var(--muted)':dias<0?'#f09595':dias===0?'#f09595':dias<=5?'#fabd75':'#7ec445';
+    var dpStr = dp===null?'':dp<0?' · 🔴 Pago atrasado '+Math.abs(dp)+'d':dp===0?' · 🔴 Paga hoy':dp<=7?' · 🟡 Pago en '+dp+'d':'';
+    return '<div class="arow" style="flex-wrap:wrap;gap:6px">' +
+      '<div style="flex:1;min-width:0"><div class="arow-name">'+esc(a.nombre)+' '+esc(a.apellidos)+'</div>' +
+      '<div class="arow-disc">'+esc((a.disciplinas||[]).join(', '))+'</div></div>' +
+      '<div style="text-align:right;flex-shrink:0">' +
+        '<span style="font-size:10px;color:'+urgColor+';font-weight:600;display:block">'+urgStr+dpStr+'</span>' +
+        (sent?'<span style="font-size:9px;color:#7ec445;display:block">✓ Enviado '+new Date(sent).toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit'})+'</span>':'') +
+        '<button onclick="enviarWAPago(\''+esc(a.folio)+'\')" style="margin-top:3px;padding:5px 10px;background:'+(sent?'var(--bg3)':'#25D366')+';color:'+(sent?'var(--muted)':'#fff')+';border:none;border-radius:var(--r2);font-size:10px;font-weight:600;cursor:pointer;font-family:var(--font)">'+
+          (sent?'↻ Reenviar':'📱 Enviar')+'</button>' +
+      '</div></div>';
+  }).join('');
+}
+
+async function admEnviarMasivo(){
+  var mes=mesCur();
+  var pendientes=(DB.alumnos||[]).filter(function(a){ return !waEnviadoEsteMes(a)&&a.tel; });
+  if(!pendientes.length){ showAlert('al-adm-wa','No hay pendientes este mes.','info'); return; }
+  if(!confirm('Se abrirá WhatsApp para enviar a '+pendientes.length+' alumno(s). ¿Continuar?')) return;
+  var i=0;
+  function sendNext(){
+    if(i>=pendientes.length){ showAlert('al-adm-wa','✓ Enviados '+i+' mensajes','ok'); admRenderWA(); return; }
+    var a=pendientes[i++];
+    enviarWAPago(a.folio);
+    setTimeout(sendNext, 1500);
+  }
+  sendNext();
+}
+
+/* ─── VISITAS ADMIN ─── */
+var admVisAlumno=null;
+function admVisBuscar(){
+  var q=(document.getElementById('adm-vis-search')||{value:''}).value.toLowerCase();
+  var c=document.getElementById('adm-vis-list'); if(!c) return;
+  document.getElementById('adm-vis-editor').style.display='none';
+  var arr=(DB.alumnos||[]).filter(function(a){
+    return !q||(a.nombre+' '+a.apellidos+' '+a.folio).toLowerCase().includes(q);
+  });
+  if(!arr.length){ c.innerHTML='<p style="font-size:12px;color:var(--muted)">Sin resultados.</p>'; return; }
+  c.innerHTML=arr.slice(0,20).map(function(a){
+    var hoy=mesCur();
+    var v=(DB.visLog||[]).filter(function(x){ return x.folio===a.folio&&mesStr((x.fecha||'')+'T00:00:00')===hoy; }).length;
+    return '<div class="arow" data-f="'+esc(a.folio)+'"><div style="flex:1;min-width:0"><div class="arow-name">'+esc(a.nombre)+' '+esc(a.apellidos)+'</div><div class="arow-disc">'+esc((a.disciplinas||[]).join(', '))+'</div></div><div style="text-align:right;flex-shrink:0"><span style="color:var(--rosa);font-weight:600;font-size:12px">'+v+' vis.</span><br><button onclick="admVisAbrir(\''+esc(a.folio)+'\')" class="btn-s" style="font-size:10px;padding:4px 8px;margin-top:3px">Editar</button></div></div>';
+  }).join('');
+}
+
+function admVisAbrir(folio){
+  var a=DB.alumnos.find(function(x){ return x.folio===folio; });
+  if(!a) return;
+  admVisAlumno=a;
+  document.getElementById('adm-vis-nombre').textContent=a.nombre+' '+a.apellidos+' · '+a.folio;
+  /* Populate disc select */
+  var sel=document.getElementById('adm-vis-disc');
+  if(sel) sel.innerHTML=(a.disciplinas||['—']).map(function(d){ return '<option value="'+esc(d)+'">'+esc(d)+'</option>'; }).join('');
+  var fEl=document.getElementById('adm-vis-fecha'); if(fEl) fEl.value=today();
+  var hEl=document.getElementById('adm-vis-hora');
+  if(hEl){ var n=new Date(); hEl.value=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0'); }
+  admVisRender();
+  document.getElementById('adm-vis-editor').style.display='block';
+  document.getElementById('adm-vis-editor').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function admVisRender(){
+  var c=document.getElementById('adm-vis-content'); if(!c||!admVisAlumno) return;
+  var hoy=mesCur();
+  var log=(DB.visLog||[]).filter(function(v){
+    var vMes=v.fecha?mesStr(v.fecha+'T00:00:00'):'';
+    return v.folio===admVisAlumno.folio&&vMes===hoy;
+  });
+  if(!log.length){ c.innerHTML='<p style="font-size:12px;color:var(--muted);margin-bottom:.5rem">Sin visitas este mes.</p>'; return; }
+  var byDisc={};
+  log.forEach(function(v){ var d=v.disc||'—'; if(!byDisc[d]) byDisc[d]=[]; byDisc[d].push(v); });
+  c.innerHTML=Object.keys(byDisc).map(function(disc){
+    return '<div style="margin-bottom:.75rem"><div style="font-size:10px;font-weight:700;color:var(--rosa);text-transform:uppercase;margin-bottom:5px">'+esc(disc)+'</div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:5px">'+
+      byDisc[disc].map(function(v){
+        return '<div style="background:var(--bg3);border:1px solid var(--rosa);border-radius:7px;padding:4px 9px;font-size:11px;display:flex;align-items:center;gap:6px">'+
+          '<span>'+esc(v.fecha||'')+' '+esc(v.hora||'')+'</span>'+
+          '<button data-ts="'+v.ts+'" onclick="admVisBorrar(this.dataset.ts)" style="background:none;border:none;color:#f09595;cursor:pointer;font-size:13px;line-height:1;padding:0">✕</button></div>';
+      }).join('')+'</div></div>';
+  }).join('');
+}
+
+async function admVisBorrar(ts){
+  if(!admVisAlumno) return;
+  if(!confirm('¿Eliminar esta visita?')) return;
+  var tsN=parseInt(ts);
+  DB.visLog=(DB.visLog||[]).filter(function(v){ return String(v.ts)!==String(ts); });
+  admVisAlumno.visitas=(admVisAlumno.visitas||[]).filter(function(v){
+    var vt=typeof v==='string'?new Date(v).getTime():(v.ts?parseInt(v.ts):0);
+    return Math.abs(vt-tsN)>3000;
+  });
+  saveLocal(); admVisRender();
+  S.writeLock=true;
+  try{ await saveDB(); }catch(e){}
+  finally{ setTimeout(function(){ S.writeLock=false; },2000); }
+}
+
+async function admVisAgregar(){
+  if(!admVisAlumno) return;
+  var disc=(document.getElementById('adm-vis-disc')||{value:'—'}).value;
+  var fecha=(document.getElementById('adm-vis-fecha')||{value:today()}).value||today();
+  var hora=(document.getElementById('adm-vis-hora')||{value:'08:00'}).value||'08:00';
+  var ts=Date.now();
+  try{ var d2=new Date(fecha+'T'+hora+':00'); if(!isNaN(d2.getTime())) ts=d2.getTime(); }catch(e){}
+  if(!DB.visLog) DB.visLog=[];
+  DB.visLog.push({folio:admVisAlumno.folio,nom:admVisAlumno.nombre+' '+admVisAlumno.apellidos,disc:disc,hora:hora,fecha:fecha,ts:ts});
+  if(DB.visLog.length>500) DB.visLog=DB.visLog.slice(-500);
+  if(!admVisAlumno.visitas) admVisAlumno.visitas=[];
+  admVisAlumno.visitas.push(new Date(ts).toISOString());
+  saveLocal(); admVisRender();
+  S.writeLock=true;
+  try{ await saveDB(); }catch(e){}
+  finally{ setTimeout(function(){ S.writeLock=false; },2000); }
 }
 
 setInterval(function(){
