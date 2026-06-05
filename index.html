@@ -258,6 +258,7 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
     <button class="nb" onclick="goPage('qr',this)">Visitas</button>
     <button class="nb" onclick="goPage('dash',this)">Resumen</button>
     <button class="nb" onclick="goPage('cfg',this)">⚙ Nube</button>
+    <button class="nb" onclick="goPage('admin',this)">⚙ Admin</button>
   </nav>
 </div>
 
@@ -557,68 +558,107 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
 
   <!-- TABS -->
   <div style="display:flex;gap:4px;margin-bottom:1rem;background:var(--bg2);border-radius:var(--r);padding:4px;border:1px solid var(--border2);flex-wrap:wrap">
-    <button class="tpill on" id="adm-t-disc" onclick="admTab('disc')">Disciplinas</button>
-    <button class="tpill" id="adm-t-plan" onclick="admTab('plan')">Planes</button>
+    <button class="tpill on" id="adm-t-cat"  onclick="admTab('cat')">📋 Catálogo</button>
     <button class="tpill" id="adm-t-pagos" onclick="admTab('pagos')">💰 Pagos</button>
-    <button class="tpill" id="adm-t-wa"   onclick="admTab('wa')">WhatsApp</button>
-    <button class="tpill" id="adm-t-vis"  onclick="admTab('vis')">Visitas</button>
+    <button class="tpill" id="adm-t-wa"    onclick="admTab('wa')">📱 WhatsApp</button>
+    <button class="tpill" id="adm-t-vis"   onclick="admTab('vis')">🗓 Visitas</button>
   </div>
 
-  <!-- TAB: DISCIPLINAS -->
-  <div id="adm-disc">
-    <div class="card">
-      <div class="ct">Disciplinas activas</div>
-      <div id="adm-disc-list"></div>
-      <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">
-        <div class="ct" style="margin-bottom:.5rem" id="adm-disc-form-title">Agregar nueva disciplina</div>
-        <input type="hidden" id="adm-disc-edit-nombre">
-        <div class="g2">
-          <div class="field"><label>Nombre *</label><input type="text" id="adm-disc-nom" placeholder="Nombre de la disciplina"></div>
-          <div class="field"><label>Precio mensual ($MXN) *</label><input type="number" id="adm-disc-precio" placeholder="500" min="0"></div>
-        </div>
-        <div style="margin-top:.75rem">
-          <div class="ct" style="margin-bottom:.5rem">Horarios (uno por línea, formato: Días | Hora)</div>
-          <textarea id="adm-disc-hors" placeholder="Lunes y Miércoles | 6:00–7:00 pm&#10;Martes y Jueves | 5:00–6:00 pm&#10;Intensivo Sábado | 10:00–12:00 pm" style="background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:13px;outline:none;width:100%;min-height:90px;resize:vertical;font-family:var(--font)"></textarea>
-        </div>
-        <div style="display:flex;gap:7px;margin-top:.5rem;flex-wrap:wrap">
-          <button class="btn-p" style="flex:1;margin:0" onclick="admAgregarDisc()">+ Guardar disciplina</button>
-          <button class="btn-s" id="adm-disc-cancel-edit" style="display:none" onclick="admCancelarEditDisc()">Cancelar</button>
-        </div>
-        <div class="alert" id="al-adm-disc" style="margin-top:.5rem"></div>
+  <!-- TAB: CATÁLOGO (Disciplinas + Planes + Membresías) -->
+  <div id="adm-cat">
+
+    <!-- SUB-SECCIÓN: DISCIPLINAS -->
+    <div class="card" style="margin-bottom:.75rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:8px">
+        <div class="ct" style="margin:0">Disciplinas</div>
+        <button class="btn-p" style="margin:0;padding:7px 14px;font-size:12px" onclick="catNuevaDisc()">+ Nueva disciplina</button>
       </div>
+      <div id="cat-disc-list"></div>
+    </div>
+
+    <!-- SUB-SECCIÓN: PAQUETES Y MEMBRESÍAS -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:8px">
+        <div class="ct" style="margin:0">Paquetes y Membresías</div>
+        <button class="btn-p" style="margin:0;padding:7px 14px;font-size:12px" onclick="catNuevoPlan()">+ Nuevo plan</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:.75rem;flex-wrap:wrap">
+        <button class="tpill on" id="cat-p-f-all" onclick="catPlanFiltro('all')">Todos</button>
+        <button class="tpill" id="cat-p-f-paq" onclick="catPlanFiltro('paq')">Paquetes</button>
+        <button class="tpill" id="cat-p-f-mem" onclick="catPlanFiltro('mem')">Membresías</button>
+        <button class="tpill" id="cat-p-f-otro" onclick="catPlanFiltro('otro')">Otros</button>
+      </div>
+      <div id="cat-plan-list"></div>
     </div>
   </div>
 
-  <!-- TAB: PLANES -->
-  <div id="adm-plan" style="display:none">
-    <div class="card">
-      <div class="ct">Planes actuales</div>
-      <div id="adm-plan-list"></div>
-      <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">
-        <div class="ct" style="margin-bottom:.5rem" id="adm-plan-form-title">Agregar / modificar plan</div>
-        <input type="hidden" id="adm-plan-edit-id">
-        <div class="g2">
-          <div class="field"><label>Nombre *</label><input type="text" id="adm-plan-nom" placeholder="Ej: Paquete #5"></div>
-          <div class="field"><label>Tipo</label>
-            <select id="adm-plan-tipo" style="background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:13px;outline:none;width:100%">
-              <option value="paq">Paquete</option>
-              <option value="mem">Membresía</option>
-              <option value="cl">Clase suelta</option>
-              <option value="otro">Taller / Otro</option>
-            </select>
-          </div>
-          <div class="field"><label>Precio ($MXN) *</label><input type="number" id="adm-plan-precio" placeholder="500" min="0"></div>
-          <div class="field"><label>Vigencia (meses)</label><input type="number" id="adm-plan-meses" placeholder="1" min="1"></div>
-          <div class="field"><label>Clases por mes (por disciplina)</label><input type="number" id="adm-plan-clases" placeholder="8" min="1"></div>
-          <div class="field"><label>Núm. disciplinas incluidas</label><input type="number" id="adm-plan-ndiscs" placeholder="1" min="1"></div>
-          <div class="field full"><label>Descripción</label><input type="text" id="adm-plan-desc" placeholder="Descripción breve del plan"></div>
-        </div>
-        <div style="display:flex;gap:7px;margin-top:.5rem;flex-wrap:wrap">
-          <button class="btn-p" style="flex:1;margin:0" onclick="admAgregarPlan()">+ Guardar plan</button>
-          <button class="btn-s" id="adm-plan-cancel-edit" style="display:none" onclick="admCancelarEditPlan()">Cancelar edición</button>
-        </div>
-        <div class="alert" id="al-adm-plan" style="margin-top:.5rem"></div>
+  <!-- MODAL EDICIÓN DISCIPLINA -->
+  <div id="cat-disc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:900;overflow-y:auto;padding:1rem">
+    <div style="max-width:540px;margin:0 auto;background:var(--bg2);border-radius:14px;padding:1.25rem;border:1px solid var(--border2)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+        <div class="ct" style="margin:0" id="cat-disc-modal-title">Disciplina</div>
+        <button onclick="catCerrarDiscModal()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1">×</button>
       </div>
+      <input type="hidden" id="cat-disc-key">
+      <div class="g2">
+        <div class="field"><label>Nombre *</label><input type="text" id="cat-disc-nom" placeholder="Ej: Pole Sport"></div>
+        <div class="field"><label>Precio mensual ($MXN) *</label><input type="number" id="cat-disc-precio" placeholder="500" min="0"></div>
+      </div>
+      <!-- Horarios dinámicos -->
+      <div style="margin-top:.75rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+          <div class="ct" style="margin:0;font-size:11px">Horarios</div>
+          <button onclick="catDiscAgregarHorario()" class="btn-s" style="font-size:10px;padding:4px 10px">+ Agregar horario</button>
+        </div>
+        <div id="cat-disc-hors-list"></div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">Formato: "Lunes y Miércoles" y horas separadas por coma. Marca "Intensivo" si aplica.</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:1rem;flex-wrap:wrap">
+        <button class="btn-p" style="flex:1;margin:0" onclick="catGuardarDisc()">💾 Guardar disciplina</button>
+        <button id="cat-disc-del-btn" class="btn-danger" style="display:none" onclick="catEliminarDisc()">🗑 Eliminar</button>
+      </div>
+      <div class="alert" id="al-cat-disc" style="margin-top:.5rem"></div>
+    </div>
+  </div>
+
+  <!-- MODAL EDICIÓN PLAN/MEMBRESÍA -->
+  <div id="cat-plan-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:900;overflow-y:auto;padding:1rem">
+    <div style="max-width:540px;margin:0 auto;background:var(--bg2);border-radius:14px;padding:1.25rem;border:1px solid var(--border2)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+        <div class="ct" style="margin:0" id="cat-plan-modal-title">Plan / Membresía</div>
+        <button onclick="catCerrarPlanModal()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1">×</button>
+      </div>
+      <input type="hidden" id="cat-plan-id">
+      <div class="g2">
+        <div class="field"><label>Nombre *</label><input type="text" id="cat-plan-nom" placeholder="Ej: Paquete #5"></div>
+        <div class="field"><label>Tipo</label>
+          <select id="cat-plan-tipo" style="background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:13px;outline:none;width:100%">
+            <option value="paq">Paquete (mensual)</option>
+            <option value="mem">Membresía (multi-mes)</option>
+            <option value="cl">Clase suelta</option>
+            <option value="otro">Taller / Otro</option>
+          </select>
+        </div>
+        <div class="field"><label>Precio ($MXN) *</label><input type="number" id="cat-plan-precio" placeholder="500" min="0"></div>
+        <div class="field"><label>Vigencia (meses)</label><input type="number" id="cat-plan-meses" placeholder="1" min="1"></div>
+        <div class="field"><label>Clases por mes / disc.</label><input type="number" id="cat-plan-clases" placeholder="8" min="1"></div>
+        <div class="field"><label>Núm. disciplinas incluidas</label><input type="number" id="cat-plan-ndiscs" placeholder="1" min="1"></div>
+        <div class="field full"><label>Descripción</label><input type="text" id="cat-plan-desc" placeholder="Describe brevemente el plan"></div>
+      </div>
+      <!-- Horarios/condiciones especiales del plan -->
+      <div style="margin-top:.75rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+          <div class="ct" style="margin:0;font-size:11px">Horarios / Condiciones especiales del plan</div>
+          <button onclick="catPlanAgregarHorario()" class="btn-s" style="font-size:10px;padding:4px 10px">+ Agregar</button>
+        </div>
+        <div id="cat-plan-hors-list"></div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">Opcional. Si el plan tiene horarios restringidos o condiciones especiales, agrégalos aquí.</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:1rem;flex-wrap:wrap">
+        <button class="btn-p" style="flex:1;margin:0" onclick="catGuardarPlan()">💾 Guardar plan</button>
+        <button id="cat-plan-del-btn" class="btn-danger" style="display:none" onclick="catEliminarPlan()">🗑 Eliminar</button>
+      </div>
+      <div class="alert" id="al-cat-plan" style="margin-top:.5rem"></div>
     </div>
   </div>
 
@@ -1006,7 +1046,7 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
   </div>
 </div>
 
-<script>/* ═════/* ══════════════════════ DATOS DE DISCIPLINAS ══════════════════════ */
+<script>/* ══════════════════════ DATOS DE DISCIPLINAS ══════════════════════ */
 const DISCS_KEYS = ['Pole Sport','Pole Exotic','Pole Espiral',"Pole Kid's",'Danza Aérea Telas','Elementos Aéreos','Enlogación/Flex','Yoga','Twerk','Jumping y Baile','Ritmos Latinos','Defensa Personal','Música/Vocalización','Heels','Otra disciplina'];
 const DISCS = {
   'Pole Sport':{precio:500,hors:[{g:'Lunes y Miércoles',h:['6:00–7:00 pm','7:00–8:00 pm']},{g:'Martes y Jueves',h:['6:00–7:00 am','7:00–8:00 am','5:00–6:00 pm','6:00–7:00 pm','7:00–8:00 pm']},{g:'Intensivo – Sábado',h:['2:00–4:00 pm'],it:1},{g:'Domingos',h:['2:00–4:00 pm']}]},
@@ -1556,7 +1596,7 @@ function goPage(id,btn){
   if(id==='dash') renderDash();
   if(id==='cita') renderCitas();
   if(id==='cal'){ renderCal(); }
-  if(id==='admin'){ admTab('disc'); }
+  if(id==='admin'){ admTab('cat'); }
   if(id==='qr'){ stopCam(); renderLogHoy(); }
   window.scrollTo(0,0);
 }
@@ -3545,7 +3585,6 @@ function diaDepago(a){
   if(pts.length<3) return null;
   return parseInt(pts[2]);
 }
-
 function parseFechaLocal(f){
   /* Parse YYYY-MM-DD without timezone shift */
   if(!f) return null;
@@ -3632,192 +3671,322 @@ function renderCal(){
 var admWaFiltroActual = 'pend';
 
 function admTab(t){
-  ['disc','plan','pagos','wa','vis'].forEach(function(x){
+  ['cat','pagos','wa','vis'].forEach(function(x){
     var el=document.getElementById('adm-'+x);
     var btn=document.getElementById('adm-t-'+x);
     if(el) el.style.display = x===t?'block':'none';
     if(btn) btn.classList.toggle('on', x===t);
   });
-  if(t==='disc') admRenderDiscs();
-  if(t==='plan') admRenderPlanes();
+  if(t==='cat')   catRender();
   if(t==='pagos') admRenderPagos();
-  if(t==='wa')   admRenderWA();
-  if(t==='vis')  admVisBuscar();
+  if(t==='wa')    admRenderWA();
+  if(t==='vis')   admVisBuscar();
 }
 
-/* ─── DISCIPLINAS ─── */
-function admRenderDiscs(){
-  var c = document.getElementById('adm-disc-list'); if(!c) return;
-  var customDiscs = DB.customDiscs||[];
-  var allDiscs = DISCS_KEYS.concat(customDiscs.filter(function(d){ return !DISCS_KEYS.includes(d.nombre); }).map(function(d){ return d.nombre; }));
-  if(!allDiscs.length){ c.innerHTML='<p style="font-size:12px;color:var(--muted)">Sin disciplinas.</p>'; return; }
-  c.innerHTML = allDiscs.map(function(nombre){
-    var custom = (customDiscs||[]).find(function(d){ return d.nombre===nombre; });
-    var precio = custom ? custom.precio : ((DISCS[nombre]||{}).precio||0);
-    var defaultDisc = DISCS[nombre];
-    var hors = custom ? (custom.hors||[]) : (defaultDisc ? (defaultDisc.hors||[]) : []);
-    var horasStr = hors.map(function(h){ return h.g; }).join(', ');
-    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">' +
-      '<div style="flex:1;min-width:0">' +
-        '<span style="font-size:13px;font-weight:500">'+esc(nombre)+'</span>' +
-        (horasStr ? '<div style="font-size:10px;color:var(--muted);margin-top:2px">'+esc(horasStr.substring(0,60))+'</div>' : '') +
-      '</div>' +
-      '<span style="color:var(--rosa);font-size:13px;font-weight:700;white-space:nowrap">$'+precio.toLocaleString('es-MX')+'/mes</span>' +
-      '<button onclick="admEditarDisc(\''+esc(nombre)+'\')" class="btn-s" style="font-size:10px;padding:4px 9px">✏️ Editar</button>' +
-      (!custom ? '' : '<button onclick="admBorrarDisc(\''+esc(nombre)+'\')" class="btn-danger" style="font-size:10px;padding:4px 8px">✕</button>') +
-      '</div>';
-  }).join('');
+/* ═══════════════════════════════════════════════════════
+   CATÁLOGO — Disciplinas, Paquetes y Membresías
+   ═══════════════════════════════════════════════════════ */
+
+var catPlanFiltroActual = 'all';
+
+function catRender(){ catRenderDiscs(); catRenderPlanes(); }
+
+function catTipoColor(tipo){
+  return tipo==='mem'?'var(--cyan)':tipo==='paq'?'var(--rosa)':tipo==='cl'?'#fabd75':'var(--muted)';
+}
+function catTipoLabel(tipo){
+  return tipo==='mem'?'Membresía':tipo==='paq'?'Paquete':tipo==='cl'?'Clase suelta':'Taller/Otro';
 }
 
-function admCancelarEditDisc(){
-  document.getElementById('adm-disc-nom').value='';
-  document.getElementById('adm-disc-precio').value='';
-  document.getElementById('adm-disc-hors').value='';
-  document.getElementById('adm-disc-edit-nombre').value='';
-  document.getElementById('adm-disc-form-title').textContent='Agregar nueva disciplina';
-  document.getElementById('adm-disc-cancel-edit').style.display='none';
-}
-
-async function admAgregarDisc(){
-  var nom    = (document.getElementById('adm-disc-nom').value||'').trim();
-  var precio = parseFloat(document.getElementById('adm-disc-precio').value)||0;
-  var horsRaw= (document.getElementById('adm-disc-hors').value||'').trim();
-  var editNom= (document.getElementById('adm-disc-edit-nombre').value||'').trim();
-  if(!nom||!precio){ showAlert('al-adm-disc','Nombre y precio son obligatorios.','err'); return; }
-  if(!DB.customDiscs) DB.customDiscs=[];
-  var hors = horsRaw.split('\n').filter(Boolean).map(function(line){
-    var pts = line.split('|'); return {g:(pts[0]||'').trim(), h:[(pts[1]||'').trim()]};
+/* ── Render disciplinas ── */
+function catRenderDiscs(){
+  var c=document.getElementById('cat-disc-list'); if(!c) return;
+  var all=DISCS_KEYS.map(function(k){
+    var ov=(DB.customDiscs||[]).find(function(d){return d.nombre===k;});
+    return {nombre:k,precio:ov?ov.precio:(DISCS[k]||{}).precio||0,
+            hors:ov?ov.hors:((DISCS[k]||{}).hors||[]),custom:!!ov};
   });
-  var disc = {nombre:nom, precio:precio, hors:hors};
-  /* If editing an existing discipline by different name, update references */
-  if(editNom && editNom !== nom){
-    /* rename: update all alumno records */
-    (DB.alumnos||[]).forEach(function(a){
-      if(a.disciplinas) a.disciplinas = a.disciplinas.map(function(d){ return d===editNom?nom:d; });
-    });
-    (DB.visLog||[]).forEach(function(v){ if(v.disc===editNom) v.disc=nom; });
-    /* remove old key */
-    var oi = DISCS_KEYS.indexOf(editNom); if(oi>=0) DISCS_KEYS.splice(oi,1);
-    delete DISCS[editNom];
-    DB.customDiscs = (DB.customDiscs||[]).filter(function(d){ return d.nombre!==editNom; });
-  }
-  var existing = DB.customDiscs.findIndex(function(d){ return d.nombre===nom; });
-  if(existing>=0) DB.customDiscs[existing]=disc; else DB.customDiscs.push(disc);
-  /* Add to DISCS_KEYS if not present */
-  if(!DISCS_KEYS.includes(nom)) DISCS_KEYS.push(nom);
-  DISCS[nom] = {precio:precio, hors:hors};
-  await saveDB();
-  showAlert('al-adm-disc','✓ Disciplina guardada: '+nom,'ok');
-  admCancelarEditDisc();
-  admRenderDiscs();
-}
-
-function admEditarDisc(nombre){
-  var custom=(DB.customDiscs||[]).find(function(x){ return x.nombre===nombre; });
-  var defaultD = DISCS[nombre];
-  var d = custom || (defaultD ? {nombre:nombre, precio:defaultD.precio, hors:defaultD.hors} : null);
-  if(!d) return;
-  document.getElementById('adm-disc-nom').value=d.nombre;
-  document.getElementById('adm-disc-precio').value=d.precio||'';
-  document.getElementById('adm-disc-hors').value=(d.hors||[]).map(function(h){ return h.g+' | '+(h.h||[]).join(', '); }).join('\n');
-  document.getElementById('adm-disc-edit-nombre').value=d.nombre;
-  document.getElementById('adm-disc-form-title').textContent='Editando: '+d.nombre;
-  document.getElementById('adm-disc-cancel-edit').style.display='inline-flex';
-  window.scrollTo(0,document.getElementById('adm-disc-nom').getBoundingClientRect().top+window.scrollY-80);
-}
-
-async function admBorrarDisc(nombre){
-  if(!confirm('¿Eliminar la disciplina "'+nombre+'"?')) return;
-  DB.customDiscs=(DB.customDiscs||[]).filter(function(d){ return d.nombre!==nombre; });
-  var idx=DISCS_KEYS.indexOf(nombre); if(idx>=0) DISCS_KEYS.splice(idx,1);
-  delete DISCS[nombre];
-  await saveDB(); admRenderDiscs();
-}
-
-/* ─── PLANES ─── */
-function admRenderPlanes(){
-  var c = document.getElementById('adm-plan-list'); if(!c) return;
-  var allPlanes = PLANES.concat((DB.customPlanes||[]).filter(function(cp){ return !PLANES.find(function(p){ return p.id===cp.id; }); }));
-  c.innerHTML = allPlanes.map(function(p){
-    var isCustom = !!(DB.customPlanes||[]).find(function(x){ return x.id===p.id; });
-    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">' +
-      '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">'+esc(p.n)+'</div>' +
-      '<div style="font-size:11px;color:var(--muted)">'+esc(p.d||'')+'</div>' +
-      '<div style="font-size:10px;color:var(--cyan);margin-top:1px">'+esc(p.t||'')+' · '+p.clases_mes+' clases/mes · '+p.num_discs+' disc.</div></div>' +
-      '<span style="color:var(--rosa);font-size:14px;font-weight:700">$'+p.p.toLocaleString('es-MX')+'</span>'+
-      '<button onclick="admEditarPlan(\''+p.id+'\')" class="btn-s" style="font-size:10px;padding:4px 9px">✏️ Editar</button>'+
-      (isCustom?'<button onclick="admBorrarPlan(\''+p.id+'\')" class="btn-danger" style="font-size:10px;padding:4px 8px">✕</button>':'') +
-      '</div>';
+  if(!all.length){c.innerHTML='<p style="color:var(--muted);font-size:12px">Sin disciplinas.</p>';return;}
+  c.innerHTML=all.map(function(d){
+    var hs=d.hors.map(function(h){
+      return '<span style="font-size:10px;background:rgba(255,255,255,.06);border-radius:4px;padding:2px 6px;margin:1px;display:inline-block">'
+        +esc(h.g)+(h.h&&h.h.length?' · '+h.h.join(', '):'')+(h.it?' ⚡':'')+'</span>';
+    }).join('');
+    return '<div style="background:var(--bg3);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:.75rem;margin-bottom:8px">'
+      +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+      +'<div style="flex:1;min-width:0">'
+      +'<span style="font-size:13px;font-weight:600">'+esc(d.nombre)+'</span>'
+      +(d.custom?'<span style="font-size:9px;background:rgba(212,83,126,.2);color:var(--rosa);border-radius:4px;padding:1px 5px;margin-left:5px">Custom</span>':'')
+      +'</div>'
+      +'<span style="font-size:14px;font-weight:700;color:var(--rosa)">$'+d.precio.toLocaleString('es-MX')+'/mes</span>'
+      +'<button onclick="catEditarDisc(\''+esc(d.nombre)+'\')" class="btn-s" style="padding:5px 10px;font-size:11px">✏️ Editar</button>'
+      +'</div>'
+      +(hs?'<div style="margin-top:5px;line-height:1.8">'+hs+'</div>'
+          :'<div style="font-size:10px;color:var(--muted);margin-top:4px">Sin horarios configurados</div>')
+      +'</div>';
   }).join('');
 }
 
-function admEditarPlan(id){
-  var p = PLANES.find(function(x){ return x.id===id; }) || (DB.customPlanes||[]).find(function(x){ return x.id===id; });
-  if(!p) return;
-  document.getElementById('adm-plan-nom').value=p.n;
-  document.getElementById('adm-plan-tipo').value=p.tipo||'paq';
-  document.getElementById('adm-plan-precio').value=p.p;
-  document.getElementById('adm-plan-meses').value=p.meses||1;
-  document.getElementById('adm-plan-clases').value=p.clases_mes||8;
-  document.getElementById('adm-plan-ndiscs').value=p.num_discs||1;
-  document.getElementById('adm-plan-desc').value=p.d||'';
-  document.getElementById('adm-plan-edit-id').value=p.id;
-  document.getElementById('adm-plan-form-title').textContent='Editando: '+p.n;
-  document.getElementById('adm-plan-cancel-edit').style.display='inline-flex';
-  window.scrollTo(0,document.getElementById('adm-plan-nom').getBoundingClientRect().top+window.scrollY-80);
+/* ── Render planes ── */
+function catRenderPlanes(){
+  var c=document.getElementById('cat-plan-list'); if(!c) return;
+  var all=PLANES.map(function(p){
+    var ov=(DB.customPlanes||[]).find(function(x){return x.id===p.id;});
+    return ov||p;
+  });
+  if(catPlanFiltroActual!=='all') all=all.filter(function(p){
+    if(catPlanFiltroActual==='otro') return p.tipo==='cl'||p.tipo==='otro';
+    return p.tipo===catPlanFiltroActual;
+  });
+  if(!all.length){c.innerHTML='<p style="color:var(--muted);font-size:12px">Sin planes en esta categoría.</p>';return;}
+  c.innerHTML=all.map(function(p){
+    var hs=(p.hors||[]).map(function(h){
+      return '<span style="font-size:10px;background:rgba(255,255,255,.06);border-radius:4px;padding:2px 6px;margin:1px;display:inline-block">'
+        +esc(h.g)+(h.h&&h.h.length?' · '+h.h.join(', '):'')+'</span>';
+    }).join('');
+    var color=catTipoColor(p.tipo);
+    var isCustom=!!(DB.customPlanes||[]).find(function(x){return x.id===p.id;});
+    return '<div style="background:var(--bg3);border:1px solid rgba(255,255,255,.07);border-left:3px solid '+color+';border-radius:10px;padding:.75rem;margin-bottom:8px">'
+      +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+      +'<div style="flex:1;min-width:0">'
+      +'<span style="font-size:13px;font-weight:600">'+esc(p.n)+'</span>'
+      +'<span style="font-size:10px;color:'+color+';background:rgba(255,255,255,.06);border-radius:4px;padding:1px 6px;margin-left:5px">'+catTipoLabel(p.tipo)+'</span>'
+      +(isCustom?'<span style="font-size:9px;background:rgba(212,83,126,.2);color:var(--rosa);border-radius:4px;padding:1px 5px;margin-left:4px">Custom</span>':'')
+      +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(p.d||'')+'</div>'
+      +'<div style="font-size:10px;color:var(--cyan);margin-top:1px">'+esc(p.t||p.meses+'m')+' · '+p.clases_mes+' clases/mes · '+p.num_discs+' disc.</div>'
+      +'</div>'
+      +'<span style="font-size:15px;font-weight:700;color:var(--rosa)">$'+p.p.toLocaleString('es-MX')+'</span>'
+      +'<button onclick="catEditarPlan(\''+esc(p.id)+'\')" class="btn-s" style="padding:5px 10px;font-size:11px">✏️ Editar</button>'
+      +'</div>'
+      +(hs?'<div style="margin-top:5px;line-height:1.8">'+hs+'</div>':'')
+      +'</div>';
+  }).join('');
 }
 
-function admCancelarEditPlan(){
-  ['adm-plan-nom','adm-plan-precio','adm-plan-meses','adm-plan-clases','adm-plan-ndiscs','adm-plan-desc'].forEach(function(id){ var e=document.getElementById(id); if(e)e.value=''; });
-  document.getElementById('adm-plan-edit-id').value='';
-  document.getElementById('adm-plan-form-title').textContent='Agregar / modificar plan';
-  document.getElementById('adm-plan-cancel-edit').style.display='none';
+function catPlanFiltro(f){
+  catPlanFiltroActual=f;
+  ['all','paq','mem','otro'].forEach(function(x){
+    var b=document.getElementById('cat-p-f-'+x); if(b) b.classList.toggle('on',x===f);
+  });
+  catRenderPlanes();
 }
 
-async function admAgregarPlan(){
-  var nom    = (document.getElementById('adm-plan-nom').value||'').trim();
-  var tipo   = document.getElementById('adm-plan-tipo').value||'paq';
-  var precio = parseFloat(document.getElementById('adm-plan-precio').value)||0;
-  var meses  = parseInt(document.getElementById('adm-plan-meses').value)||1;
-  var clases = parseInt(document.getElementById('adm-plan-clases').value)||8;
-  var ndiscs = parseInt(document.getElementById('adm-plan-ndiscs').value)||1;
-  var desc   = (document.getElementById('adm-plan-desc').value||'').trim();
-  var editId = (document.getElementById('adm-plan-edit-id').value||'').trim();
-  if(!nom||!precio){ showAlert('al-adm-plan','Nombre y precio son obligatorios.','err'); return; }
+/* ══ MODAL DISCIPLINA ══ */
+var catDiscHors=[];
 
-  if(editId){
-    /* Edit existing plan */
-    var planIdx = PLANES.findIndex(function(p){ return p.id===editId; });
-    var updatedPlan = {id:editId, n:nom, t:(meses===1?'1 mes':meses===12?'1 año':meses+' meses'), tipo:tipo, p:precio,
-                d:desc||nom, num_discs:ndiscs, clases_mes:clases, horas:1, meses:meses};
-    if(planIdx>=0) PLANES[planIdx] = updatedPlan;
-    /* Also update in customPlanes */
-    if(!DB.customPlanes) DB.customPlanes=[];
-    var cpIdx = DB.customPlanes.findIndex(function(p){ return p.id===editId; });
-    if(cpIdx>=0) DB.customPlanes[cpIdx] = updatedPlan;
-    else DB.customPlanes.push(updatedPlan); /* store override of default */
-    showAlert('al-adm-plan','✓ Plan actualizado: '+nom,'ok');
-  } else {
-    /* New plan */
-    var newId = 'CUSTOM-'+Date.now();
-    var plan = {id:newId, n:nom, t:(meses===1?'1 mes':meses===12?'1 año':meses+' meses'), tipo:tipo, p:precio,
-                d:desc||nom, num_discs:ndiscs, clases_mes:clases, horas:1, meses:meses};
-    if(!DB.customPlanes) DB.customPlanes=[];
-    DB.customPlanes.push(plan);
-    PLANES.push(plan);
-    showAlert('al-adm-plan','✓ Plan guardado: '+nom,'ok');
+function catNuevaDisc(){
+  catDiscHors=[];
+  document.getElementById('cat-disc-key').value='';
+  document.getElementById('cat-disc-nom').value='';
+  document.getElementById('cat-disc-precio').value='';
+  document.getElementById('cat-disc-modal-title').textContent='Nueva disciplina';
+  document.getElementById('cat-disc-del-btn').style.display='none';
+  showAlert('al-cat-disc','','');
+  catRenderDiscHors();
+  document.getElementById('cat-disc-modal').style.display='block';
+}
+
+function catEditarDisc(nombre){
+  var ov=(DB.customDiscs||[]).find(function(d){return d.nombre===nombre;});
+  var base=DISCS[nombre]||{};
+  catDiscHors=JSON.parse(JSON.stringify(ov?ov.hors||[]:base.hors||[]));
+  document.getElementById('cat-disc-key').value=nombre;
+  document.getElementById('cat-disc-nom').value=nombre;
+  document.getElementById('cat-disc-precio').value=ov?ov.precio:base.precio||0;
+  document.getElementById('cat-disc-modal-title').textContent='Editar: '+nombre;
+  document.getElementById('cat-disc-del-btn').style.display=ov?'inline-flex':'none';
+  showAlert('al-cat-disc','','');
+  catRenderDiscHors();
+  document.getElementById('cat-disc-modal').style.display='block';
+}
+
+function catCerrarDiscModal(){ document.getElementById('cat-disc-modal').style.display='none'; }
+
+function catDiscAgregarHorario(){ catDiscHors.push({g:'',h:[],it:false}); catRenderDiscHors(); }
+
+function catRenderDiscHors(){
+  var c=document.getElementById('cat-disc-hors-list'); if(!c) return;
+  if(!catDiscHors.length){
+    c.innerHTML='<div style="font-size:11px;color:var(--muted);padding:6px 0">Sin horarios. Pulsa "+ Agregar horario".</div>';
+    return;
   }
-  await saveDB();
-  admCancelarEditPlan();
-  admRenderPlanes();
+  c.innerHTML=catDiscHors.map(function(h,i){
+    return '<div style="background:var(--bg);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px;margin-bottom:7px">'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'
+      +'<input type="text" value="'+esc(h.g)+'" placeholder="Días (ej: Lunes y Miércoles)" '
+      +'oninput="catDiscHors['+i+'].g=this.value" '
+      +'style="flex:1;background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:6px 9px;color:var(--blanco);font-size:12px;outline:none">'
+      +'<label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);white-space:nowrap;cursor:pointer">'
+      +'<input type="checkbox" '+(h.it?'checked':'')+' onchange="catDiscHors['+i+'].it=this.checked" style="accent-color:var(--rosa)">Intensivo</label>'
+      +'<button onclick="catDiscHors.splice('+i+',1);catRenderDiscHors()" '
+      +'style="background:rgba(163,45,45,.3);border:none;color:#f09595;border-radius:5px;width:24px;height:24px;cursor:pointer;font-size:14px;flex-shrink:0">×</button>'
+      +'</div>'
+      +'<div style="font-size:10px;color:var(--muted);margin-bottom:3px">Horarios (uno por línea):</div>'
+      +'<textarea placeholder="6:00–7:00 pm&#10;7:00–8:00 pm" rows="2" '
+      +'oninput="catDiscHors['+i+'].h=this.value.split(\'\\n\').map(function(x){return x.trim();}).filter(Boolean)" '
+      +'style="width:100%;background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:6px 9px;color:var(--blanco);font-size:12px;outline:none;resize:vertical;font-family:var(--font)">'+esc((h.h||[]).join('\n'))+'</textarea>'
+      +'</div>';
+  }).join('');
 }
 
-async function admBorrarPlan(id){
-  if(!confirm('¿Eliminar este plan?')) return;
-  DB.customPlanes=(DB.customPlanes||[]).filter(function(p){ return p.id!==id; });
-  var idx=PLANES.findIndex(function(p){ return p.id===id; }); if(idx>=0) PLANES.splice(idx,1);
-  await saveDB(); admRenderPlanes();
+async function catGuardarDisc(){
+  var nombre=(document.getElementById('cat-disc-nom').value||'').trim();
+  var precio=parseFloat(document.getElementById('cat-disc-precio').value)||0;
+  var oldKey=(document.getElementById('cat-disc-key').value||'').trim();
+  if(!nombre||!precio){showAlert('al-cat-disc','Nombre y precio son obligatorios.','err');return;}
+  /* Sync DOM values into catDiscHors */
+  var gEls=document.querySelectorAll('#cat-disc-hors-list input[type=text]');
+  var taEls=document.querySelectorAll('#cat-disc-hors-list textarea');
+  var cbEls=document.querySelectorAll('#cat-disc-hors-list input[type=checkbox]');
+  gEls.forEach(function(el,i){if(catDiscHors[i])catDiscHors[i].g=el.value.trim();});
+  taEls.forEach(function(el,i){if(catDiscHors[i])catDiscHors[i].h=el.value.split('\n').map(function(x){return x.trim();}).filter(Boolean);});
+  cbEls.forEach(function(el,i){if(catDiscHors[i])catDiscHors[i].it=el.checked;});
+  var hors=catDiscHors.filter(function(h){return h.g;});
+  if(!DB.customDiscs) DB.customDiscs=[];
+  if(oldKey && oldKey!==nombre){
+    (DB.alumnos||[]).forEach(function(a){
+      if(a.disciplinas) a.disciplinas=a.disciplinas.map(function(d){return d===oldKey?nombre:d;});
+    });
+    (DB.visLog||[]).forEach(function(v){if(v.disc===oldKey)v.disc=nombre;});
+    var oki=DISCS_KEYS.indexOf(oldKey); if(oki>=0) DISCS_KEYS.splice(oki,1);
+    delete DISCS[oldKey];
+    DB.customDiscs=DB.customDiscs.filter(function(d){return d.nombre!==oldKey;});
+  }
+  var disc={nombre:nombre,precio:precio,hors:hors};
+  var ei=DB.customDiscs.findIndex(function(d){return d.nombre===nombre;});
+  if(ei>=0) DB.customDiscs[ei]=disc; else DB.customDiscs.push(disc);
+  if(!DISCS_KEYS.includes(nombre)) DISCS_KEYS.push(nombre);
+  DISCS[nombre]={precio:precio,hors:hors};
+  await saveDB();
+  showAlert('al-cat-disc','✓ Disciplina guardada','ok');
+  setTimeout(catCerrarDiscModal,800);
+  catRenderDiscs();
 }
+
+async function catEliminarDisc(){
+  var nombre=(document.getElementById('cat-disc-nom').value||'').trim();
+  if(!confirm('¿Eliminar "'+nombre+'"? Los alumnos que la tengan asignada la perderán.')) return;
+  DB.customDiscs=(DB.customDiscs||[]).filter(function(d){return d.nombre!==nombre;});
+  var ki=DISCS_KEYS.indexOf(nombre); if(ki>=0) DISCS_KEYS.splice(ki,1);
+  delete DISCS[nombre];
+  (DB.alumnos||[]).forEach(function(a){
+    if(a.disciplinas) a.disciplinas=a.disciplinas.filter(function(d){return d!==nombre;});
+  });
+  await saveDB();
+  catCerrarDiscModal();
+  catRenderDiscs();
+}
+
+/* ══ MODAL PLAN / MEMBRESÍA ══ */
+var catPlanHors=[];
+
+function catNuevoPlan(){
+  catPlanHors=[];
+  ['cat-plan-id','cat-plan-nom','cat-plan-precio','cat-plan-desc'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value='';
+  });
+  document.getElementById('cat-plan-tipo').value='paq';
+  document.getElementById('cat-plan-meses').value='1';
+  document.getElementById('cat-plan-clases').value='8';
+  document.getElementById('cat-plan-ndiscs').value='1';
+  document.getElementById('cat-plan-modal-title').textContent='Nuevo plan / membresía';
+  document.getElementById('cat-plan-del-btn').style.display='none';
+  showAlert('al-cat-plan','','');
+  catRenderPlanHors();
+  document.getElementById('cat-plan-modal').style.display='block';
+}
+
+function catEditarPlan(id){
+  var base=PLANES.find(function(x){return x.id===id;});
+  var ov=(DB.customPlanes||[]).find(function(x){return x.id===id;});
+  var plan=ov||base; if(!plan) return;
+  catPlanHors=JSON.parse(JSON.stringify(plan.hors||[]));
+  document.getElementById('cat-plan-id').value=plan.id;
+  document.getElementById('cat-plan-nom').value=plan.n;
+  document.getElementById('cat-plan-tipo').value=plan.tipo||'paq';
+  document.getElementById('cat-plan-precio').value=plan.p;
+  document.getElementById('cat-plan-meses').value=plan.meses||1;
+  document.getElementById('cat-plan-clases').value=plan.clases_mes||8;
+  document.getElementById('cat-plan-ndiscs').value=plan.num_discs||1;
+  document.getElementById('cat-plan-desc').value=plan.d||'';
+  document.getElementById('cat-plan-modal-title').textContent='Editar: '+plan.n;
+  document.getElementById('cat-plan-del-btn').style.display=ov?'inline-flex':'none';
+  showAlert('al-cat-plan','','');
+  catRenderPlanHors();
+  document.getElementById('cat-plan-modal').style.display='block';
+}
+
+function catCerrarPlanModal(){ document.getElementById('cat-plan-modal').style.display='none'; }
+
+function catPlanAgregarHorario(){ catPlanHors.push({g:'',h:[]}); catRenderPlanHors(); }
+
+function catRenderPlanHors(){
+  var c=document.getElementById('cat-plan-hors-list'); if(!c) return;
+  if(!catPlanHors.length){
+    c.innerHTML='<div style="font-size:11px;color:var(--muted);padding:6px 0">Sin horarios especiales. Opcional.</div>';
+    return;
+  }
+  c.innerHTML=catPlanHors.map(function(h,i){
+    return '<div style="background:var(--bg);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px;margin-bottom:7px">'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'
+      +'<input type="text" value="'+esc(h.g)+'" placeholder="Condición / Días (ej: Solo fines de semana)" '
+      +'oninput="catPlanHors['+i+'].g=this.value" '
+      +'style="flex:1;background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:6px 9px;color:var(--blanco);font-size:12px;outline:none">'
+      +'<button onclick="catPlanHors.splice('+i+',1);catRenderPlanHors()" '
+      +'style="background:rgba(163,45,45,.3);border:none;color:#f09595;border-radius:5px;width:24px;height:24px;cursor:pointer;font-size:14px;flex-shrink:0">×</button>'
+      +'</div>'
+      +'<textarea placeholder="Horarios o condiciones (opcional)" rows="2" '
+      +'oninput="catPlanHors['+i+'].h=this.value.split(\'\\n\').map(function(x){return x.trim();}).filter(Boolean)" '
+      +'style="width:100%;background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:6px 9px;color:var(--blanco);font-size:12px;outline:none;resize:vertical;font-family:var(--font)">'+esc((h.h||[]).join('\n'))+'</textarea>'
+      +'</div>';
+  }).join('');
+}
+
+async function catGuardarPlan(){
+  var nom=(document.getElementById('cat-plan-nom').value||'').trim();
+  var tipo=document.getElementById('cat-plan-tipo').value||'paq';
+  var precio=parseFloat(document.getElementById('cat-plan-precio').value)||0;
+  var meses=parseInt(document.getElementById('cat-plan-meses').value)||1;
+  var clases=parseInt(document.getElementById('cat-plan-clases').value)||8;
+  var ndiscs=parseInt(document.getElementById('cat-plan-ndiscs').value)||1;
+  var desc=(document.getElementById('cat-plan-desc').value||'').trim();
+  var editId=(document.getElementById('cat-plan-id').value||'').trim();
+  if(!nom||!precio){showAlert('al-cat-plan','Nombre y precio son obligatorios.','err');return;}
+  /* Sync DOM */
+  document.querySelectorAll('#cat-plan-hors-list input[type=text]').forEach(function(el,i){if(catPlanHors[i])catPlanHors[i].g=el.value.trim();});
+  document.querySelectorAll('#cat-plan-hors-list textarea').forEach(function(el,i){if(catPlanHors[i])catPlanHors[i].h=el.value.split('\n').map(function(x){return x.trim();}).filter(Boolean);});
+  var hors=catPlanHors.filter(function(h){return h.g;});
+  var tStr=meses===1?'1 mes':meses===12?'1 año':meses+' meses';
+  var plan={id:editId||('CUSTOM-'+Date.now()),n:nom,t:tStr,tipo:tipo,p:precio,
+            d:desc||nom,num_discs:ndiscs,clases_mes:clases,horas:1,meses:meses,hors:hors};
+  if(!DB.customPlanes) DB.customPlanes=[];
+  var cpIdx=DB.customPlanes.findIndex(function(x){return x.id===plan.id;});
+  if(cpIdx>=0) DB.customPlanes[cpIdx]=plan; else DB.customPlanes.push(plan);
+  var pi=PLANES.findIndex(function(x){return x.id===plan.id;});
+  if(pi>=0) PLANES[pi]=plan; else PLANES.push(plan);
+  await saveDB();
+  showAlert('al-cat-plan','✓ Plan guardado','ok');
+  setTimeout(catCerrarPlanModal,800);
+  catRenderPlanes();
+}
+
+async function catEliminarPlan(){
+  var id=(document.getElementById('cat-plan-id').value||'').trim();
+  var nom=(document.getElementById('cat-plan-nom').value||'').trim();
+  if(!confirm('¿Eliminar el plan "'+nom+'"?')) return;
+  DB.customPlanes=(DB.customPlanes||[]).filter(function(p){return p.id!==id;});
+  var pi=PLANES.findIndex(function(p){return p.id===id;}); if(pi>=0) PLANES.splice(pi,1);
+  await saveDB();
+  catCerrarPlanModal();
+  catRenderPlanes();
+}
+
+/* ── Legacy stubs ── */
+function admRenderDiscs(){ catRenderDiscs(); }
+function admRenderPlanes(){ catRenderPlanes(); }
+function admBorrarDisc(n){ catEditarDisc(n); }
+function admBorrarPlan(id){ catEditarPlan(id); }
+
 
 /* ─── PAGOS AUTOMÁTICOS ─── */
 var admPagosFiltroActual = 'todos';
