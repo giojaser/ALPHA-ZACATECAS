@@ -463,6 +463,7 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
         <button class="btn-s" style="background:rgba(0,212,255,.1);border-color:var(--cyan);color:var(--cyan)" onclick="abrirPagoModal('pagar')">&#x1F4B0; Pagar</button>
         <button class="btn-p" style="margin:0;padding:9px 14px;font-size:12px;background:#3b6d11;border-color:#3b6d11" onclick="abrirPagoModal('renovar')">&#x1F504; Renovar / Renovar</button>
         <button id="pf-wa-pago-btn" style="padding:9px 14px;background:rgba(37,211,102,.15);color:#7ec445;border:1px solid rgba(37,211,102,.3);border-radius:var(--r2);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font)" onclick="enviarWAPagoActual()">📱 Aviso pago WA</button>
+        <button class="btn-s" style="background:rgba(133,79,11,.15);border-color:#fabd75;color:#fabd75" onclick="abrirSaldoModal()">⚠ Saldos / Promos</button>
         <button class="btn-danger" onclick="eliminar()">Eliminar</button>
         <button class="btn-s" onclick="cerrarPerfil()">← Volver</button>
       </div>
@@ -865,13 +866,32 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
       <div class="disc-grid" id="pm-disc-grid"></div>
       <div id="pm-disc-extra"></div>
     </div>
+
+    <!-- SALDOS PENDIENTES ACUMULADOS -->
+    <div id="pm-saldos-banner" style="display:none;background:rgba(133,79,11,.2);border:1px solid #fabd75;border-radius:var(--r2);padding:.75rem;margin-bottom:.75rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
+        <div style="font-size:12px;font-weight:700;color:#fabd75">⚠ Saldos pendientes acumulados</div>
+        <span id="pm-saldos-total" style="font-size:14px;font-weight:700;color:#fabd75">$0</span>
+      </div>
+      <div id="pm-saldos-detalle" style="font-size:11px;color:var(--muted);margin-bottom:.5rem"></div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+        <input type="checkbox" id="pm-saldos-incluir" checked onchange="pmCalcTotal()" style="accent-color:#fabd75;width:16px;height:16px">
+        <span style="color:#fabd75;font-weight:600">Incluir saldos pendientes en este pago</span>
+      </label>
+    </div>
+
+    <!-- DESCUENTO / PROMOCIÓN -->
     <div style="background:var(--bg3);border-radius:var(--r2);padding:.75rem;margin-bottom:.75rem">
-      <div class="ct" style="margin-bottom:.4rem">Descuento / Promoción (opcional)</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
+        <div class="ct" style="margin:0">Descuento / Promoción</div>
+        <div id="pm-promos-activas" style="font-size:10px;color:var(--cyan)"></div>
+      </div>
       <div class="g2">
         <div class="field"><label>Descuento $</label><input type="number" id="pm-desc-monto" min="0" placeholder="0" oninput="pmCalcTotal()"></div>
         <div class="field"><label>Descuento %</label><input type="number" id="pm-desc-pct" min="0" max="100" placeholder="0" oninput="pmCalcTotal()"></div>
-        <div class="field full"><label>Motivo</label><input type="text" id="pm-desc-nota" placeholder="Ej: Promo especial, descuento estudiante..."></div>
+        <div class="field full"><label>Motivo</label><input type="text" id="pm-desc-nota" placeholder="Ej: Promo especial, descuento estudiante, mes gratis..."></div>
       </div>
+      <div id="pm-promos-lista" style="margin-top:.4rem"></div>
     </div>
     <div style="background:var(--bg3);border-radius:var(--r2);padding:.75rem;margin-bottom:.75rem">
       <div class="ct" style="margin-bottom:.4rem">Pago</div>
@@ -885,13 +905,82 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
       </div>
     </div>
     <div style="background:var(--rosa-xl);border:1px solid var(--rosa);border-radius:var(--r2);padding:.85rem;margin-bottom:.75rem">
-      <div style="display:flex;justify-content:space-between"><span style="font-size:12px;color:var(--muted)">Subtotal</span><span id="pm-subtotal" style="font-weight:600">$0</span></div>
-      <div id="pm-desc-row" style="display:none;justify-content:space-between;margin-top:3px"><span style="font-size:12px;color:var(--muted)">Descuento</span><span id="pm-desc-display" style="color:#fabd75">-$0</span></div>
-      <div style="display:flex;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px solid rgba(212,83,126,.3)"><span style="font-weight:700">Total</span><span id="pm-total" style="font-size:20px;font-weight:700;color:var(--rosa)">$0</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="font-size:12px;color:var(--muted)">Subtotal plan</span><span id="pm-subtotal" style="font-weight:600">$0</span></div>
+      <div id="pm-saldo-row" style="display:none;justify-content:space-between;margin-top:3px"><span style="font-size:12px;color:#fabd75">+ Saldos pendientes</span><span id="pm-saldo-display" style="color:#fabd75;font-weight:600">+$0</span></div>
+      <div id="pm-desc-row" style="display:none;justify-content:space-between;margin-top:3px"><span style="font-size:12px;color:var(--muted)">Descuento</span><span id="pm-desc-display" style="color:#7ec445">-$0</span></div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px solid rgba(212,83,126,.3)"><span style="font-weight:700">Total a cobrar</span><span id="pm-total" style="font-size:20px;font-weight:700;color:var(--rosa)">$0</span></div>
       <input type="number" id="pm-monto-manual" placeholder="O escribe monto manual..." min="0" oninput="pmSetManual(this.value)" style="width:100%;margin-top:.5rem;background:var(--bg2);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:7px 10px;color:var(--blanco);font-size:13px;outline:none">
     </div>
     <button class="btn-p" style="margin:0" onclick="pmGuardar()">Registrar pago</button>
     <div class="alert" id="al-pm" style="margin-top:.5rem"></div>
+  </div>
+</div>
+
+<!-- MODAL: GESTIÓN DE SALDOS Y PROMOCIONES -->
+<div class="modal-bg" id="saldo-modal">
+  <div class="modal" style="max-width:500px;text-align:left;max-height:90vh;overflow-y:auto;padding:1.25rem">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;color:#fabd75">Saldos y Ajustes</div>
+        <p id="sm-alumno-info" style="font-size:12px;color:var(--muted);margin-top:2px"></p>
+      </div>
+      <button onclick="cerrarSaldoModal()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer">×</button>
+    </div>
+
+    <!-- Saldos pendientes -->
+    <div style="margin-bottom:1rem">
+      <div class="ct" style="margin-bottom:.5rem">⚠ Saldos pendientes</div>
+      <div id="sm-saldos-list"></div>
+      <button onclick="smAgregarSaldo()" class="btn-s" style="font-size:11px;padding:5px 10px;margin-top:.4rem">+ Agregar saldo manual</button>
+    </div>
+
+    <!-- Promociones / Descuentos vigentes -->
+    <div style="border-top:1px solid var(--border);padding-top:1rem;margin-bottom:1rem">
+      <div class="ct" style="margin-bottom:.5rem">🎁 Promociones y descuentos activos</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:.5rem">Se aplican automáticamente al siguiente pago. Puedes agregar meses gratis, descuentos fijos o porcentuales.</p>
+      <div id="sm-promos-list"></div>
+    </div>
+
+    <!-- Formulario agregar promoción -->
+    <div style="background:var(--bg3);border-radius:var(--r2);padding:.75rem;margin-bottom:.75rem" id="sm-promo-form">
+      <div class="ct" style="margin-bottom:.5rem" id="sm-promo-form-title">Agregar promoción / ajuste</div>
+      <input type="hidden" id="sm-promo-edit-idx">
+      <div class="g2">
+        <div class="field">
+          <label>Tipo</label>
+          <select id="sm-promo-tipo" style="background:var(--bg2);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:8px 10px;color:var(--blanco);font-size:13px;outline:none;width:100%" onchange="smPromoTipoChange()">
+            <option value="desc_monto">Descuento fijo ($)</option>
+            <option value="desc_pct">Descuento porcentual (%)</option>
+            <option value="mes_gratis">Mes(es) gratis</option>
+            <option value="otro">Otro ajuste</option>
+          </select>
+        </div>
+        <div class="field" id="sm-promo-val-wrap">
+          <label id="sm-promo-val-lbl">Valor</label>
+          <input type="number" id="sm-promo-valor" placeholder="0" min="0" style="background:var(--bg2);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:8px 10px;color:var(--blanco);font-size:13px;outline:none;width:100%">
+        </div>
+        <div class="field">
+          <label>Aplicar</label>
+          <select id="sm-promo-aplica" style="background:var(--bg2);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:8px 10px;color:var(--blanco);font-size:13px;outline:none;width:100%">
+            <option value="1">Próximo pago</option>
+            <option value="2">2 pagos</option>
+            <option value="3">3 pagos</option>
+            <option value="0">Indefinido</option>
+          </select>
+        </div>
+        <div class="field full">
+          <label>Motivo / Descripción *</label>
+          <input type="text" id="sm-promo-motivo" placeholder="Ej: Referido, cumpleaños, pago adelantado, recuperación, etc." style="background:var(--bg2);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:8px 10px;color:var(--blanco);font-size:13px;outline:none;width:100%">
+        </div>
+      </div>
+      <div style="display:flex;gap:7px;margin-top:.5rem">
+        <button class="btn-p" style="flex:1;margin:0;font-size:12px" onclick="smGuardarPromo()">💾 Guardar ajuste</button>
+        <button class="btn-s" id="sm-promo-cancel" style="display:none;font-size:12px" onclick="smCancelarEditPromo()">Cancelar</button>
+      </div>
+      <div class="alert" id="al-sm" style="margin-top:.5rem"></div>
+    </div>
+
+    <button onclick="cerrarSaldoModal()" class="btn-s" style="width:100%;margin-top:.5rem">Cerrar</button>
   </div>
 </div>
 
@@ -2005,6 +2094,8 @@ function verPerfil(f){
     else if(_dias!==null&&_dias<=5){ _vigEl.innerHTML=_vs+' <span style="color:#fabd75;font-size:10px;font-weight:700">Vence en '+_dias+'d</span>'; }
     else{ _vigEl.textContent=_vs+(_dias!==null?' ('+_dias+' días)':''); }
   }
+  /* Auto-detect vencimiento sin pago */
+  autoDetectarSaldoVencido(a);
   renderVisGrid(a); renderPagosHist(a);
   const qm=document.getElementById('pf-qr-mini');qm.innerHTML='';
   new QRCode(qm,{text:a.folio,width:72,height:72,colorDark:'#d4537e',colorLight:'#141414'});
@@ -2179,18 +2270,37 @@ function renderPagosHist(a){
   var pagos = a.pagos||[];
   if(!pagos.length){ c.innerHTML='<p style="font-size:12px;color:var(--muted)">Sin pagos.</p>'; return; }
 
-  /* Show pending saldo banner */
+  /* Saldos pendientes banner */
   var saldoActivo = (a.saldos||[]).filter(function(s){ return !s.pagado; });
+  var promoActiva = (a.promos||[]).filter(function(p){ return !p.agotado && p.usos_restantes!==0; });
   var saldoBanner = '';
+
   if(saldoActivo.length){
     var totalPend = saldoActivo.reduce(function(t,s){ return t+s.monto; },0);
-    saldoBanner = '<div style="background:rgba(133,79,11,.25);border:1px solid #fabd75;border-radius:var(--r2);padding:.6rem .85rem;margin-bottom:.6rem;display:flex;justify-content:space-between;align-items:center">' +
-      '<div><div style="font-size:12px;font-weight:700;color:#fabd75">&#x26A0; Saldo pendiente</div>' +
-      '<div style="font-size:11px;color:var(--muted)">'+saldoActivo.map(function(s){return s.plan+' ('+s.fecha+')';}).join(', ')+'</div></div>' +
-      '<div style="display:flex;align-items:center;gap:8px">' +
-      '<span style="font-size:16px;font-weight:700;color:#fabd75">$'+totalPend.toLocaleString('es-MX')+'</span>' +
-      '<button onclick="liquidarSaldo()" style="background:#fabd75;color:#000;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font)">Pagar</button>' +
-      '</div></div>';
+    saldoBanner += '<div style="background:rgba(133,79,11,.25);border:1px solid #fabd75;border-radius:var(--r2);padding:.6rem .85rem;margin-bottom:.5rem">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'
+      +'<div style="font-size:12px;font-weight:700;color:#fabd75">⚠ Saldo pendiente acumulado</div>'
+      +'<span style="font-size:16px;font-weight:700;color:#fabd75">$'+totalPend.toLocaleString('es-MX')+'</span>'
+      +'</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-bottom:.4rem">'
+      +saldoActivo.map(function(s){ return '• '+(s.motivo||s.plan||'Saldo')+' ('+s.fecha+'): $'+s.monto.toLocaleString('es-MX'); }).join('<br>')
+      +'</div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      +'<button onclick="liquidarSaldo()" style="padding:5px 12px;background:#fabd75;color:#000;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font)">💵 Pagar saldo</button>'
+      +'<button onclick="abrirSaldoModal()" style="padding:5px 10px;background:rgba(133,79,11,.3);color:#fabd75;border:1px solid #fabd75;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font)">⚙ Gestionar</button>'
+      +'</div></div>';
+  }
+
+  if(promoActiva.length){
+    saldoBanner += '<div style="background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.3);border-radius:var(--r2);padding:.6rem .85rem;margin-bottom:.5rem">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--cyan);margin-bottom:3px">🎁 Promociones activas</div>'
+      +promoActiva.map(function(p){
+        var tipStr = p.tipo==='desc_monto'?'-$'+p.valor+' descuento':
+                     p.tipo==='desc_pct'?'-'+p.valor+'% descuento':
+                     p.tipo==='mes_gratis'?p.valor+' mes'+(p.valor!==1?'es':'')+' gratis':'Ajuste';
+        return '<div style="font-size:11px;color:var(--muted)">• <strong style="color:var(--cyan)">'+tipStr+'</strong> — '+esc(p.motivo||'')+(p.usos_restantes>0?' ('+p.usos_restantes+' uso'+(p.usos_restantes!==1?'s':'')+' rest.)':' (indefinido)')+'</div>';
+      }).join('')
+      +'</div>';
   }
 
   var rows = [...pagos].reverse().map(function(x){
@@ -2198,32 +2308,217 @@ function renderPagosHist(a){
       ? '<span style="background:rgba(133,79,11,.25);color:#fabd75;font-size:9px;padding:1px 5px;border-radius:4px;font-weight:700">PARCIAL</span> '
       : (x.completo ? '<span style="background:rgba(59,109,17,.2);color:#7ec445;font-size:9px;padding:1px 5px;border-radius:4px;font-weight:600">OK</span> ' : '');
     var saldoStr = (x.saldo && x.saldo>0) ? ' <span style="color:#fabd75;font-size:10px">+$'+x.saldo.toLocaleString('es-MX')+' pend.</span>' : '';
-    var descStr  = x.descuento ? ' <span style="color:var(--muted);font-size:10px">(-$'+x.descuento.toLocaleString('es-MX')+')</span>' : '';
-    return '<div class="pago-row" style="flex-wrap:wrap;gap:4px">' +
-      '<span style="font-size:11px;color:var(--muted)">'+x.fecha+'</span>' +
-      '<span style="color:var(--muted);font-size:11px;flex:1">'+badge+(x.plan||'')+'</span>' +
-      '<span class="pago-monto">$'+x.monto.toLocaleString('es-MX')+descStr+saldoStr+'</span>' +
-      '<span style="color:var(--muted);font-size:10px">'+(x.metodo||'')+'</span>' +
-      '</div>';
+    var saldoLiqStr = (x.saldosLiquid && x.saldosLiquid>0) ? ' <span style="color:#7ec445;font-size:10px">✓ $'+x.saldosLiquid.toLocaleString('es-MX')+' liq.</span>' : '';
+    var descStr  = x.descuento ? ' <span style="color:var(--muted);font-size:10px">(-$'+x.descuento.toLocaleString('es-MX')+(x.descNota?' · '+x.descNota:'')+')</span>' : '';
+    return '<div class="pago-row" style="flex-wrap:wrap;gap:4px">'
+      +'<span style="font-size:11px;color:var(--muted)">'+x.fecha+'</span>'
+      +'<span style="color:var(--muted);font-size:11px;flex:1">'+badge+esc(x.plan||'')+'</span>'
+      +'<span class="pago-monto">$'+x.monto.toLocaleString('es-MX')+descStr+saldoStr+saldoLiqStr+'</span>'
+      +'<span style="color:var(--muted);font-size:10px">'+esc(x.metodo||'')+'</span>'
+      +'</div>';
   }).join('');
 
   c.innerHTML = saldoBanner + rows;
 }
 
+/* ═══════════════════════════════════════
+   MODAL GESTIÓN DE SALDOS Y PROMOCIONES
+   ═══════════════════════════════════════ */
+
+function abrirSaldoModal(){
+  var a = S.alumno; if(!a) return;
+  var infoEl = document.getElementById('sm-alumno-info');
+  if(infoEl) infoEl.textContent = a.nombre+' '+a.apellidos+' · '+a.folio;
+  smRenderSaldos();
+  smRenderPromos();
+  smCancelarEditPromo();
+  showAlert('al-sm','','');
+  document.getElementById('saldo-modal').classList.add('on');
+}
+
+function cerrarSaldoModal(){
+  document.getElementById('saldo-modal').classList.remove('on');
+}
+
+function smRenderSaldos(){
+  var c = document.getElementById('sm-saldos-list'); if(!c) return;
+  var a = S.alumno; if(!a){ c.innerHTML=''; return; }
+  var saldos = a.saldos||[];
+  if(!saldos.length){ c.innerHTML='<p style="font-size:12px;color:var(--muted)">Sin saldos registrados.</p>'; return; }
+  c.innerHTML = saldos.map(function(s,i){
+    var color = s.pagado ? '#7ec445' : '#fabd75';
+    return '<div style="background:var(--bg3);border-radius:8px;padding:.6rem .75rem;margin-bottom:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+      +'<div style="flex:1;min-width:0">'
+      +'<span style="font-size:11px;color:var(--muted)">'+s.fecha+' · </span>'
+      +'<span style="font-size:12px;font-weight:600;color:'+color+'">$'+s.monto.toLocaleString('es-MX')+'</span>'
+      +'<div style="font-size:11px;color:var(--muted)">'+esc(s.motivo||s.plan||'Saldo')+'</div>'
+      +'</div>'
+      +'<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:'+(s.pagado?'rgba(59,109,17,.2)':'rgba(133,79,11,.25)')+';color:'+color+'">'+(s.pagado?'PAGADO':'PENDIENTE')+'</span>'
+      +(!s.pagado?'<button onclick="smPagarSaldo('+i+')" style="padding:3px 9px;background:#fabd75;color:#000;border:none;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;font-family:var(--font)">Marcar pagado</button>':'')
+      +'<button onclick="smEliminarSaldo('+i+')" style="background:rgba(163,45,45,.3);border:none;color:#f09595;border-radius:5px;width:22px;height:22px;cursor:pointer;font-size:13px">×</button>'
+      +'</div>';
+  }).join('');
+}
+
+function smAgregarSaldo(){
+  var a = S.alumno; if(!a) return;
+  var monto = parseFloat(prompt('Monto del saldo pendiente ($):')||'0');
+  if(!monto||monto<=0) return;
+  var motivo = (prompt('Motivo (ej: Mensualidad enero vencida, diferencia pago, etc.):')||'').trim();
+  if(!motivo) return;
+  if(!a.saldos) a.saldos=[];
+  a.saldos.push({fecha:today(),monto:monto,motivo:motivo,plan:a.planActual||'Manual',pagado:false});
+  var idx = DB.alumnos.findIndex(function(x){return x.folio===a.folio;});
+  if(idx>=0) DB.alumnos[idx]=a;
+  saveDB();
+  smRenderSaldos();
+  renderPagosHist(a);
+}
+
+async function smPagarSaldo(idx){
+  var a = S.alumno; if(!a||!a.saldos||!a.saldos[idx]) return;
+  a.saldos[idx].pagado=true; a.saldos[idx].fechaPago=today();
+  var i = DB.alumnos.findIndex(function(x){return x.folio===a.folio;});
+  if(i>=0) DB.alumnos[i]=a;
+  await saveDB(); smRenderSaldos(); renderPagosHist(a);
+}
+
+async function smEliminarSaldo(idx){
+  var a = S.alumno; if(!a||!a.saldos) return;
+  if(!confirm('¿Eliminar este saldo?')) return;
+  a.saldos.splice(idx,1);
+  var i=DB.alumnos.findIndex(function(x){return x.folio===a.folio;});
+  if(i>=0) DB.alumnos[i]=a;
+  await saveDB(); smRenderSaldos(); renderPagosHist(a);
+}
+
+function smRenderPromos(){
+  var c = document.getElementById('sm-promos-list'); if(!c) return;
+  var a = S.alumno; if(!a){ c.innerHTML=''; return; }
+  var promos = a.promos||[];
+  if(!promos.length){ c.innerHTML='<p style="font-size:12px;color:var(--muted)">Sin promociones activas.</p>'; return; }
+  c.innerHTML = promos.map(function(p,i){
+    var tipStr = p.tipo==='desc_monto'?'$'+p.valor+' dto.':
+                 p.tipo==='desc_pct'?p.valor+'% dto.':
+                 p.tipo==='mes_gratis'?p.valor+' mes(es) gratis':'Ajuste';
+    var color = p.agotado ? 'var(--muted)' : 'var(--cyan)';
+    return '<div style="background:var(--bg3);border-radius:8px;padding:.6rem .75rem;margin-bottom:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+      +'<div style="flex:1;min-width:0">'
+      +'<span style="font-size:11px;font-weight:700;color:'+color+'">'+tipStr+'</span>'
+      +'<span style="font-size:11px;color:var(--muted)"> · '+esc(p.motivo||'')+'</span>'
+      +'<div style="font-size:10px;color:var(--muted);margin-top:1px">'
+      +(p.agotado?'Agotado':(p.usos_restantes===0?'Indefinido':p.usos_restantes+' uso'+(p.usos_restantes!==1?'s':'')+' restante'+(p.usos_restantes!==1?'s':'')))
+      +'</div></div>'
+      +'<button onclick="smEditarPromo('+i+')" class="btn-s" style="font-size:10px;padding:3px 8px">✏️</button>'
+      +'<button onclick="smEliminarPromo('+i+')" style="background:rgba(163,45,45,.3);border:none;color:#f09595;border-radius:5px;width:22px;height:22px;cursor:pointer;font-size:13px">×</button>'
+      +'</div>';
+  }).join('');
+}
+
+function smPromoTipoChange(){
+  var tipo = document.getElementById('sm-promo-tipo').value;
+  var lbl = document.getElementById('sm-promo-val-lbl');
+  var wrap = document.getElementById('sm-promo-val-wrap');
+  if(lbl){
+    lbl.textContent = tipo==='desc_monto'?'Valor ($)':tipo==='desc_pct'?'Porcentaje (%)':tipo==='mes_gratis'?'Cantidad de meses':'Valor';
+  }
+  if(wrap) wrap.style.display = tipo==='otro' ? 'none' : 'block';
+}
+
+function smEditarPromo(idx){
+  var a = S.alumno; if(!a||!a.promos||!a.promos[idx]) return;
+  var p = a.promos[idx];
+  document.getElementById('sm-promo-edit-idx').value=idx;
+  document.getElementById('sm-promo-tipo').value=p.tipo||'desc_monto';
+  document.getElementById('sm-promo-valor').value=p.valor||0;
+  document.getElementById('sm-promo-aplica').value=p.usos_restantes||1;
+  document.getElementById('sm-promo-motivo').value=p.motivo||'';
+  document.getElementById('sm-promo-form-title').textContent='Editar promoción';
+  document.getElementById('sm-promo-cancel').style.display='inline-flex';
+  smPromoTipoChange();
+}
+
+function smCancelarEditPromo(){
+  document.getElementById('sm-promo-edit-idx').value='';
+  document.getElementById('sm-promo-tipo').value='desc_monto';
+  document.getElementById('sm-promo-valor').value='';
+  document.getElementById('sm-promo-aplica').value='1';
+  document.getElementById('sm-promo-motivo').value='';
+  document.getElementById('sm-promo-form-title').textContent='Agregar promoción / ajuste';
+  document.getElementById('sm-promo-cancel').style.display='none';
+  smPromoTipoChange();
+}
+
+async function smGuardarPromo(){
+  var a = S.alumno; if(!a) return;
+  var tipo   = document.getElementById('sm-promo-tipo').value;
+  var valor  = parseFloat(document.getElementById('sm-promo-valor').value)||0;
+  var aplica = parseInt(document.getElementById('sm-promo-aplica').value)||1;
+  var motivo = (document.getElementById('sm-promo-motivo').value||'').trim();
+  var editIdx= document.getElementById('sm-promo-edit-idx').value;
+  if(!motivo){ showAlert('al-sm','El motivo es obligatorio.','err'); return; }
+  if(tipo!=='otro' && valor<=0){ showAlert('al-sm','Ingresa un valor válido.','err'); return; }
+  var promo = {tipo:tipo, valor:valor, usos_restantes:aplica, motivo:motivo, agotado:false, fecha:today()};
+  if(!a.promos) a.promos=[];
+  if(editIdx!==''){
+    a.promos[parseInt(editIdx)]=promo;
+  } else {
+    a.promos.push(promo);
+  }
+  var i=DB.alumnos.findIndex(function(x){return x.folio===a.folio;});
+  if(i>=0) DB.alumnos[i]=a;
+  await saveDB();
+  showAlert('al-sm','✓ Guardado','ok');
+  smCancelarEditPromo();
+  smRenderPromos();
+  renderPagosHist(a);
+}
+
+async function smEliminarPromo(idx){
+  var a=S.alumno; if(!a||!a.promos) return;
+  if(!confirm('¿Eliminar esta promoción?')) return;
+  a.promos.splice(idx,1);
+  var i=DB.alumnos.findIndex(function(x){return x.folio===a.folio;});
+  if(i>=0) DB.alumnos[i]=a;
+  await saveDB(); smRenderPromos(); renderPagosHist(a);
+}
+
+/* Auto-detect vencimiento sin pago y registrar saldo */
+function autoDetectarSaldoVencido(a){
+  if(!a||!a.planActual) return;
+  var plan = PLANES.find(function(p){ return p.n===a.planActual; });
+  if(!plan||!plan.meses) return;
+  var dv = diasRestantes(a.fechaExpira);
+  if(dv === null || dv >= 0) return; /* no vencido */
+  /* Check if already registered for this expiry period */
+  var expKey = a.fechaExpira; /* YYYY-MM-DD */
+  var yaRegistrado = (a.saldos||[]).some(function(s){ return s.expiraRef === expKey && !s.pagado; });
+  if(yaRegistrado) return;
+  /* Check if covered by promo (mes gratis) */
+  var tienePromoGratis = (a.promos||[]).some(function(p){
+    return !p.agotado && p.tipo==='mes_gratis';
+  });
+  if(tienePromoGratis) return;
+  /* Register expired saldo */
+  if(!a.saldos) a.saldos=[];
+  a.saldos.push({
+    fecha:    a.fechaExpira,
+    monto:    plan.p,
+    motivo:   'Mensualidad vencida · '+plan.n+' (exp. '+a.fechaExpira+')',
+    plan:     plan.n,
+    expiraRef: expKey,
+    pagado:   false
+  });
+  /* Update in DB */
+  var idx=DB.alumnos.findIndex(function(x){return x.folio===a.folio;});
+  if(idx>=0) DB.alumnos[idx]=a;
+  saveLocal();
+  /* Async save in background */
+  saveDB().catch(function(){});
+}
 function liquidarSaldo(){
   if(!S.alumno) return;
-  /* Open pago modal pre-configured as adeudo */
-  S.alumnoRenovar = S.alumno;
-  abrirPagoModal();
-  /* Mark as adeudo type in modal */
-  setTimeout(function(){
-    var infoEl = document.getElementById('pm-alumno-info');
-    if(infoEl){
-      var pend = (S.alumno.saldos||[]).filter(function(s){ return !s.pagado; });
-      var tot  = pend.reduce(function(t,s){ return t+s.monto; },0);
-      infoEl.textContent += ' | Saldo pendiente: $'+tot.toLocaleString('es-MX');
-    }
-  },100);
+  abrirPagoModal('renovar');
 }
 async function marcarVisita(){
   if(!S.alumno) return;
@@ -2738,6 +3033,7 @@ function abrirPagoModal(modo){
   pmRenderPkgs();
   pmRenderDiscs();
   pmCalcTotal();
+  pmMostrarPromos();
   document.getElementById('pago-modal').classList.add('on');
 }
 
@@ -2830,21 +3126,97 @@ function pmCalcTotal(){
   pmRenderTotal();
 }
 
+function pmGetSaldosPendientes(){
+  if(!pmAlumno) return [];
+  return (pmAlumno.saldos||[]).filter(function(s){ return !s.pagado; });
+}
+
+function pmGetPromoActiva(){
+  /* Returns { descMonto, descPct, motivo } from first active promo */
+  if(!pmAlumno) return null;
+  var promos = (pmAlumno.promos||[]).filter(function(p){
+    return !p.agotado && (p.usos_restantes===0 || p.usos_restantes>0);
+  });
+  if(!promos.length) return null;
+  return promos[0];
+}
+
 function pmRenderTotal(){
   var descMonto = parseFloat(document.getElementById('pm-desc-monto').value)||0;
   var descPct   = parseFloat(document.getElementById('pm-desc-pct').value)||0;
   var descTotal = descMonto + Math.round(pmSubtotal * descPct / 100);
-  var total     = Math.max(0, pmSubtotal - descTotal);
+
+  /* Saldos pendientes */
+  var incluirSaldos = false;
+  var saldosBanner = document.getElementById('pm-saldos-banner');
+  var saldosPend = pmGetSaldosPendientes();
+  var totalSaldos = saldosPend.reduce(function(t,s){ return t+s.monto; },0);
+  if(saldosPend.length && saldosBanner){
+    saldosBanner.style.display='block';
+    document.getElementById('pm-saldos-total').textContent='$'+totalSaldos.toLocaleString('es-MX');
+    document.getElementById('pm-saldos-detalle').innerHTML = saldosPend.map(function(s){
+      return '• '+esc(s.motivo||s.plan||'Saldo')+' ('+s.fecha+'): <strong style="color:#fabd75">$'+s.monto.toLocaleString('es-MX')+'</strong>';
+    }).join('<br>');
+    var cbIncluir = document.getElementById('pm-saldos-incluir');
+    incluirSaldos = cbIncluir ? cbIncluir.checked : false;
+  } else if(saldosBanner){
+    saldosBanner.style.display='none';
+  }
+
+  var saldoIncluido = incluirSaldos ? totalSaldos : 0;
+  var total = Math.max(0, pmSubtotal + saldoIncluido - descTotal);
 
   var subEl  = document.getElementById('pm-subtotal');
   var dRow   = document.getElementById('pm-desc-row');
   var dDisp  = document.getElementById('pm-desc-display');
+  var sRow   = document.getElementById('pm-saldo-row');
+  var sDisp  = document.getElementById('pm-saldo-display');
   var totEl  = document.getElementById('pm-total');
 
-  if(subEl) subEl.textContent = '$' + pmSubtotal.toLocaleString('es-MX');
-  if(dRow)  dRow.style.display = descTotal > 0 ? 'flex' : 'none';
-  if(dDisp) dDisp.textContent  = '-$' + descTotal.toLocaleString('es-MX');
-  if(totEl) totEl.textContent  = '$' + total.toLocaleString('es-MX');
+  if(subEl) subEl.textContent = '$'+(pmManual?pmSubtotal:pmSubtotal).toLocaleString('es-MX');
+  if(sRow)  sRow.style.display  = saldoIncluido > 0 ? 'flex' : 'none';
+  if(sDisp) sDisp.textContent   = '+$'+saldoIncluido.toLocaleString('es-MX');
+  if(dRow)  dRow.style.display  = descTotal > 0 ? 'flex' : 'none';
+  if(dDisp) dDisp.textContent   = '-$'+descTotal.toLocaleString('es-MX');
+  if(totEl) totEl.textContent   = '$'+total.toLocaleString('es-MX');
+}
+
+/* Show active promos in payment modal */
+function pmMostrarPromos(){
+  var el = document.getElementById('pm-promos-lista');
+  var cnt = document.getElementById('pm-promos-activas');
+  if(!pmAlumno || !el) return;
+  var promos = (pmAlumno.promos||[]).filter(function(p){ return !p.agotado && p.usos_restantes!==0; });
+  if(!promos.length){ el.innerHTML=''; if(cnt)cnt.textContent=''; return; }
+  if(cnt) cnt.textContent = promos.length+' activa'+( promos.length!==1?'s':'' );
+  el.innerHTML = promos.map(function(p,i){
+    var tipStr = p.tipo==='desc_monto'?'-$'+p.valor:
+                 p.tipo==='desc_pct'?'-'+p.valor+'%':
+                 p.tipo==='mes_gratis'?p.valor+' mes'+(p.valor!==1?'es':'')+' gratis':'Ajuste';
+    return '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;flex-wrap:wrap">'
+      +'<span style="font-size:10px;background:rgba(0,212,255,.15);color:var(--cyan);border-radius:4px;padding:1px 7px;font-weight:700">'+tipStr+'</span>'
+      +'<span style="font-size:11px;color:var(--muted);flex:1">'+esc(p.motivo||'')+'</span>'
+      +(p.usos_restantes>0?'<span style="font-size:10px;color:var(--muted)">'+p.usos_restantes+' uso'+(p.usos_restantes!==1?'s':'')+' restante'+(p.usos_restantes!==1?'s':'')+'</span>':'<span style="font-size:10px;color:var(--muted)">Indefinido</span>')
+      +'<button onclick="pmAplicarPromo('+i+')" class="btn-s" style="font-size:10px;padding:2px 8px;background:rgba(0,212,255,.1);border-color:var(--cyan);color:var(--cyan)">Aplicar</button>'
+      +'</div>';
+  }).join('');
+}
+
+function pmAplicarPromo(idx){
+  var promos = (pmAlumno.promos||[]).filter(function(p){ return !p.agotado && p.usos_restantes!==0; });
+  var p = promos[idx]; if(!p) return;
+  if(p.tipo==='desc_monto'){
+    document.getElementById('pm-desc-monto').value=p.valor;
+    document.getElementById('pm-desc-nota').value=p.motivo||'Promoción aplicada';
+  } else if(p.tipo==='desc_pct'){
+    document.getElementById('pm-desc-pct').value=p.valor;
+    document.getElementById('pm-desc-nota').value=p.motivo||'Descuento aplicado';
+  } else if(p.tipo==='mes_gratis'){
+    /* mes gratis = precio plan a 0 */
+    document.getElementById('pm-desc-pct').value=100;
+    document.getElementById('pm-desc-nota').value=p.motivo||p.valor+' mes(es) gratis';
+  }
+  pmCalcTotal();
 }
 
 async function pmGuardar(){
@@ -2857,8 +3229,15 @@ async function pmGuardar(){
   var manualVal = parseFloat(document.getElementById('pm-monto-manual').value)||0;
   var subtotal  = pmManual ? manualVal : (plan ? (plan.libre ? pmSubtotal : plan.p) : pmSubtotal);
   var descTotal = descMonto + Math.round(subtotal * descPct / 100);
-  var montoFull = Math.max(0, subtotal - descTotal); /* full expected price */
-  var montoPagado = manualVal > 0 ? manualVal : montoFull;
+  var montoFull = Math.max(0, subtotal - descTotal);
+
+  /* Saldos pendientes acumulados */
+  var cbIncluir = document.getElementById('pm-saldos-incluir');
+  var incluirSaldos = cbIncluir ? cbIncluir.checked : false;
+  var saldosPend = pmGetSaldosPendientes();
+  var totalSaldosIncluidos = incluirSaldos ? saldosPend.reduce(function(t,s){ return t+s.monto; },0) : 0;
+
+  var montoPagado = manualVal > 0 ? manualVal : (montoFull + totalSaldosIncluidos);
   var fecha     = document.getElementById('pm-fecha').value || today();
   var metodo    = document.getElementById('pm-metodo').value;
 
@@ -2872,25 +3251,26 @@ async function pmGuardar(){
     pmDiscs[pmDiscs.indexOf('Otra disciplina')] = otraNombreEl.value.trim();
   }
 
-  /* Determine if this is a full mensualidad/paquete payment */
+  /* Determine if full plan payment */
   var esPagoCompleto = plan && !plan.libre && (montoPagado >= montoFull);
-  var saldoPendiente = esPagoCompleto ? 0 : Math.max(0, montoFull - montoPagado);
+  var saldoNuevo = esPagoCompleto ? 0 : Math.max(0, montoFull - (montoPagado - totalSaldosIncluidos));
   var tipoPlanes = ['paq','mem'];
   var esPaqueteOMem = plan && tipoPlanes.includes(plan.tipo);
 
   var pago = {
-    fecha:      fecha,
-    plan:       plan ? plan.n : 'Pago manual',
-    monto:      montoPagado,
-    montoFull:  montoFull,
-    saldo:      saldoPendiente > 0 ? saldoPendiente : undefined,
-    descuento:  descTotal > 0 ? descTotal : undefined,
-    descNota:   descNota || undefined,
-    metodo:     metodo,
-    ref:        document.getElementById('pm-ref').value,
-    notas:      document.getElementById('pm-notas').value,
-    tipo:       plan ? plan.tipo : 'manual',
-    completo:   esPagoCompleto
+    fecha:          fecha,
+    plan:           plan ? plan.n : 'Pago manual',
+    monto:          montoPagado,
+    montoFull:      montoFull,
+    saldo:          saldoNuevo > 0 ? saldoNuevo : undefined,
+    saldosLiquid:   totalSaldosIncluidos > 0 ? totalSaldosIncluidos : undefined,
+    descuento:      descTotal > 0 ? descTotal : undefined,
+    descNota:       descNota || undefined,
+    metodo:         metodo,
+    ref:            document.getElementById('pm-ref').value,
+    notas:          document.getElementById('pm-notas').value,
+    tipo:           plan ? plan.tipo : 'manual',
+    completo:       esPagoCompleto
   };
 
   pmAlumno.pagos = pmAlumno.pagos || [];
@@ -2898,18 +3278,36 @@ async function pmGuardar(){
   if(pmDiscs.length > 0) pmAlumno.disciplinas = pmDiscs;
   if(plan){ pmAlumno.planActual = plan.n; pmAlumno.fechaExpira = calcFechaExpira(fecha, plan.id); }
 
-  /* Track pending balance on alumno */
+  /* Liquidar saldos pendientes si se incluyeron */
+  if(incluirSaldos && saldosPend.length){
+    (pmAlumno.saldos||[]).forEach(function(s){ if(!s.pagado) s.pagado = true; s.fechaPago = fecha; });
+  }
+
+  /* Registrar nuevo saldo si pago parcial */
   if(!pmAlumno.saldos) pmAlumno.saldos = [];
-  if(saldoPendiente > 0){
+  if(saldoNuevo > 0){
     pmAlumno.saldos.push({
-      fecha:  fecha,
-      monto:  saldoPendiente,
-      plan:   plan ? plan.n : 'Pago manual',
-      pagado: false
+      fecha:   fecha,
+      monto:   saldoNuevo,
+      motivo:  'Pago parcial de '+(plan?plan.n:'plan'),
+      plan:    plan ? plan.n : 'Pago manual',
+      pagado:  false
     });
   }
 
-  /* Reset visits ONLY on full renovacion (mensualidad/paquete) */
+  /* Consumir promos aplicadas */
+  if(descNota && pmAlumno.promos){
+    pmAlumno.promos.forEach(function(p){
+      if(!p.agotado && (p.motivo===descNota || p.tipo==='mes_gratis')){
+        if(p.usos_restantes > 0){
+          p.usos_restantes--;
+          if(p.usos_restantes === 0) p.agotado = true;
+        }
+      }
+    });
+  }
+
+  /* Reset visits ONLY on full renovacion */
   var reinicioMsg = '';
   var esRenovacion = pmModo === 'renovar';
   if(esRenovacion && esPagoCompleto && esPaqueteOMem){
@@ -2921,24 +3319,24 @@ async function pmGuardar(){
       var vMes = v.fecha ? mesStr(v.fecha+'T00:00:00') : '';
       return !(v.folio === pmAlumno.folio && vMes === mesReset);
     });
-    reinicioMsg = ' \u00b7 \u2705 Asistencias reiniciadas';
-  } else if(saldoPendiente > 0){
-    reinicioMsg = ' \u00b7 Saldo pendiente: $' + saldoPendiente.toLocaleString('es-MX');
+    reinicioMsg = ' · ✅ Asistencias reiniciadas';
   }
+  if(saldoNuevo > 0) reinicioMsg += ' · ⚠ Saldo pendiente: $'+saldoNuevo.toLocaleString('es-MX');
+  if(totalSaldosIncluidos > 0) reinicioMsg += ' · ✓ Saldos ant. liquidados ($'+totalSaldosIncluidos.toLocaleString('es-MX')+')';
 
   S.writeLock = true;
   saveLocal();
   try{
     await saveDB();
     showAlert('al-pm',
-      String.fromCharCode(10003)+' Pago $'+montoPagado.toLocaleString('es-MX')+' registrado'+reinicioMsg,'ok');
+      '✓ Pago $'+montoPagado.toLocaleString('es-MX')+' registrado'+reinicioMsg,'ok');
     S.alumno = pmAlumno;
     verPerfil(pmAlumno.folio);
-    setTimeout(function(){ cerrarPagoModal(); }, 2000);
+    setTimeout(function(){ cerrarPagoModal(); }, 2200);
   } catch(e){
     showAlert('al-pm','Error al guardar: '+e.message,'err');
   } finally{
-    setTimeout(function(){ S.writeLock=false; },2000);
+    setTimeout(function(){ S.writeLock=false; },2200);
   }
 }
 
@@ -3591,10 +3989,6 @@ function parseFechaLocal(f){
   var s=String(f).split('T')[0]; var p=s.split('-');
   if(p.length<3) return null;
   return new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));
-}
-function diasRestantes(a){
-  var v=calcVencimiento(a); if(!v) return null;
-  return Math.ceil((v.getTime()-Date.now())/86400000);
 }
 function badgeVigencia(a){
   var d=diasRestantes(a.fechaExpira); if(d===null) return '';
