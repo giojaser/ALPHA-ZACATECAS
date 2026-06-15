@@ -1136,7 +1136,7 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
 </div>
 
 <script>/* ══════════════════════ DATOS DE DISCIPLINAS ══════════════════════ */
-const DISCS_KEYS = ['Pole Sport','Pole Exotic','Pole Espiral',"Pole Kid's",'Danza Aérea Telas','Elementos Aéreos','Enlogación/Flex','Yoga','Twerk','Jumping y Baile','Ritmos Latinos','Defensa Personal','Música/Vocalización','Heels','Otra disciplina'];
+const DISCS_KEYS = ['Pole Sport','Pole Exotic','Pole Espiral',"Pole Kid's",'Danza Aérea Telas','Elementos Aéreos','Enlogación/Flex','Yoga','Twerk','Jumping y Baile','Ritmos Latinos','Defensa Personal','Música/Vocalización','Heels','21 Días de Sanidad Interior','Otra disciplina'];
 const DISCS = {
   'Pole Sport':{precio:500,hors:[{g:'Lunes y Miércoles',h:['6:00–7:00 pm','7:00–8:00 pm']},{g:'Martes y Jueves',h:['6:00–7:00 am','7:00–8:00 am','5:00–6:00 pm','6:00–7:00 pm','7:00–8:00 pm']},{g:'Intensivo – Sábado',h:['2:00–4:00 pm'],it:1},{g:'Domingos',h:['2:00–4:00 pm']}]},
   'Pole Exotic':{precio:500,hors:[{g:'Lunes y Miércoles',h:['8:00–9:00 pm']},{g:'Intensivo – Sábado',h:['12:00–2:00 pm'],it:1}]},
@@ -1152,6 +1152,12 @@ const DISCS = {
   'Defensa Personal':{precio:500,hors:[{g:'Sábados',h:['9:00–11:00 am']}]},
   'Música/Vocalización':{precio:700,hors:[{g:'Lun/Mié/Jue',h:['6:00–7:00 pm']},{g:'Mar/Jue',h:['5:30–6:30 pm','6:30–7:30 pm']},{g:'Intensivo Viernes',h:['4:00–7:00 pm'],it:1}]},
   'Heels':{precio:300,hors:[{g:'Sábados / Eventos',h:['Ver horario']}]},
+  '21 Días de Sanidad Interior':{precio:500,taller:1,hors:[
+    {g:'Lunes, Miércoles y Jueves',h:['5:00 pm – 6:30 pm']},
+    {g:'Inicio: 15 de Junio 2026',h:['Duración: 21 sesiones · 3 días/semana']},
+    {g:'Imparte: Dulce Carolina Ríos Juárez',h:['Mentora en Sanidad Emocional']},
+    {g:'Lugar: Edificio Alpha',h:['Av. Universidad 252, La Loma, Zacatecas']}
+  ]},
   'Otra disciplina':{precio:0,libre:1,hors:[]}
 };
 const PLANES=[
@@ -1189,6 +1195,12 @@ const PLANES=[
   {id:'M5',n:'Membresía #5',t:'12 meses',tipo:'mem',p:4800,
    d:'1 disciplina · 1 hr · 8 clases/mes · 1 año',
    num_discs:1, clases_mes:8,  horas:1,   meses:12},
+  {id:'TL21',n:'Taller 21 Días de Sanidad Interior',t:'21 sesiones',tipo:'otro',p:500,
+   d:'Cuerpo, Mente y Espíritu en Restauración · Lun/Mié/Jue 5:00–6:30 pm · Inicia 15 Jun 2026 · Grupo privado WA + Mentoría grupal',
+   num_discs:1, clases_mes:12, horas:1.5, meses:1, taller:1,
+   impartido_por:'Dulce Carolina Ríos Juárez — Mentora en Sanidad Emocional',
+   lugar:'Edificio Alpha · Av. Universidad 252, La Loma, Zacatecas Centro',
+   inicio:'2026-06-15'},
   {id:'CL',n:'Clase suelta', t:'Por hora',tipo:'cl', p:100,
    d:'$100 por hora'},
   {id:'OT',n:'Otro / Taller',t:'Libre',  tipo:'otro',p:0,
@@ -1694,8 +1706,10 @@ function goPage(id,btn){
 function buildDiscGrid(containerId, selArr, onToggle){
   var g = document.getElementById(containerId); if(!g) return;
   g.innerHTML = DISCS_KEYS.map(function(d,i){
-    var isOtra = d === 'Otra disciplina';
-    return '<button class="disc-btn' + (selArr.includes(d)?' on':'') + '" data-i="' + i + '" data-cid="' + containerId + '">' + d + '</button>';
+    var isTaller = DISCS[d] && DISCS[d].taller;
+    var extraStyle = isTaller ? ' style="border-color:#fabd75;color:#fabd75;font-size:10px"' : '';
+    var badge = isTaller ? ' ⭐' : '';
+    return '<button class="disc-btn' + (selArr.includes(d)?' on':'') + '" data-i="' + i + '" data-cid="' + containerId + '"' + extraStyle + '>' + d + badge + '</button>';
   }).join('');
   g.querySelectorAll('.disc-btn').forEach(function(btn){
     btn.addEventListener('click', function(){
@@ -1720,6 +1734,19 @@ function buildDiscGrid(containerId, selArr, onToggle){
           }
         } else {
           if(existing) existing.remove();
+        }
+      }
+      /* If 21 Días selected, auto-set tipo plan to 'otro' and pre-select TL21 */
+      if(disc === '21 Días de Sanidad Interior' && this.classList.contains('on')){
+        if(containerId === 'r-disc-grid'){
+          S.tipoPlan = 'otro';
+          ['paq','mem','cl','otro'].forEach(function(x){
+            var el=document.getElementById('tp-'+x); if(el) el.classList.toggle('on',x==='otro');
+          });
+          S.rPlan = 'TL21';
+          if(document.getElementById('r-monto')) document.getElementById('r-monto').value = 500;
+          renderPkgs();
+          updateSum();
         }
       }
     });
@@ -1795,11 +1822,15 @@ function renderPkgs(){
   var g = document.getElementById('pkg-grid');
   var list = PLANES.filter(function(p){ return p.tipo===S.tipoPlan; });
   g.innerHTML = list.map(function(p){
-    return '<div class="pkg' + (S.rPlan===p.id?' on':'') + '" data-pid="' + p.id + '">' +
+    var tallerBadge = p.taller ? '<div style="font-size:9px;font-weight:700;color:#fabd75;background:rgba(133,79,11,.3);border-radius:3px;padding:1px 5px;margin-bottom:3px;display:inline-block">TALLER</div>' : '';
+    var extraImpartido = (p.taller && p.impartido_por) ? '<div style="font-size:9px;color:var(--muted);margin-top:3px">👤 '+p.impartido_por+'</div>' : '';
+    return '<div class="pkg' + (S.rPlan===p.id?' on':'') + '" data-pid="' + p.id + '" style="'+(p.taller?'border-color:#fabd75;':'')+'">' +
       (p.vip ? '<div class="pkg-vip">VIP</div>' : '') +
+      tallerBadge +
       '<div class="pkg-name">' + p.n + '</div>' +
       '<div class="pkg-time">' + p.t + '</div>' +
       '<div class="pkg-desc">' + p.d + '</div>' +
+      extraImpartido +
       (p.libre
         ? '<input type="number" class="pkg-price-input" placeholder="$ Precio libre" min="0" style="width:100%;background:var(--bg2);border:1px solid var(--rosa);border-radius:var(--r2);padding:6px 10px;color:var(--rosa);font-family:var(--font);font-size:16px;font-weight:700;text-align:center;margin-top:4px" onclick="event.stopPropagation()" oninput="setPrecioLibre(this.value)">'
         : '<div class="pkg-price">$' + p.p.toLocaleString('es-MX') + '</div>') +
@@ -3061,11 +3092,16 @@ function pmRenderPkgs(){
   if(!g) return;
   var list = PLANES.filter(function(p){ return p.tipo === pmTipo; });
   g.innerHTML = list.map(function(p){
-    return '<div class="pkg' + (pmPlan===p.id?' on':'') + '" data-pid="' + p.id + '" style="cursor:pointer">' +
+    var tallerBadge = p.taller ? '<div style="font-size:9px;font-weight:700;color:#fabd75;background:rgba(133,79,11,.3);border-radius:3px;padding:1px 5px;margin-bottom:3px;display:inline-block">TALLER</div>' : '';
+    var extraInfo = (p.taller && p.impartido_por) ? '<div style="font-size:9px;color:var(--muted);margin-top:3px">👤 '+p.impartido_por+'</div>' : '';
+    var extraInfo2 = (p.taller && p.lugar) ? '<div style="font-size:9px;color:var(--muted)">📍 '+p.lugar+'</div>' : '';
+    return '<div class="pkg' + (pmPlan===p.id?' on':'') + '" data-pid="' + p.id + '" style="cursor:pointer;'+(p.taller?'border-color:#fabd75;':'')+'">' +
       (p.vip?'<div class="pkg-vip">VIP</div>':'') +
+      tallerBadge +
       '<div class="pkg-name">' + p.n + '</div>' +
       '<div class="pkg-time">' + p.t + '</div>' +
       '<div class="pkg-desc">' + p.d + '</div>' +
+      extraInfo + extraInfo2 +
       (p.libre
         ? '<input type="number" placeholder="$ Libre" min="0" onclick="event.stopPropagation()" oninput="pmSetLibre(this.value)" style="width:100%;background:var(--bg2);border:1px solid var(--rosa);border-radius:6px;padding:5px 8px;color:var(--rosa);font-size:15px;font-weight:700;text-align:center;margin-top:4px">'
         : '<div class="pkg-price">$' + p.p.toLocaleString('es-MX') + '</div>') +
