@@ -2094,8 +2094,12 @@ function verPerfil(f){
     else if(_dias!==null&&_dias<=5){ _vigEl.innerHTML=_vs+' <span style="color:#fabd75;font-size:10px;font-weight:700">Vence en '+_dias+'d</span>'; }
     else{ _vigEl.textContent=_vs+(_dias!==null?' ('+_dias+' días)':''); }
   }
-  /* Auto-detect vencimiento sin pago */
-  autoDetectarSaldoVencido(a);
+  /* Auto-detectar y acumular saldos de meses vencidos */
+  var changed = autoAcumularSaldosPendientes(a);
+  if(changed){
+    var idx2=DB.alumnos.findIndex(function(x){return x.folio===a.folio;}); if(idx2>=0) DB.alumnos[idx2]=a;
+    saveLocal(); saveDB().catch(function(){});
+  }
   renderVisGrid(a); renderPagosHist(a);
   const qm=document.getElementById('pf-qr-mini');qm.innerHTML='';
   new QRCode(qm,{text:a.folio,width:72,height:72,colorDark:'#d4537e',colorLight:'#141414'});
@@ -2135,93 +2139,114 @@ function renderVisGrid(a){
   var prog = document.getElementById('pf-prog');
   if(!g) return;
 
-  var hoy = mesCur();
-
-  /* Get this month's visits from DB.visLog (has discipline) */
-  var visLog = (DB.visLog||[]).filter(function(v){
-    var vMes = v.fecha
-      ? mesStr(v.fecha + 'T00:00:00')
-      : (v.ts ? mesStr(new Date(v.ts).toISOString()) : '');
-    return v.folio === a.folio && vMes === hoy;
-  });
-
-  /* Legacy plain visitas (no discipline) */
-  var visRaw = (a.visitas||[]).filter(function(v){
-    return mesStr(typeof v==='string' ? v : (v.ts||'')) === hoy;
-  });
-
-  /* Total visits this month */
-  var totalVis = visLog.length || visRaw.length;
-
-  /* Get plan limits */
-  var planId  = (a.planActual||'').replace('Paquete ','P').replace('Membresía ','M')
-                  .replace('#','').replace(' ','');
-  var plan    = PLANES.find(function(p){ return p.n === a.planActual; });
-  var maxMes  = plan ? (plan.vip ? 999 : (plan.clases_mes || 8)) : 8;
+  var hoyDate = new Date();
+  var hoyMes  = mesCur(); /* "month-year" key */
+  var plan    = PLANES.find(function(p){ return p.n===a.planActual; });
+  var maxMes  = plan ? (plan.vip ? 999 : (plan.clases_mes||8)) : 8;
   var vip     = plan ? !!plan.vip : false;
 
-  /* Group visLog by discipline */
+  /* ─ Calendar-based class days this month ─ */
+  var diasCalendario = calcDiasClaseMes(a, hoyDate.getFullYear(), hoyDate.getMonth());
+  var clasesPasadas  = clasesPasadasMes(a, hoyDate.getFullYear(), hoyDate.getMonth());
+  var clasesRest     = clasesRestantesMes(a);
+
+  /* ─ Actual visits from DB ─ */
+  var visLog = (DB.visLog||[]).filter(function(v){
+    var vf=v.fecha||''; var pp=vf.split('-');
+    if(pp.length<3) return false;
+    return v.folio===a.folio && ((parseInt(pp[1])-1)+'-'+parseInt(pp[0]))===hoyMes;
+  });
+  var visRaw = (a.visitas||[]).filter(function(v){
+    return mesStr(typeof v==='string'?v:(v.ts||''))===hoyMes;
+  });
+  var totalVis = visLog.length || visRaw.length;
+
+  /* ─ Header: classes this month ─ */
+  var calHtml = '';
+  if(diasCalendario.length){
+    var WD = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+    calHtml = '<div style="margin-bottom:.5rem;padding:.5rem .6rem;background:var(--bg3);border-radius:8px;font-size:11px;color:var(--muted)">'
+      +'<div style="font-weight:600;color:var(--blanco);margin-bottom:3px">📅 Clases del mes (por calendario)</div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px">'
+      +diasCalendario.map(function(d){
+        var hoyH=new Date(); hoyH.setHours(23,59,59,0);
+        var pasado=d<=hoyH;
+        var esHoy=d.toDateString()===hoyH.toDateString();
+        var bg=esHoy?'rgba(212,83,126,.4)':pasado?'rgba(255,255,255,.12)':'rgba(255,255,255,.04)';
+        var col=esHoy?'var(--rosa)':pasado?'var(--blanco)':'rgba(255,255,255,.3)';
+        return '<span style="background:'+bg+';color:'+col+';border-radius:4px;padding:2px 5px;font-size:10px;white-space:nowrap">'
+          +WD[d.getDay()]+' '+d.getDate()+(esHoy?' ◀':'')+'</span>';
+      }).join('')
+      +'</div>'
+      +'<div style="display:flex;gap:10px;flex-wrap:wrap">'
+      +'<span>Total mes: <strong style="color:var(--blanco)">'+diasCalendario.length+'</strong></span>'
+      +'<span>Pasadas: <strong style="color:'+(clasesPasadas>0?'#fabd75':'var(--muted)')+'">'+clasesPasadas+'</strong></span>'
+      +'<span>Restantes: <strong style="color:'+(clasesRest>0?'#7ec445':'var(--muted)')+'">'+clasesRest+'</strong></span>'
+      +'<span>Asistidas: <strong style="color:var(--rosa)">'+totalVis+'</strong></span>'
+      +'</div>'
+      +(clasesPasadas>totalVis?'<div style="margin-top:4px;color:#fabd75;font-size:10px">⚠ '+
+        (clasesPasadas-totalVis)+' clase'+(clasesPasadas-totalVis!==1?'s':'')+
+        ' sin registrar (se descuentan del paquete)</div>':'')
+      +'</div>';
+  }
+
+  /* ─ Visit grid ─ */
   var byDisc = {};
-  visLog.forEach(function(v){
-    var d = v.disc || '—';
-    if(!byDisc[d]) byDisc[d] = [];
-    byDisc[d].push(v);
-  });
+  visLog.forEach(function(v){ var d=v.disc||'—'; if(!byDisc[d])byDisc[d]=[]; byDisc[d].push(v); });
 
-  /* If no visLog yet but has legacy raw visits, show flat grid */
+  var gridHtml = '';
   if(!visLog.length && visRaw.length){
-    g.innerHTML = buildFlatGrid(visRaw, maxMes);
-    attachVboxListeners(a);
-    if(cnt)  cnt.textContent  = visRaw.length;
-    if(prog) prog.style.width = Math.min(100,Math.round(visRaw.length/maxMes*100))+'%';
-    return;
-  }
-
-  if(!visLog.length){
-    g.innerHTML = '<p style="font-size:12px;color:var(--muted);padding:.4rem 0">Sin visitas registradas este mes.</p>';
-    if(cnt)  cnt.textContent  = '0';
-    if(prog) prog.style.width = '0%';
-    return;
-  }
-
-  /* Build per-discipline rows */
-  var html = '';
-  Object.keys(byDisc).forEach(function(disc){
-    var entries = byDisc[disc];
-    var n       = entries.length;
-    var pct     = vip ? Math.min(100,Math.round(n/8*100)) : Math.min(100,Math.round(n/maxMes*100));
-    var state   = vip ? 'ok' : (n >= maxMes ? 'full' : (n >= maxMes-2 ? 'warn' : 'ok'));
-    var label   = vip ? (n+' vis') : (n+'/'+maxMes);
-
-    html += '<div class="vrow">';
-    /* Header: discipline name + counter */
-    html += '<div class="vrow-head">';
-    html += '<span class="vrow-disc">' + disc + '</span>';
-    html += '<span class="vrow-count ' + state + '">' + label +
-      (state==='full' ? ' — LÍMITE' : (state==='warn' ? ' — casi completo' : '')) + '</span>';
-    html += '</div>';
-    /* Progress bar */
-    html += '<div class="vrow-prog"><div class="vrow-prog-f ' + state + '" style="width:' + pct + '%"></div></div>';
-    /* Visit boxes */
-    html += '<div class="vboxes">';
-    entries.forEach(function(v, i){
-      html += '<div class="vbox done" title="' + (v.fecha||'') + ' ' + (v.hora||'') + '">' +
-        '<span>' + (i+1) + '</span>' +
-        '<span class="vdate">' + (v.hora||'') + '</span>' +
-        '</div>';
+    gridHtml = buildFlatGrid(visRaw, maxMes);
+  } else if(visLog.length){
+    Object.keys(byDisc).forEach(function(disc){
+      var entries=byDisc[disc], n=entries.length;
+      var pct=vip?Math.min(100,Math.round(n/8*100)):Math.min(100,Math.round(n/maxMes*100));
+      var state=vip?'ok':(n>=maxMes?'full':(n>=maxMes-2?'warn':'ok'));
+      var label=vip?(n+' vis'):(n+'/'+maxMes);
+      gridHtml+='<div class="vrow">'
+        +'<div class="vrow-head">'
+        +'<span class="vrow-disc">'+disc+'</span>'
+        +'<span class="vrow-count '+state+'">'+label+(state==='full'?' — LÍMITE':(state==='warn'?' — casi completo':''))+'</span>'
+        +'</div>'
+        +'<div class="vrow-prog"><div class="vrow-prog-f '+state+'" style="width:'+pct+'%"></div></div>'
+        +'<div class="vboxes">';
+      entries.forEach(function(v,i){
+        gridHtml+='<div class="vbox done" title="'+(v.fecha||'')+' '+(v.hora||'')+'">'
+          +'<span>'+(i+1)+'</span><span class="vdate">'+(v.hora||'')+'</span></div>';
+      });
+      if(!vip) for(var s=n;s<maxMes;s++) gridHtml+='<div class="vbox" style="opacity:.35"><span>'+(s+1)+'</span></div>';
+      gridHtml+='</div></div>';
     });
-    /* Empty slots up to maxMes */
-    if(!vip){
-      for(var s = n; s < maxMes; s++){
-        html += '<div class="vbox" style="opacity:.35"><span>' + (s+1) + '</span></div>';
-      }
-    }
-    html += '</div></div>';
-  });
+  } else {
+    gridHtml='<p style="font-size:12px;color:var(--muted);padding:.4rem 0">Sin visitas registradas este mes.</p>';
+  }
 
-  g.innerHTML = html;
-  if(cnt)  cnt.textContent  = totalVis;
-  if(prog) prog.style.width = Math.min(100,Math.round(totalVis/(maxMes*(Object.keys(byDisc).length||1))*100))+'%';
+  /* ─ Annual overview ─ */
+  var resumen = resumenClasesAnual(a, hoyDate.getFullYear());
+  var anualHtml = '<div style="margin-top:.6rem;padding:.6rem;background:var(--bg3);border-radius:8px">'
+    +'<div style="font-size:11px;font-weight:600;color:var(--blanco);margin-bottom:.4rem">📊 '+hoyDate.getFullYear()+' · Clases por mes</div>'
+    +'<div style="display:flex;gap:3px;overflow-x:auto;padding-bottom:2px">'
+    +resumen.map(function(r){
+      var isCur = r.idx===hoyDate.getMonth();
+      var bg = isCur?'rgba(212,83,126,.18)':'var(--bg)';
+      var brd = isCur?'1px solid rgba(212,83,126,.5)':'1px solid rgba(255,255,255,.06)';
+      var futura = r.idx > hoyDate.getMonth();
+      return '<div style="flex:1;min-width:36px;background:'+bg+';border:'+brd+';border-radius:6px;padding:4px 2px;text-align:center">'
+        +'<div style="font-size:9px;color:var(--muted)">'+r.mes+'</div>'
+        +'<div style="font-size:12px;font-weight:700;color:'+(r.total>0?'var(--blanco)':'var(--muted)')+'">'+r.total+'</div>'
+        +(futura
+          ? '<div style="font-size:8px;color:rgba(255,255,255,.2)">—</div>'
+          : '<div style="font-size:9px;color:'+(r.consumidas>=r.total&&r.total>0?'#7ec445':r.consumidas>0?'#fabd75':'var(--muted)')+'">'+r.consumidas+'✓</div>')
+        +'</div>';
+    }).join('')
+    +'</div>'
+    +'<div style="font-size:10px;color:var(--muted);margin-top:3px">Total mes · consumidas (por calendario)</div>'
+    +'</div>';
+
+  g.innerHTML = calHtml + (gridHtml ? '<div style="margin-top:.5rem">'+gridHtml+'</div>' : '') + anualHtml;
+  if(!visLog.length && visRaw.length) attachVboxListeners(a);
+  if(cnt)  cnt.textContent  = totalVis+' / '+clasesPasadas+' pasadas';
+  if(prog) prog.style.width = Math.min(100,Math.round((totalVis/Math.max(1,maxMes))*100))+'%';
 }
 
 function buildFlatGrid(visRaw, maxMes){
@@ -2485,36 +2510,15 @@ async function smEliminarPromo(idx){
 
 /* Auto-detect vencimiento sin pago y registrar saldo */
 function autoDetectarSaldoVencido(a){
-  if(!a||!a.planActual) return;
-  var plan = PLANES.find(function(p){ return p.n===a.planActual; });
-  if(!plan||!plan.meses) return;
-  var dv = diasRestantes(a.fechaExpira);
-  if(dv === null || dv >= 0) return; /* no vencido */
-  /* Check if already registered for this expiry period */
-  var expKey = a.fechaExpira; /* YYYY-MM-DD */
-  var yaRegistrado = (a.saldos||[]).some(function(s){ return s.expiraRef === expKey && !s.pagado; });
-  if(yaRegistrado) return;
-  /* Check if covered by promo (mes gratis) */
-  var tienePromoGratis = (a.promos||[]).some(function(p){
-    return !p.agotado && p.tipo==='mes_gratis';
-  });
-  if(tienePromoGratis) return;
-  /* Register expired saldo */
-  if(!a.saldos) a.saldos=[];
-  a.saldos.push({
-    fecha:    a.fechaExpira,
-    monto:    plan.p,
-    motivo:   'Mensualidad vencida · '+plan.n+' (exp. '+a.fechaExpira+')',
-    plan:     plan.n,
-    expiraRef: expKey,
-    pagado:   false
-  });
-  /* Update in DB */
-  var idx=DB.alumnos.findIndex(function(x){return x.folio===a.folio;});
-  if(idx>=0) DB.alumnos[idx]=a;
-  saveLocal();
-  /* Async save in background */
-  saveDB().catch(function(){});
+  /* Delegates to the full calendar-based accumulator */
+  if(!a) return;
+  var changed = autoAcumularSaldosPendientes(a);
+  if(changed){
+    var idx=DB.alumnos.findIndex(function(x){return x.folio===a.folio;});
+    if(idx>=0) DB.alumnos[idx]=a;
+    saveLocal();
+    saveDB().catch(function(){});
+  }
 }
 function liquidarSaldo(){
   if(!S.alumno) return;
@@ -3273,14 +3277,20 @@ async function pmGuardar(){
     completo:       esPagoCompleto
   };
 
+  /* Detectar saldos de meses anteriores ANTES de registrar el pago */
+  var prevChanged = autoAcumularSaldosPendientes(pmAlumno);
+
   pmAlumno.pagos = pmAlumno.pagos || [];
   pmAlumno.pagos.push(pago);
   if(pmDiscs.length > 0) pmAlumno.disciplinas = pmDiscs;
   if(plan){ pmAlumno.planActual = plan.n; pmAlumno.fechaExpira = calcFechaExpira(fecha, plan.id); }
 
+  /* Auto-accumulate all previous unpaid months BEFORE marking this one paid */
+  autoAcumularSaldosPendientes(pmAlumno);
+
   /* Liquidar saldos pendientes si se incluyeron */
   if(incluirSaldos && saldosPend.length){
-    (pmAlumno.saldos||[]).forEach(function(s){ if(!s.pagado) s.pagado = true; s.fechaPago = fecha; });
+    (pmAlumno.saldos||[]).forEach(function(s){ if(!s.pagado){ s.pagado=true; s.fechaPago=fecha; } });
   }
 
   /* Registrar nuevo saldo si pago parcial */
@@ -3920,68 +3930,237 @@ function esc(s){
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
-function calcVencimiento(a){
+/* ═══════════════════════════════════════════════════════════════
+   SISTEMA DE CLASES POR CALENDARIO
+   ─────────────────────────────────────────────────────────────
+   • clases_mes se define en el plan (ej: 8 normales, 4 intensivas)
+   • Las clases se calculan por el día de la semana del alta
+   • Se consumen por el paso del tiempo aunque no haya visita registrada
+   • Las clases NO se recuperan
+   • La fecha de pago es FIJA: siempre el mismo día del mes del alta
+   • Al registrar pago se detecta y acumula saldo de meses anteriores
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Deduce días de la semana en que el alumno tiene clase,
+   basándose en la fecha de alta y en cuántas clases/semana tiene.
+   clases_mes ≤ 4  → 1 día/semana
+   clases_mes 5-8  → 2 días/semana
+   clases_mes 9-12 → 3 días/semana
+   clases_mes ≥ 13 → todos los días hábiles */
+function inferDiasSemana(a){
   var plan = PLANES.find(function(p){ return p.n===a.planActual; });
-  if(!plan||!plan.meses) return null;
-  /* Use latest full pago date, or fechaAlta */
-  var pagos = (a.pagos||[]).filter(function(p){ return p.completo||p.tipo==='paq'||p.tipo==='mem'; });
-  var baseFecha = pagos.length ? pagos[pagos.length-1].fecha : a.fechaAlta;
-  if(!baseFecha) return null;
-  /* Parse date parts to avoid timezone shift */
-  var pts = String(baseFecha).split('T')[0].split('-');
-  if(pts.length<3) return null;
-  var base = new Date(parseInt(pts[0]), parseInt(pts[1])-1, parseInt(pts[2]));
-  if(isNaN(base.getTime())) return null;
-  var v = new Date(base); v.setMonth(v.getMonth()+plan.meses); return v;
+  var cm = plan ? (plan.clases_mes||8) : 8;
+  var pts = String(a.fechaAlta||'').split('T')[0].split('-');
+  if(pts.length<3) return [];
+  var alta = new Date(parseInt(pts[0]),parseInt(pts[1])-1,parseInt(pts[2]));
+  if(isNaN(alta.getTime())) return [];
+  var dow = alta.getDay(); /* día de semana del alta */
+
+  /* Si el alumno tiene días de clase guardados explícitamente, usarlos */
+  if(a.diasClase && a.diasClase.length) return a.diasClase;
+
+  var dias;
+  if(cm <= 4)       dias = [dow];
+  else if(cm <= 8)  dias = [dow, (dow+2)%7];          /* ej: lun+mié o mar+jue */
+  else if(cm <= 12) dias = [dow, (dow+2)%7, (dow+4)%7];
+  else              dias = [1,2,3,4,5];                /* lun–vie */
+  /* Evitar domingo/sábado si no tiene sentido */
+  return dias.filter(function(d){ return d>=0&&d<=6; });
 }
 
-/* Calcula la fecha de próximo pago para un alumno basándose en su fecha de registro.
-   Si tiene pagos, el próximo pago se calcula a partir del último pago.
-   Independientemente de si ha asistido o no. */
-function calcProximoPago(a){
+/* Retorna un array de Date con los días de clase de un mes dado.
+   Se limita a clases_mes clases por mes. */
+function calcDiasClaseMes(a, año, mes){
   var plan = PLANES.find(function(p){ return p.n===a.planActual; });
-  if(!plan || !plan.meses) return null;
-  var pagos = (a.pagos||[]).filter(function(p){ return p.tipo==='paq'||p.tipo==='mem'||p.completo; });
-  var baseFecha;
-  if(pagos.length){
-    baseFecha = pagos[pagos.length-1].fecha;
-  } else {
-    baseFecha = a.fechaAlta;
+  if(!plan) return [];
+  var maxClases = plan.vip ? 999 : (plan.clases_mes||8);
+  var diasSem   = inferDiasSemana(a);
+  if(!diasSem.length) return [];
+
+  var pts = String(a.fechaAlta||'').split('T')[0].split('-');
+  var altaDate = pts.length>=3
+    ? new Date(parseInt(pts[0]),parseInt(pts[1])-1,parseInt(pts[2]))
+    : new Date(0);
+
+  var primero = new Date(año, mes, 1);
+  var ultimo  = new Date(año, mes+1, 0);
+  var dias = [];
+  var d = new Date(primero);
+  while(d <= ultimo && dias.length < maxClases){
+    if(d >= altaDate && diasSem.indexOf(d.getDay()) >= 0)
+      dias.push(new Date(d));
+    d.setDate(d.getDate()+1);
   }
-  if(!baseFecha) return null;
-  var pts = String(baseFecha).split('T')[0].split('-');
+  return dias;
+}
+
+/* Clases que ya "pasaron" en el mes (por el calendario), hayan o no asistido */
+function clasesPasadasMes(a, año, mes){
+  if(año===undefined){ var h=new Date(); año=h.getFullYear(); mes=h.getMonth(); }
+  var hoy2 = new Date(); hoy2.setHours(23,59,59,0);
+  return calcDiasClaseMes(a,año,mes).filter(function(d){ return d<=hoy2; }).length;
+}
+
+/* Clases registradas con visita real */
+function clasesAsistidasMes(a, año, mes){
+  if(año===undefined){ var h=new Date(); año=h.getFullYear(); mes=h.getMonth(); }
+  var mesKey = mes+'-'+año;
+  var fromLog = (DB.visLog||[]).filter(function(v){
+    if(v.folio!==a.folio) return false;
+    var vf=v.fecha||''; var pp=vf.split('-');
+    if(pp.length<3) return false;
+    return ((parseInt(pp[1])-1)+'-'+parseInt(pp[0])) === mesKey;
+  }).length;
+  var fromRaw = (a.visitas||[]).filter(function(v){
+    return mesStr(typeof v==='string'?v:(v.ts||'')) === mesKey;
+  }).length;
+  return fromLog || fromRaw;
+}
+
+/* Clases consumidas = max(asistidas, pasadas por calendario).
+   Las clases se descuentan aunque no haya registro de visita. */
+function clasesConsumidas(a, año, mes){
+  if(año===undefined){ var h=new Date(); año=h.getFullYear(); mes=h.getMonth(); }
+  return Math.max(clasesAsistidasMes(a,año,mes), clasesPasadasMes(a,año,mes));
+}
+
+/* Clases restantes este mes */
+function clasesRestantesMes(a){
+  var hoy=new Date();
+  var plan=PLANES.find(function(p){ return p.n===a.planActual; });
+  var max=plan?(plan.vip?999:(plan.clases_mes||8)):8;
+  return Math.max(0, max - clasesConsumidas(a,hoy.getFullYear(),hoy.getMonth()));
+}
+
+/* Genera resumen de clases de un alumno para TODO el año actual o un rango */
+function resumenClasesAnual(a, año){
+  if(!año) año = new Date().getFullYear();
+  var plan = PLANES.find(function(p){ return p.n===a.planActual; });
+  if(!plan) return [];
+  var resultado = [];
+  var MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  for(var m=0; m<12; m++){
+    var dias    = calcDiasClaseMes(a, año, m);
+    var pasadas = clasesPasadasMes(a, año, m);
+    var asistidas = clasesAsistidasMes(a, año, m);
+    var consumidas = Math.max(asistidas, pasadas);
+    resultado.push({
+      mes: MESES[m], año: año, idx: m,
+      total: dias.length,
+      pasadas: pasadas,
+      asistidas: asistidas,
+      consumidas: consumidas,
+      restantes: Math.max(0, dias.length - consumidas),
+      dias: dias
+    });
+  }
+  return resultado;
+}
+
+/* ─── FECHA DE PAGO FIJA (siempre el día del alta) ─── */
+
+function diaPagoFijo(a){
+  var pts=String(a.fechaAlta||'').split('T')[0].split('-');
+  return pts.length>=3 ? parseInt(pts[2]) : null;
+}
+
+function proximaFechaPagoFija(a){
+  var pts=String(a.fechaAlta||'').split('T')[0].split('-');
   if(pts.length<3) return null;
-  var base = new Date(parseInt(pts[0]), parseInt(pts[1])-1, parseInt(pts[2]));
-  if(isNaN(base.getTime())) return null;
-  /* Advance by meses until we find the next future payment date */
-  var now = new Date(); now.setHours(0,0,0,0);
-  var next = new Date(base);
-  while(next <= now){
-    next = new Date(next);
-    next.setMonth(next.getMonth() + plan.meses);
-  }
+  var dia=parseInt(pts[2]);
+  var altaD=new Date(parseInt(pts[0]),parseInt(pts[1])-1,dia);
+  var hoy=new Date(); hoy.setHours(0,0,0,0);
+  /* Avanzar mes a mes desde la fecha de alta hasta encontrar la próxima fecha de pago futura */
+  var next=new Date(altaD);
+  while(next<=hoy) next=new Date(next.getFullYear(),next.getMonth()+1,dia);
   return next;
 }
 
-/* Returns días until next payment (always positive or 0) */
-function diasParaPago(a){
-  var np = calcProximoPago(a);
-  if(!np) return null;
-  var now = new Date(); now.setHours(0,0,0,0);
-  return Math.ceil((np.getTime() - now.getTime()) / 86400000);
+function diasAlProximoPago(a){
+  var np=proximaFechaPagoFija(a); if(!np) return null;
+  var hoy=new Date(); hoy.setHours(0,0,0,0);
+  return Math.ceil((np-hoy)/86400000);
 }
 
-/* Returns the day of month the alumno's payment is due (based on registration) */
-function diaDepago(a){
-  var baseFecha = a.fechaAlta;
-  if((a.pagos||[]).length){
-    var pagos = a.pagos.filter(function(p){ return p.tipo==='paq'||p.tipo==='mem'||p.completo; });
-    if(pagos.length) baseFecha = pagos[pagos.length-1].fecha;
+function calcProximoPago(a){ return proximaFechaPagoFija(a); }
+function diasParaPago(a){    return diasAlProximoPago(a); }
+function diaDepago(a){       return diaPagoFijo(a); }
+
+/* ─── ACUMULACIÓN AUTOMÁTICA DE MESES VENCIDOS ─── */
+/* Recorre todos los meses desde el alta hasta hoy.
+   Si un mes no tiene pago completo registrado → genera saldo pendiente.
+   No duplica saldos ya registrados (usa expiraRef como clave).
+   No aplica si el alumno tiene promo de mes gratis activa para ese período. */
+function autoAcumularSaldosPendientes(a){
+  if(!a||!a.planActual||!a.fechaAlta) return false;
+  var plan=PLANES.find(function(p){ return p.n===a.planActual; });
+  if(!plan||!plan.meses) return false;
+
+  var pts=String(a.fechaAlta).split('T')[0].split('-');
+  if(pts.length<3) return false;
+  var dia=parseInt(pts[2]);
+  var hoy=new Date(); hoy.setHours(0,0,0,0);
+  if(!a.saldos) a.saldos=[];
+
+  /* Índice de saldos ya registrados para no duplicar */
+  var yaReg={};
+  (a.saldos||[]).forEach(function(s){ if(s.expiraRef) yaReg[s.expiraRef]=true; });
+
+  /* Meses que SÍ tienen pago completo registrado */
+  var mesesPagados={};
+  (a.pagos||[]).forEach(function(p){
+    if(!p.completo && !p.tipo) return; /* solo pagos completos o con tipo */
+    var pp=String(p.fecha||'').split('T')[0].split('-');
+    if(pp.length>=2){
+      /* El pago cubre el mes en que se realizó Y el mes que "compra" */
+      mesesPagados[pp[0]+'-'+pp[1]]=true;
+    }
+  });
+
+  /* Promos de mes gratis activas: generan una lista de meses exentos */
+  var mesexentos={};
+  (a.promos||[]).forEach(function(p){
+    if(!p.agotado && p.tipo==='mes_gratis' && p.fecha){
+      var pp=String(p.fecha).split('T')[0].split('-');
+      if(pp.length>=2) mesexentos[pp[0]+'-'+pp[1]]=true;
+    }
+  });
+
+  var changed=false;
+  var MESES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  /* Iterar desde el mes del alta hasta el mes anterior al actual */
+  var cursor=new Date(parseInt(pts[0]),parseInt(pts[1])-1,1);
+  var thisMonth=new Date(hoy.getFullYear(),hoy.getMonth(),1);
+
+  while(cursor<thisMonth){
+    var y=cursor.getFullYear(), mo=cursor.getMonth();
+    var mesKey=y+'-'+String(mo+1).padStart(2,'0');
+    /* La fecha de vencimiento es el día de alta de ese mes */
+    var diasEnMes = new Date(y,mo+1,0).getDate();
+    var diaEfectivo = Math.min(dia, diasEnMes);
+    var fechaVencStr=mesKey+'-'+String(diaEfectivo).padStart(2,'0');
+    var fechaVenc=new Date(y,mo,diaEfectivo);
+
+    if(!mesesPagados[mesKey] && !yaReg[fechaVencStr] && !mesexentos[mesKey] && fechaVenc<hoy){
+      a.saldos.push({
+        fecha:     fechaVencStr,
+        monto:     plan.p,
+        motivo:    'Mensualidad vencida — '+MESES[mo]+' '+y+' · '+plan.n,
+        plan:      plan.n,
+        expiraRef: fechaVencStr,
+        pagado:    false
+      });
+      yaReg[fechaVencStr]=true;
+      changed=true;
+    }
+    cursor=new Date(y,mo+1,1);
   }
-  if(!baseFecha) return null;
-  var pts = String(baseFecha).split('T')[0].split('-');
-  if(pts.length<3) return null;
-  return parseInt(pts[2]);
+  return changed;
+}
+
+/* calcVencimiento: legacy — devuelve próxima fecha de pago */
+function calcVencimiento(a){
+  var np=proximaFechaPagoFija(a); return np || null;
 }
 function parseFechaLocal(f){
   /* Parse YYYY-MM-DD without timezone shift */
