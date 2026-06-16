@@ -916,7 +916,80 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
   </div>
 </div>
 
-<!-- MODAL: GESTIÓN DE SALDOS Y PROMOCIONES -->
+<!-- MODAL: EDITAR / ELIMINAR PAGO -->
+<div class="modal-bg" id="edit-pago-modal" style="z-index:1100">
+  <div class="modal" style="max-width:500px;text-align:left;padding:1.25rem;max-height:92vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+      <div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--rosa)">✏️ Editar Pago</div>
+        <p id="ep-alumno-info" style="font-size:11px;color:var(--muted);margin-top:2px"></p>
+      </div>
+      <button onclick="cerrarEditPagoModal()" style="background:none;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1">×</button>
+    </div>
+    <input type="hidden" id="ep-idx">
+
+    <!-- Resumen del pago original -->
+    <div id="ep-original-banner" style="background:rgba(0,212,255,.07);border:1px solid rgba(0,212,255,.2);border-radius:var(--r2);padding:.6rem .85rem;margin-bottom:.85rem;font-size:11px;color:var(--muted)"></div>
+
+    <div class="g2" style="margin-bottom:.75rem">
+      <div class="field">
+        <label>Fecha del pago *</label>
+        <input type="date" id="ep-fecha" style="background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:13px;outline:none;width:100%">
+      </div>
+      <div class="field">
+        <label>Plan / Concepto *</label>
+        <input type="text" id="ep-plan" placeholder="Ej: Paquete #1" list="ep-plan-list" style="background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:13px;outline:none;width:100%">
+        <datalist id="ep-plan-list"></datalist>
+      </div>
+      <div class="field">
+        <label>Monto pagado ($) *</label>
+        <input type="number" id="ep-monto" min="0" placeholder="0" oninput="epRecalc()" style="background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:13px;outline:none;width:100%">
+      </div>
+      <div class="field">
+        <label>Monto esperado ($)</label>
+        <input type="number" id="ep-monto-full" min="0" placeholder="0" oninput="epRecalc()" style="background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:13px;outline:none;width:100%">
+      </div>
+      <div class="field">
+        <label>Método de pago</label>
+        <select id="ep-metodo" style="background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:13px;outline:none;width:100%">
+          <option value="Efectivo">Efectivo</option>
+          <option value="Transferencia">Transferencia</option>
+          <option value="Tarjeta">Tarjeta</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Descuento ($)</label>
+        <input type="number" id="ep-descuento" min="0" placeholder="0" oninput="epRecalc()" style="background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:13px;outline:none;width:100%">
+      </div>
+      <div class="field">
+        <label>Motivo descuento</label>
+        <input type="text" id="ep-desc-nota" placeholder="Ej: Promo, referido..." style="background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:13px;outline:none;width:100%">
+      </div>
+      <div class="field">
+        <label>Notas / Referencia</label>
+        <input type="text" id="ep-notas" placeholder="Referencia de transferencia u observaciones" style="background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:13px;outline:none;width:100%">
+      </div>
+    </div>
+
+    <!-- Estado del pago calculado -->
+    <div id="ep-calc-banner" style="background:var(--bg3);border-radius:var(--r2);padding:.6rem .85rem;margin-bottom:.75rem;font-size:12px"></div>
+
+    <div style="background:var(--bg3);border-radius:var(--r2);padding:.6rem .75rem;margin-bottom:.85rem">
+      <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="ep-completo" onchange="epRecalc()" style="accent-color:var(--rosa);width:16px;height:16px">
+        <span>Marcar como pago <strong>completo</strong> (cierra la mensualidad)</span>
+      </label>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn-p" style="flex:1;margin:0;min-width:140px" onclick="epGuardar()">💾 Guardar cambios</button>
+      <button class="btn-danger" style="min-width:130px" onclick="epEliminar()">🗑 Eliminar pago</button>
+      <button class="btn-s" style="min-width:80px" onclick="cerrarEditPagoModal()">Cancelar</button>
+    </div>
+    <div class="alert" id="al-ep" style="margin-top:.5rem"></div>
+  </div>
+</div>
 <div class="modal-bg" id="saldo-modal">
   <div class="modal" style="max-width:500px;text-align:left;max-height:90vh;overflow-y:auto;padding:1.25rem">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
@@ -2359,18 +2432,25 @@ function renderPagosHist(a){
       +'</div>';
   }
 
-  var rows = [...pagos].reverse().map(function(x){
+  /* Get original indices (pagos are shown in reverse) */
+  var totalPagos = pagos.length;
+  var rows = [...pagos].map(function(x, origIdx){ return {x:x, origIdx:origIdx}; }).reverse().map(function(item){
+    var x = item.x; var origIdx = item.origIdx;
     var badge = x.completo===false || (x.saldo&&x.saldo>0)
       ? '<span style="background:rgba(133,79,11,.25);color:#fabd75;font-size:9px;padding:1px 5px;border-radius:4px;font-weight:700">PARCIAL</span> '
       : (x.completo ? '<span style="background:rgba(59,109,17,.2);color:#7ec445;font-size:9px;padding:1px 5px;border-radius:4px;font-weight:600">OK</span> ' : '');
     var saldoStr = (x.saldo && x.saldo>0) ? ' <span style="color:#fabd75;font-size:10px">+$'+x.saldo.toLocaleString('es-MX')+' pend.</span>' : '';
     var saldoLiqStr = (x.saldosLiquid && x.saldosLiquid>0) ? ' <span style="color:#7ec445;font-size:10px">✓ $'+x.saldosLiquid.toLocaleString('es-MX')+' liq.</span>' : '';
     var descStr  = x.descuento ? ' <span style="color:var(--muted);font-size:10px">(-$'+x.descuento.toLocaleString('es-MX')+(x.descNota?' · '+x.descNota:'')+')</span>' : '';
-    return '<div class="pago-row" style="flex-wrap:wrap;gap:4px">'
-      +'<span style="font-size:11px;color:var(--muted)">'+x.fecha+'</span>'
-      +'<span style="color:var(--muted);font-size:11px;flex:1">'+badge+esc(x.plan||'')+'</span>'
-      +'<span class="pago-monto">$'+x.monto.toLocaleString('es-MX')+descStr+saldoStr+saldoLiqStr+'</span>'
+    return '<div class="pago-row" style="flex-wrap:wrap;gap:4px;align-items:center">'
+      +'<span style="font-size:11px;color:var(--muted);white-space:nowrap">'+x.fecha+'</span>'
+      +'<span style="color:var(--muted);font-size:11px;flex:1;min-width:0">'+badge+esc(x.plan||'')+'</span>'
+      +'<span class="pago-monto" style="white-space:nowrap">$'+x.monto.toLocaleString('es-MX')+descStr+saldoStr+saldoLiqStr+'</span>'
       +'<span style="color:var(--muted);font-size:10px">'+esc(x.metodo||'')+'</span>'
+      +'<div style="display:flex;gap:4px;flex-shrink:0">'
+        +'<button onclick="abrirEditPago('+origIdx+')" title="Editar pago" style="background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.3);color:var(--cyan);border-radius:5px;width:26px;height:26px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;font-family:var(--font)">✏️</button>'
+        +'<button onclick="eliminarPagoDirecto('+origIdx+')" title="Eliminar pago" style="background:rgba(163,45,45,.2);border:1px solid rgba(163,45,45,.3);color:#f09595;border-radius:5px;width:26px;height:26px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;font-family:var(--font)">🗑</button>'
+      +'</div>'
       +'</div>';
   }).join('');
 
@@ -2378,8 +2458,223 @@ function renderPagosHist(a){
 }
 
 /* ═══════════════════════════════════════
-   MODAL GESTIÓN DE SALDOS Y PROMOCIONES
+   EDITAR / ELIMINAR PAGO DEL HISTORIAL
    ═══════════════════════════════════════ */
+
+function abrirEditPago(idx){
+  var a = S.alumno; if(!a) return;
+  var pago = (a.pagos||[])[idx]; if(!pago) return;
+
+  /* Populate datalist with all plan names */
+  var dl = document.getElementById('ep-plan-list');
+  if(dl) dl.innerHTML = PLANES.map(function(p){ return '<option value="'+esc(p.n)+'">'; }).join('');
+
+  document.getElementById('ep-idx').value = idx;
+  document.getElementById('ep-alumno-info').textContent =
+    (a.nombre||'')+' '+(a.apellidos||'')+' · '+(a.folio||'');
+
+  /* Original banner */
+  var banner = document.getElementById('ep-original-banner');
+  if(banner) banner.innerHTML =
+    '<strong style="color:var(--blanco)">Registro original:</strong> '
+    + esc(pago.plan||'—') + ' · $' + (pago.monto||0).toLocaleString('es-MX')
+    + ' · ' + esc(pago.fecha||'') + ' · ' + esc(pago.metodo||'')
+    + (pago.completo ? ' · <span style="color:#7ec445;font-weight:700">COMPLETO</span>' : ' · <span style="color:#fabd75;font-weight:700">PARCIAL</span>');
+
+  document.getElementById('ep-fecha').value      = pago.fecha   || today();
+  document.getElementById('ep-plan').value       = pago.plan    || '';
+  document.getElementById('ep-monto').value      = pago.monto   || 0;
+  document.getElementById('ep-monto-full').value = pago.montoFull || pago.monto || 0;
+  document.getElementById('ep-metodo').value     = pago.metodo  || 'Efectivo';
+  document.getElementById('ep-descuento').value  = pago.descuento || 0;
+  document.getElementById('ep-desc-nota').value  = pago.descNota  || '';
+  document.getElementById('ep-notas').value      = pago.notas   || pago.ref || '';
+  document.getElementById('ep-completo').checked = !!pago.completo;
+
+  showAlert('al-ep','','');
+  epRecalc();
+  document.getElementById('edit-pago-modal').classList.add('on');
+}
+
+function epRecalc(){
+  var monto     = parseFloat(document.getElementById('ep-monto').value)||0;
+  var montoFull = parseFloat(document.getElementById('ep-monto-full').value)||monto;
+  var desc      = parseFloat(document.getElementById('ep-descuento').value)||0;
+  var completo  = document.getElementById('ep-completo').checked;
+  var saldo     = Math.max(0, montoFull - desc - monto);
+  var banner    = document.getElementById('ep-calc-banner');
+  if(!banner) return;
+
+  if(completo || monto >= (montoFull - desc)){
+    banner.innerHTML = '<span style="color:#7ec445;font-weight:700">✓ Pago completo</span>'
+      + ' — Monto: $'+monto.toLocaleString('es-MX')
+      + (desc>0?' · Dto: -$'+desc.toLocaleString('es-MX'):'');
+    document.getElementById('ep-completo').checked = true;
+  } else {
+    banner.innerHTML = '<span style="color:#fabd75;font-weight:700">⚠ Pago parcial</span>'
+      + ' — Pagado: $'+monto.toLocaleString('es-MX')
+      + ' de $'+(montoFull-desc).toLocaleString('es-MX')
+      + ' · Saldo pendiente: <strong style="color:#fabd75">$'+saldo.toLocaleString('es-MX')+'</strong>';
+  }
+}
+
+function cerrarEditPagoModal(){
+  document.getElementById('edit-pago-modal').classList.remove('on');
+}
+
+async function epGuardar(){
+  var a = S.alumno; if(!a) return;
+  var idx = parseInt(document.getElementById('ep-idx').value);
+  if(isNaN(idx) || !a.pagos || !a.pagos[idx]){
+    showAlert('al-ep','Error: pago no encontrado.','err'); return;
+  }
+
+  var fecha     = document.getElementById('ep-fecha').value;
+  var plan      = (document.getElementById('ep-plan').value||'').trim();
+  var monto     = parseFloat(document.getElementById('ep-monto').value)||0;
+  var montoFull = parseFloat(document.getElementById('ep-monto-full').value)||monto;
+  var metodo    = document.getElementById('ep-metodo').value;
+  var descuento = parseFloat(document.getElementById('ep-descuento').value)||0;
+  var descNota  = (document.getElementById('ep-desc-nota').value||'').trim();
+  var notas     = (document.getElementById('ep-notas').value||'').trim();
+  var completo  = document.getElementById('ep-completo').checked;
+
+  if(!fecha || !plan || monto <= 0){
+    showAlert('al-ep','Fecha, plan y monto son obligatorios.','err'); return;
+  }
+
+  var saldoPend = (!completo && monto < (montoFull - descuento))
+    ? Math.max(0, montoFull - descuento - monto) : 0;
+
+  /* Update pago in place, preserving original fields */
+  var pagoActual = a.pagos[idx];
+  a.pagos[idx] = Object.assign({}, pagoActual, {
+    fecha:      fecha,
+    plan:       plan,
+    monto:      monto,
+    montoFull:  montoFull,
+    metodo:     metodo,
+    descuento:  descuento > 0 ? descuento : undefined,
+    descNota:   descNota      ? descNota  : undefined,
+    notas:      notas || pagoActual.notas,
+    ref:        notas || pagoActual.ref,
+    completo:   completo,
+    saldo:      saldoPend > 0 ? saldoPend : undefined,
+    _editado:   today()   /* audit trail */
+  });
+
+  /* Recalculate planActual and fechaExpira from last complete pago */
+  var pagosCompletos = a.pagos.filter(function(p){ return p.completo; });
+  if(pagosCompletos.length){
+    var ultimo = pagosCompletos[pagosCompletos.length-1];
+    a.planActual = ultimo.plan;
+    var planObj = PLANES.find(function(p){ return p.n===ultimo.plan; });
+    if(planObj) a.fechaExpira = calcFechaExpira(ultimo.fecha, planObj.id);
+  }
+
+  /* Sync to DB */
+  var dbIdx = DB.alumnos.findIndex(function(x){ return x.folio===a.folio; });
+  if(dbIdx>=0) DB.alumnos[dbIdx] = a;
+
+  var btnSave = document.querySelector('#edit-pago-modal .btn-p');
+  if(btnSave){ btnSave.disabled=true; btnSave.textContent='Guardando...'; }
+
+  try{
+    saveLocal();
+    await saveDB();
+    showAlert('al-ep','✅ Pago actualizado y guardado en la base de datos','ok');
+    setTimeout(function(){
+      cerrarEditPagoModal();
+      verPerfil(a.folio);
+    }, 1100);
+  } catch(e){
+    showAlert('al-ep','❌ Error al guardar en nube: '+e.message+'. Guardado local OK.','err');
+  } finally{
+    if(btnSave){ btnSave.disabled=false; btnSave.textContent='💾 Guardar cambios'; }
+  }
+}
+
+async function epEliminar(){
+  var a = S.alumno; if(!a) return;
+  var idx = parseInt(document.getElementById('ep-idx').value);
+  if(isNaN(idx) || !a.pagos || !a.pagos[idx]) return;
+
+  var pago = a.pagos[idx];
+  var confirmMsg = '¿Eliminar este pago?\n\n'
+    + '📅 Fecha: ' + pago.fecha + '\n'
+    + '📋 Plan: '  + pago.plan  + '\n'
+    + '💰 Monto: $' + (pago.monto||0).toLocaleString('es-MX') + '\n\n'
+    + 'Esta acción no se puede deshacer.';
+  if(!confirm(confirmMsg)) return;
+
+  /* Remove pago */
+  a.pagos.splice(idx, 1);
+
+  /* Recalculate planActual and fechaExpira */
+  var pagosCompletos = a.pagos.filter(function(p){ return p.completo; });
+  if(pagosCompletos.length){
+    var ultimo = pagosCompletos[pagosCompletos.length-1];
+    a.planActual = ultimo.plan;
+    var planObj = PLANES.find(function(p){ return p.n===ultimo.plan; });
+    if(planObj) a.fechaExpira = calcFechaExpira(ultimo.fecha, planObj.id);
+  } else {
+    a.fechaExpira = null;
+    /* Keep planActual so profile still shows discipline */
+  }
+
+  var dbIdx = DB.alumnos.findIndex(function(x){ return x.folio===a.folio; });
+  if(dbIdx>=0) DB.alumnos[dbIdx] = a;
+
+  var btnDel = document.querySelector('#edit-pago-modal .btn-danger');
+  if(btnDel){ btnDel.disabled=true; btnDel.textContent='Eliminando...'; }
+
+  try{
+    saveLocal();
+    await saveDB();
+    showAlert('al-ep','✅ Pago eliminado y guardado en la base de datos','ok');
+    setTimeout(function(){
+      cerrarEditPagoModal();
+      verPerfil(a.folio);
+    }, 900);
+  } catch(e){
+    showAlert('al-ep','❌ Error al guardar en nube: '+e.message+'. Eliminado local OK.','err');
+  } finally{
+    if(btnDel){ btnDel.disabled=false; btnDel.textContent='🗑 Eliminar pago'; }
+  }
+}
+
+/* Quick-delete from row without opening modal */
+async function eliminarPagoDirecto(idx){
+  var a = S.alumno; if(!a || !a.pagos || !a.pagos[idx]) return;
+  var pago = a.pagos[idx];
+  if(!confirm('¿Eliminar el pago de $'+pago.monto.toLocaleString('es-MX')
+    +'\n'+pago.plan+' · '+pago.fecha+'?\n\nEsta acción no se puede deshacer.')) return;
+
+  a.pagos.splice(idx, 1);
+
+  /* Recalculate expiry from remaining complete pagos */
+  var pagosCompletos = a.pagos.filter(function(p){ return p.completo; });
+  if(pagosCompletos.length){
+    var ultimo = pagosCompletos[pagosCompletos.length-1];
+    a.planActual = ultimo.plan;
+    var planObj = PLANES.find(function(p){ return p.n===ultimo.plan; });
+    if(planObj) a.fechaExpira = calcFechaExpira(ultimo.fecha, planObj.id);
+  } else {
+    a.fechaExpira = null;
+  }
+
+  var dbIdx = DB.alumnos.findIndex(function(x){ return x.folio===a.folio; });
+  if(dbIdx>=0) DB.alumnos[dbIdx] = a;
+
+  saveLocal();
+  try{
+    await saveDB();
+    verPerfil(a.folio);
+  } catch(e){
+    alert('Eliminado localmente, pero error en nube: '+e.message+'\nIntenta sincronizar manualmente.');
+    renderPagosHist(a);
+  }
+}
 
 function abrirSaldoModal(){
   var a = S.alumno; if(!a) return;
