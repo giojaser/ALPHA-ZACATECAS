@@ -410,9 +410,33 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
   <div class="pt">Alumnos</div>
   <div class="ps">Busca, edita o consulta perfiles</div>
   <div class="card" style="padding:.7rem .9rem">
-    <input type="search" id="als-q" placeholder="Buscar nombre, folio, disciplina..."
-      style="background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:10px 12px;color:var(--blanco);font-size:14px;outline:none;width:100%"
+    <input type="search" id="als-q" placeholder="🔍 Buscar nombre, folio, teléfono, disciplina..."
+      style="background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:10px 12px;color:var(--blanco);font-size:14px;outline:none;width:100%;margin-bottom:.6rem"
       oninput="renderAls()">
+    <!-- Filtros rápidos -->
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:.4rem">
+      <button class="tpill on" id="als-f-todos" onclick="alsSetFiltro('todos')">Todos</button>
+      <button class="tpill" id="als-f-vencidos" onclick="alsSetFiltro('vencidos')">⚠ Vencidos</button>
+      <button class="tpill" id="als-f-vence7" onclick="alsSetFiltro('vence7')">🔔 Vencen en 7d</button>
+      <button class="tpill" id="als-f-vigentes" onclick="alsSetFiltro('vigentes')">✓ Vigentes</button>
+      <button class="tpill" id="als-f-sinpago" onclick="alsSetFiltro('sinpago')">💸 Sin pago</button>
+    </div>
+    <!-- Filtro por disciplina y plan -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <select id="als-f-disc" onchange="renderAls()" style="flex:1;min-width:120px;background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:7px 9px;color:var(--blanco);font-size:12px;outline:none">
+        <option value="">Todas las disciplinas</option>
+      </select>
+      <select id="als-f-plan" onchange="renderAls()" style="flex:1;min-width:120px;background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:7px 9px;color:var(--blanco);font-size:12px;outline:none">
+        <option value="">Todos los planes</option>
+      </select>
+      <select id="als-f-ord" onchange="renderAls()" style="flex:1;min-width:130px;background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:7px 9px;color:var(--blanco);font-size:12px;outline:none">
+        <option value="nombre">Ordenar: Nombre</option>
+        <option value="vence">Ordenar: Vencimiento</option>
+        <option value="pago">Ordenar: Día de pago</option>
+        <option value="alta">Ordenar: Fecha alta</option>
+      </select>
+    </div>
+    <div id="als-count" style="font-size:11px;color:var(--muted);margin-top:.4rem;text-align:right"></div>
   </div>
   <div id="als-list"></div>
   <!-- PERFIL -->
@@ -1722,11 +1746,59 @@ function calcFechaExpira(fechaAlta, planId){
   var plan  = PLANES.find(function(p){ return p.id===planId || p.n===planId; });
   var meses = plan ? (plan.meses||1) : 1;
   if(!fechaAlta) return null;
-  var d = new Date(fechaAlta);
+  var pts = String(fechaAlta).split('T')[0].split('-');
+  if(pts.length<3) return null;
+  var d = new Date(parseInt(pts[0]),parseInt(pts[1])-1,parseInt(pts[2]));
   if(isNaN(d.getTime())) return null;
   d.setMonth(d.getMonth() + meses);
   return d.toISOString().split('T')[0];
 }
+
+/* Calcula cuándo vencerá el paquete por clases agotadas (calendario).
+   Retorna la fecha (Date) en que se consumirá la clase número clases_mes del mes.
+   Si ya se alcanzó este mes, retorna el pasado. */
+function calcFechaVencePorClases(a){
+  var plan = PLANES.find(function(p){ return p.n===a.planActual; });
+  if(!plan || plan.vip) return null;
+  var maxMes = plan.clases_mes||8;
+  var hoy = new Date();
+  var diasMes = calcDiasClaseMes(a, hoy.getFullYear(), hoy.getMonth());
+  if(!diasMes.length) return null;
+  /* Día en que se termina la clase número maxMes */
+  var diaVence = diasMes[maxMes-1];
+  return diaVence || diasMes[diasMes.length-1];
+}
+
+/* Vence lo que ocurra PRIMERO: fecha calendario O clases agotadas */
+function calcVencimientoEfectivo(a){
+  var vFecha = proximaFechaPagoFija(a);   /* próximo pago por fecha */
+  var vClase = calcFechaVencePorClases(a); /* vence cuando se agotan clases */
+  if(!vFecha && !vClase) return null;
+  if(!vFecha) return vClase;
+  if(!vClase) return vFecha;
+  return vClase < vFecha ? vClase : vFecha;
+}
+
+/* Días hasta el vencimiento efectivo */
+function diasHastaVencimiento(a){
+  var v = calcVencimientoEfectivo(a); if(!v) return null;
+  var hoy=new Date(); hoy.setHours(0,0,0,0);
+  return Math.ceil((v.getTime()-hoy.getTime())/86400000);
+}
+
+/* Día exacto de vencimiento de pago en el mes indicado
+   (puede caer distinto cada mes según días del mes) */
+function fechaVencimientoMes(a, año, mes){
+  var plan = PLANES.find(function(p){ return p.n===a.planActual; });
+  if(!plan) return null;
+  var pts = String(a.fechaAlta||'').split('T')[0].split('-');
+  if(pts.length<3) return null;
+  var dia = parseInt(pts[2]);
+  var diasEnMes = new Date(año, mes+1, 0).getDate();
+  var diaEf = Math.min(dia, diasEnMes);
+  return new Date(año, mes, diaEf);
+}
+
 
 function diasRestantes(fechaExpira){
   if(!fechaExpira) return null;
@@ -2128,34 +2200,138 @@ async function delCita(id){
   }
 }
 /* ══════════════════════ ALUMNOS LIST ══════════════════════ */
+var alsFiltroActual = 'todos';
+
+function alsSetFiltro(f){
+  alsFiltroActual = f;
+  ['todos','vencidos','vence7','vigentes','sinpago'].forEach(function(x){
+    var b=document.getElementById('als-f-'+x); if(b) b.classList.toggle('on',x===f);
+  });
+  renderAls();
+}
+
+function alsInitSelects(){
+  var discSel = document.getElementById('als-f-disc');
+  var planSel = document.getElementById('als-f-plan');
+  if(!discSel||!planSel) return;
+  var curDisc = discSel.value, curPlan = planSel.value;
+  discSel.innerHTML = '<option value="">Todas las disciplinas</option>'
+    + DISCS_KEYS.map(function(d){ return '<option value="'+esc(d)+'">'+esc(d)+'</option>'; }).join('');
+  planSel.innerHTML = '<option value="">Todos los planes</option>'
+    + PLANES.map(function(p){ return '<option value="'+esc(p.n)+'">'+esc(p.n)+'</option>'; }).join('');
+  discSel.value = curDisc;
+  planSel.value = curPlan;
+}
+
 function renderAls(){
-  const q=(document.getElementById('als-q').value||'').toLowerCase();
-  const lst=document.getElementById('als-list');
-  const pfw=document.getElementById('pf-wrap');
-  if(pfw.style.display!=='none'&&!q)return;
-  pfw.style.display='none';lst.style.display='';
-  let arr=DB.alumnos||[];
-  if(q) arr=arr.filter(a=>(a.nombre+' '+a.apellidos+' '+a.folio+' '+(a.disciplinas||[]).join(' ')).toLowerCase().includes(q));
-  if(!arr.length){lst.innerHTML='<div class="card" style="text-align:center;color:var(--muted);font-size:13px">Sin alumnos registrados aún.</div>';return;}
-  const hoy=mesCur();
-  lst.innerHTML=arr.map(a=>{
-    const v=(a.visitas||[]).filter(x=>mesStr(x)===hoy).length;
-    const waEnv = waEnviadoEsteMes(a);
-    const dp = diasParaPago(a);
+  alsInitSelects();
+  const q   = (document.getElementById('als-q').value||'').toLowerCase().trim();
+  const fDisc = (document.getElementById('als-f-disc')||{}).value || '';
+  const fPlan = (document.getElementById('als-f-plan')||{}).value || '';
+  const fOrd  = (document.getElementById('als-f-ord')||{}).value  || 'nombre';
+  const lst   = document.getElementById('als-list');
+  const pfw   = document.getElementById('pf-wrap');
+  if(pfw.style.display!=='none'&&!q&&!fDisc&&!fPlan&&alsFiltroActual==='todos') return;
+  pfw.style.display='none'; lst.style.display='';
+
+  let arr = DB.alumnos||[];
+
+  /* Text search */
+  if(q) arr = arr.filter(a=>(
+    (a.nombre||'')+' '+(a.apellidos||'')+' '+(a.folio||'')+' '
+    +(a.telefono||'')+' '+(a.disciplinas||[]).join(' ')
+  ).toLowerCase().includes(q));
+
+  /* Disc filter */
+  if(fDisc) arr = arr.filter(a=>(a.disciplinas||[]).includes(fDisc));
+
+  /* Plan filter */
+  if(fPlan) arr = arr.filter(a=>(a.planActual||'')=== fPlan);
+
+  /* Status filter */
+  arr = arr.filter(function(a){
+    var dp = diasParaPago(a);
+    var dv = diasRestantes(a.fechaExpira);
+    if(alsFiltroActual==='vencidos')  return dv!==null && dv<0;
+    if(alsFiltroActual==='vence7')    return dp!==null && dp>=0 && dp<=7;
+    if(alsFiltroActual==='vigentes')  return dv!==null && dv>=0;
+    if(alsFiltroActual==='sinpago')   return !(a.pagos||[]).length;
+    return true;
+  });
+
+  /* Sort */
+  arr.sort(function(a,b){
+    if(fOrd==='vence'){
+      var da=diasHastaVencimiento(a)||999, db=diasHastaVencimiento(b)||999;
+      return da-db;
+    }
+    if(fOrd==='pago'){
+      var pa=diasParaPago(a)||999, pb=diasParaPago(b)||999;
+      return pa-pb;
+    }
+    if(fOrd==='alta') return (a.fechaAlta||'').localeCompare(b.fechaAlta||'');
+    return (a.nombre||'').localeCompare(b.nombre||'');
+  });
+
+  const cntEl = document.getElementById('als-count');
+  if(cntEl) cntEl.textContent = arr.length+' alumno'+(arr.length!==1?'s':'');
+
+  if(!arr.length){
+    lst.innerHTML='<div class="card" style="text-align:center;color:var(--muted);font-size:13px">Sin alumnos en esta categoría.</div>';
+    return;
+  }
+
+  const hoy = mesCur();
+  lst.innerHTML = arr.map(a=>{
+    const v    = (a.visitas||[]).filter(x=>mesStr(x)===hoy).length;
+    const waEnv= waEnviadoEsteMes(a);
+    const dp   = diasParaPago(a);
+    const dv   = diasRestantes(a.fechaExpira);
     const dpColor = dp===null?'var(--muted)':dp<0?'#f09595':dp<=7?'#fabd75':'#7ec445';
-    const dpStr = dp===null?'':dp<0?'Atrasado':dp===0?'Paga hoy':'Paga en '+dp+'d';
-    return `<div class="arow" style="flex-wrap:wrap;gap:4px" data-f="${a.folio}">
-      <div style="flex:1;min-width:0;cursor:pointer" onclick="verPerfil('${a.folio}')">
-        <div class="arow-name">${a.nombre} ${a.apellidos}</div>
-        <div class="arow-disc">${(a.disciplinas||[]).join(', ')}</div>
-        ${dpStr?`<div style="font-size:10px;color:${dpColor};font-weight:600;margin-top:1px">${dpStr}</div>`:''}
-      </div>
-      <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:3px">
-        <div class="arow-folio" onclick="verPerfil('${a.folio}')">${a.folio}</div>
-        <div class="arow-vis" onclick="verPerfil('${a.folio}')">${v} vis.</div>
-        <button onclick="event.stopPropagation();enviarWAPago('${a.folio}')" style="padding:3px 8px;background:${waEnv?'var(--bg4)':'rgba(37,211,102,.15)'};color:${waEnv?'var(--muted)':'#7ec445'};border:1px solid ${waEnv?'rgba(255,255,255,.08)':'rgba(37,211,102,.3)'};border-radius:6px;font-size:9px;font-weight:600;cursor:pointer;font-family:var(--font);white-space:nowrap">
-          ${waEnv?'↻ WA':'📱 WA'}
-        </button>
+    const dvColor = dv===null?'var(--muted)':dv<0?'#f09595':dv<=5?'#fabd75':'#7ec445';
+    const dpStr = dp===null?'':dp<0?'⚠ Atrasado':dp===0?'💰 Paga hoy':'Paga en '+dp+'d';
+    const dvStr = dv===null?'':dv<0?'VENCIDO hace '+Math.abs(dv)+'d':dv===0?'Vence HOY':'Vence en '+dv+'d';
+
+    /* Class progress this month */
+    const plan = PLANES.find(p=>p.n===a.planActual);
+    const maxC = plan?(plan.vip?null:plan.clases_mes||8):null;
+    const cons = maxC ? clasesConsumidas(a) : null;
+    const pct  = maxC ? Math.min(100,Math.round(cons/maxC*100)) : 0;
+    const barColor = pct>=100?'#f09595':pct>=75?'#fabd75':'#7ec445';
+
+    /* Next payment date this month / year */
+    const np = proximaFechaPagoFija(a);
+    const npStr = np ? np.toLocaleDateString('es-MX',{day:'2-digit',month:'short'}) : '';
+
+    /* Pending saldos */
+    const saldosPend = (a.saldos||[]).filter(s=>!s.pagado);
+    const totalSaldo = saldosPend.reduce((t,s)=>t+s.monto,0);
+
+    return `<div class="arow" style="flex-wrap:wrap;gap:4px;flex-direction:column" data-f="${a.folio}">
+      <div style="display:flex;align-items:flex-start;gap:8px">
+        <div style="flex:1;min-width:0;cursor:pointer" onclick="verPerfil('${a.folio}')">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span class="arow-name">${a.nombre} ${a.apellidos}</span>
+            ${dv!==null&&dv<0?'<span style="font-size:9px;background:rgba(163,45,45,.3);color:#f09595;border-radius:4px;padding:1px 5px;font-weight:700">VENCIDO</span>':''}
+            ${totalSaldo>0?`<span style="font-size:9px;background:rgba(133,79,11,.3);color:#fabd75;border-radius:4px;padding:1px 5px;font-weight:700">Saldo $${totalSaldo.toLocaleString('es-MX')}</span>`:''}
+          </div>
+          <div class="arow-disc">${(a.disciplinas||[]).join(' · ')}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px">
+            ${dpStr?`<span style="font-size:10px;color:${dpColor};font-weight:600">${dpStr}${npStr?' ('+npStr+')':''}</span>`:''}
+            ${dvStr&&dv!==null&&dv<=10?`<span style="font-size:10px;color:${dvColor}">· ${dvStr}</span>`:''}
+          </div>
+          ${maxC?`<div style="margin-top:4px;background:rgba(255,255,255,.07);border-radius:4px;height:4px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${barColor};border-radius:4px;transition:width .3s"></div>
+          </div>
+          <div style="font-size:9px;color:var(--muted);margin-top:2px">${cons}/${maxC} clases · ${Math.max(0,maxC-cons)} restantes</div>`:''}
+        </div>
+        <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+          <div class="arow-folio" onclick="verPerfil('${a.folio}')">${a.folio}</div>
+          <div class="arow-vis" onclick="verPerfil('${a.folio}')">${v} vis.</div>
+          <button onclick="event.stopPropagation();enviarWAPago('${a.folio}')" style="padding:3px 8px;background:${waEnv?'var(--bg4)':'rgba(37,211,102,.15)'};color:${waEnv?'var(--muted)':'#7ec445'};border:1px solid ${waEnv?'rgba(255,255,255,.08)':'rgba(37,211,102,.3)'};border-radius:6px;font-size:9px;font-weight:600;cursor:pointer;font-family:var(--font);white-space:nowrap">
+            ${waEnv?'↻ WA':'📱 WA'}
+          </button>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -2244,17 +2420,16 @@ function renderVisGrid(a){
   if(!g) return;
 
   var hoyDate = new Date();
-  var hoyMes  = mesCur(); /* "month-year" key */
+  var hoyMes  = mesCur();
   var plan    = PLANES.find(function(p){ return p.n===a.planActual; });
   var maxMes  = plan ? (plan.vip ? 999 : (plan.clases_mes||8)) : 8;
   var vip     = plan ? !!plan.vip : false;
 
-  /* ─ Calendar-based class days this month ─ */
-  var diasCalendario = calcDiasClaseMes(a, hoyDate.getFullYear(), hoyDate.getMonth());
-  var clasesPasadas  = clasesPasadasMes(a, hoyDate.getFullYear(), hoyDate.getMonth());
-  var clasesRest     = clasesRestantesMes(a);
+  var WD = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  var MESES_N = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                 'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-  /* ─ Actual visits from DB ─ */
+  /* ── Visits from log ── */
   var visLog = (DB.visLog||[]).filter(function(v){
     var vf=v.fecha||''; var pp=vf.split('-');
     if(pp.length<3) return false;
@@ -2265,92 +2440,136 @@ function renderVisGrid(a){
   });
   var totalVis = visLog.length || visRaw.length;
 
-  /* ─ Header: classes this month ─ */
+  /* ── Calendar per discipline ── */
+  var disciplinas = a.disciplinas||[];
+  if(!disciplinas.length && a.planActual) disciplinas=['—'];
+
   var calHtml = '';
-  if(diasCalendario.length){
-    var WD = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-    calHtml = '<div style="margin-bottom:.5rem;padding:.5rem .6rem;background:var(--bg3);border-radius:8px;font-size:11px;color:var(--muted)">'
-      +'<div style="font-weight:600;color:var(--blanco);margin-bottom:3px">📅 Clases del mes (por calendario)</div>'
-      +'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px">'
-      +diasCalendario.map(function(d){
+
+  /* Header: Fecha exacta de vencimiento de pago este mes */
+  var fechaVencMes = fechaVencimientoMes(a, hoyDate.getFullYear(), hoyDate.getMonth());
+  var fechaVencNext = (function(){
+    var nm = hoyDate.getMonth()+1 > 11 ? 0 : hoyDate.getMonth()+1;
+    var ny = hoyDate.getMonth()+1 > 11 ? hoyDate.getFullYear()+1 : hoyDate.getFullYear();
+    return fechaVencimientoMes(a, ny, nm);
+  })();
+  var vencPorClases = calcFechaVencePorClases(a);
+
+  if(fechaVencMes || vencPorClases){
+    var vencInfo = [];
+    if(fechaVencMes){
+      var dvMes = Math.round((fechaVencMes - hoyDate)/86400000);
+      var dvColor = dvMes<0?'#f09595':dvMes<=5?'#fabd75':'#7ec445';
+      vencInfo.push('<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">'
+        +'<div>'
+        +'<span style="font-size:11px;color:var(--muted)">📅 Vencimiento pago: </span>'
+        +'<strong style="color:'+dvColor+'">'+fechaVencMes.toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'})+'</strong>'
+        +(dvMes<0?' <span style="font-size:10px;color:#f09595">(hace '+Math.abs(dvMes)+'d)</span>':dvMes===0?' <span style="font-size:10px;color:#f09595">HOY</span>':' <span style="font-size:10px;color:'+dvColor+'">en '+dvMes+'d</span>')
+        +'</div>'
+        +(fechaVencNext?'<div style="font-size:10px;color:var(--muted)">Próx: '+fechaVencNext.toLocaleDateString('es-MX',{day:'2-digit',month:'short'})+'</div>':'')
+        +'</div>');
+    }
+    if(vencPorClases && !vip){
+      var clasesCons = clasesConsumidas(a);
+      var dvClase = Math.round((vencPorClases - hoyDate)/86400000);
+      var claseColor = clasesCons>=maxMes?'#f09595':dvClase<=3?'#fabd75':'var(--cyan)';
+      vencInfo.push('<div style="font-size:11px;color:'+claseColor+'">'
+        +'📦 Vence por clases: <strong>'+vencPorClases.toLocaleDateString('es-MX',{day:'2-digit',month:'long'})+'</strong>'
+        +' (clase '+maxMes+'/'+maxMes+')'
+        +(clasesCons>=maxMes?' · <strong style="color:#f09595">LÍMITE ALCANZADO</strong>':'')
+        +'</div>');
+    }
+    calHtml += '<div style="background:var(--bg3);border-radius:8px;padding:.6rem .75rem;margin-bottom:.5rem">'
+      + vencInfo.join('<div style="height:4px"></div>')
+      + '</div>';
+  }
+
+  /* Per-discipline calendar */
+  disciplinas.forEach(function(disc){
+    var diasCal = calcDiasClaseMes(a, hoyDate.getFullYear(), hoyDate.getMonth());
+    /* Filter days for this discipline based on weekday pattern (same for all discs for now) */
+    var clasesPas = clasesPasadasMes(a, hoyDate.getFullYear(), hoyDate.getMonth());
+    var visitasDisc = visLog.filter(function(v){ return v.disc===disc; });
+    var asistidas = visitasDisc.length;
+
+    calHtml += '<div style="background:var(--bg3);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:.65rem .75rem;margin-bottom:.5rem">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem;flex-wrap:wrap;gap:4px">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--rosa)">📋 '+esc(disc)+'</div>'
+      +'<div style="display:flex;gap:6px;font-size:10px;flex-wrap:wrap">'
+      +'<span style="color:var(--blanco)">'+diasCal.length+' clases/mes</span>'
+      +'<span style="color:#fabd75">'+clasesPas+' pasadas</span>'
+      +'<span style="color:var(--rosa)">'+asistidas+' asistidas</span>'
+      +(clasesPas>asistidas?'<span style="color:#f09595">'+( clasesPas-asistidas)+' sin registro</span>':'')
+      +'</div></div>'
+      /* Mini calendar grid */
+      +'<div style="display:flex;flex-wrap:wrap;gap:3px">'
+      +diasCal.map(function(d){
         var hoyH=new Date(); hoyH.setHours(23,59,59,0);
         var pasado=d<=hoyH;
         var esHoy=d.toDateString()===hoyH.toDateString();
-        var bg=esHoy?'rgba(212,83,126,.4)':pasado?'rgba(255,255,255,.12)':'rgba(255,255,255,.04)';
-        var col=esHoy?'var(--rosa)':pasado?'var(--blanco)':'rgba(255,255,255,.3)';
-        return '<span style="background:'+bg+';color:'+col+';border-radius:4px;padding:2px 5px;font-size:10px;white-space:nowrap">'
-          +WD[d.getDay()]+' '+d.getDate()+(esHoy?' ◀':'')+'</span>';
+        var asistioEste=visitasDisc.some(function(v){
+          var vf=v.fecha||''; return vf===d.toISOString().split('T')[0];
+        });
+        var bg,col,brd;
+        if(esHoy){ bg='rgba(212,83,126,.4)'; col='#fff'; brd='1px solid var(--rosa)'; }
+        else if(asistioEste){ bg='rgba(59,109,17,.35)'; col='#7ec445'; brd='1px solid #7ec445'; }
+        else if(pasado){ bg='rgba(255,255,255,.08)'; col='rgba(255,255,255,.5)'; brd='1px solid rgba(255,255,255,.08)'; }
+        else { bg='rgba(0,0,0,.15)'; col='rgba(255,255,255,.2)'; brd='1px solid rgba(255,255,255,.04)'; }
+        return '<div style="background:'+bg+';border:'+brd+';border-radius:5px;padding:3px 5px;text-align:center;min-width:38px">'
+          +'<div style="font-size:9px;color:rgba(255,255,255,.4)">'+WD[d.getDay()]+'</div>'
+          +'<div style="font-size:11px;font-weight:700;color:'+col+'">'+d.getDate()+'</div>'
+          +(asistioEste?'<div style="font-size:8px;color:#7ec445">✓</div>':
+            pasado?'<div style="font-size:8px;color:rgba(255,255,255,.2)">—</div>':
+            '<div style="font-size:8px;color:rgba(255,255,255,.1)">·</div>')
+          +'</div>';
       }).join('')
       +'</div>'
-      +'<div style="display:flex;gap:10px;flex-wrap:wrap">'
-      +'<span>Total mes: <strong style="color:var(--blanco)">'+diasCalendario.length+'</strong></span>'
-      +'<span>Pasadas: <strong style="color:'+(clasesPasadas>0?'#fabd75':'var(--muted)')+'">'+clasesPasadas+'</strong></span>'
-      +'<span>Restantes: <strong style="color:'+(clasesRest>0?'#7ec445':'var(--muted)')+'">'+clasesRest+'</strong></span>'
-      +'<span>Asistidas: <strong style="color:var(--rosa)">'+totalVis+'</strong></span>'
-      +'</div>'
-      +(clasesPasadas>totalVis?'<div style="margin-top:4px;color:#fabd75;font-size:10px">⚠ '+
-        (clasesPasadas-totalVis)+' clase'+(clasesPasadas-totalVis!==1?'s':'')+
-        ' sin registrar (se descuentan del paquete)</div>':'')
+      /* Visit boxes */
+      +(asistidas>0||clasesPas>0?
+        '<div class="vboxes" style="margin-top:.5rem">'
+        +Array.from({length:maxMes},function(_,i){
+          var done = i<asistidas;
+          var pasadaSinReg = !done && i<clasesPas;
+          var v = done ? visitasDisc[i] : null;
+          var hora = v ? (v.hora||'') : '';
+          return '<div class="vbox'+(done?' done':'')+(pasadaSinReg?' style="opacity:.3;background:rgba(133,79,11,.2)"':'') +
+            '" title="'+(done?(v.fecha||'')+(hora?' '+hora:''):pasadaSinReg?'Sin registro':'')+'">'+
+            '<span>'+(i+1)+'</span>'+(done?'<span class="vdate">'+hora+'</span>':'')+'</div>';
+        }).join('')
+        +'</div>':'')
       +'</div>';
-  }
+  });
 
-  /* ─ Visit grid ─ */
-  var byDisc = {};
-  visLog.forEach(function(v){ var d=v.disc||'—'; if(!byDisc[d])byDisc[d]=[]; byDisc[d].push(v); });
-
-  var gridHtml = '';
-  if(!visLog.length && visRaw.length){
-    gridHtml = buildFlatGrid(visRaw, maxMes);
-  } else if(visLog.length){
-    Object.keys(byDisc).forEach(function(disc){
-      var entries=byDisc[disc], n=entries.length;
-      var pct=vip?Math.min(100,Math.round(n/8*100)):Math.min(100,Math.round(n/maxMes*100));
-      var state=vip?'ok':(n>=maxMes?'full':(n>=maxMes-2?'warn':'ok'));
-      var label=vip?(n+' vis'):(n+'/'+maxMes);
-      gridHtml+='<div class="vrow">'
-        +'<div class="vrow-head">'
-        +'<span class="vrow-disc">'+disc+'</span>'
-        +'<span class="vrow-count '+state+'">'+label+(state==='full'?' — LÍMITE':(state==='warn'?' — casi completo':''))+'</span>'
-        +'</div>'
-        +'<div class="vrow-prog"><div class="vrow-prog-f '+state+'" style="width:'+pct+'%"></div></div>'
-        +'<div class="vboxes">';
-      entries.forEach(function(v,i){
-        gridHtml+='<div class="vbox done" title="'+(v.fecha||'')+' '+(v.hora||'')+'">'
-          +'<span>'+(i+1)+'</span><span class="vdate">'+(v.hora||'')+'</span></div>';
-      });
-      if(!vip) for(var s=n;s<maxMes;s++) gridHtml+='<div class="vbox" style="opacity:.35"><span>'+(s+1)+'</span></div>';
-      gridHtml+='</div></div>';
-    });
-  } else {
-    gridHtml='<p style="font-size:12px;color:var(--muted);padding:.4rem 0">Sin visitas registradas este mes.</p>';
-  }
-
-  /* ─ Annual overview ─ */
+  /* ── Annual summary ── */
   var resumen = resumenClasesAnual(a, hoyDate.getFullYear());
   var anualHtml = '<div style="margin-top:.6rem;padding:.6rem;background:var(--bg3);border-radius:8px">'
-    +'<div style="font-size:11px;font-weight:600;color:var(--blanco);margin-bottom:.4rem">📊 '+hoyDate.getFullYear()+' · Clases por mes</div>'
-    +'<div style="display:flex;gap:3px;overflow-x:auto;padding-bottom:2px">'
+    +'<div style="font-size:11px;font-weight:600;color:var(--blanco);margin-bottom:.4rem">📊 '+hoyDate.getFullYear()+' · Calendario anual</div>'
+    +'<div style="display:flex;gap:3px;overflow-x:auto;padding-bottom:4px">'
     +resumen.map(function(r){
       var isCur = r.idx===hoyDate.getMonth();
       var bg = isCur?'rgba(212,83,126,.18)':'var(--bg)';
-      var brd = isCur?'1px solid rgba(212,83,126,.5)':'1px solid rgba(255,255,255,.06)';
+      var brd = isCur?'2px solid var(--rosa)':'1px solid rgba(255,255,255,.06)';
       var futura = r.idx > hoyDate.getMonth();
-      return '<div style="flex:1;min-width:36px;background:'+bg+';border:'+brd+';border-radius:6px;padding:4px 2px;text-align:center">'
-        +'<div style="font-size:9px;color:var(--muted)">'+r.mes+'</div>'
-        +'<div style="font-size:12px;font-weight:700;color:'+(r.total>0?'var(--blanco)':'var(--muted)')+'">'+r.total+'</div>'
+      /* Exact payment date for this month */
+      var fvm = fechaVencimientoMes(a, hoyDate.getFullYear(), r.idx);
+      var diaVenc = fvm ? fvm.getDate() : null;
+      return '<div style="flex:1;min-width:40px;background:'+bg+';border:'+brd+';border-radius:6px;padding:5px 2px;text-align:center">'
+        +'<div style="font-size:9px;color:var(--muted);font-weight:600">'+r.mes+'</div>'
+        +'<div style="font-size:13px;font-weight:700;color:'+(r.total>0?'var(--blanco)':'var(--muted)')+'">'+r.total+'</div>'
+        +(diaVenc?'<div style="font-size:8px;color:#fabd75">p.'+diaVenc+'</div>':'')
         +(futura
-          ? '<div style="font-size:8px;color:rgba(255,255,255,.2)">—</div>'
+          ? '<div style="font-size:8px;color:rgba(255,255,255,.15)">—</div>'
           : '<div style="font-size:9px;color:'+(r.consumidas>=r.total&&r.total>0?'#7ec445':r.consumidas>0?'#fabd75':'var(--muted)')+'">'+r.consumidas+'✓</div>')
         +'</div>';
     }).join('')
     +'</div>'
-    +'<div style="font-size:10px;color:var(--muted);margin-top:3px">Total mes · consumidas (por calendario)</div>'
+    +'<div style="font-size:10px;color:var(--muted);margin-top:3px">Clases/mes · p.## = día de pago · ✓ = consumidas</div>'
     +'</div>';
 
-  g.innerHTML = calHtml + (gridHtml ? '<div style="margin-top:.5rem">'+gridHtml+'</div>' : '') + anualHtml;
+  g.innerHTML = calHtml + anualHtml;
   if(!visLog.length && visRaw.length) attachVboxListeners(a);
-  if(cnt)  cnt.textContent  = totalVis+' / '+clasesPasadas+' pasadas';
-  if(prog) prog.style.width = Math.min(100,Math.round((totalVis/Math.max(1,maxMes))*100))+'%';
+  if(cnt)  cnt.textContent  = totalVis+' asistidas / '+clasesConsumidas(a)+' consumidas';
+  if(prog) prog.style.width = Math.min(100,Math.round((clasesConsumidas(a)/Math.max(1,maxMes))*100))+'%';
 }
 
 function buildFlatGrid(visRaw, maxMes){
