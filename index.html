@@ -17,9 +17,13 @@
 :root{
   --bg:#0a0a0a;--bg2:#141414;--bg3:#1e1e1e;--bg4:#252525;
   --rosa:#d4537e;--rosa2:#e8729a;--rosa-d:#8c2f50;--rosa-xl:rgba(212,83,126,.12);
-  --cyan:#00d4ff;--blanco:#f0ece4;--muted:#777;
-  --border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.13);
-  --r:12px;--r2:8px;--font:'Outfit',sans-serif;
+  --cyan:#00d4ff;--blanco:#f0ece4;--muted:#888;--muted2:#5a5a5a;
+  --border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.14);
+  --ok:#7ec445;--warn:#fabd75;--err:#f09595;
+  --r:14px;--r2:9px;--r3:6px;--font:'Outfit',sans-serif;
+  --shadow-sm:0 1px 3px rgba(0,0,0,.3);
+  --shadow-md:0 4px 16px rgba(0,0,0,.35);
+  --shadow-glow:0 0 0 1px rgba(212,83,126,.15),0 4px 20px rgba(212,83,126,.08);
 }
 html{font-size:15px}
 body{font-family:var(--font);background:var(--bg);color:var(--blanco);min-height:100vh;overflow-x:hidden}
@@ -1258,50 +1262,61 @@ const DISCS = {
   'Otra disciplina':{precio:0,libre:1,hors:[]}
 };
 const PLANES=[
-  /* clases_mes = max clases por disciplina por mes
-     num_discs  = numero de disciplinas incluidas
-     horas      = duracion de clase en horas
-     vip        = sin limite */
-  {id:'P1',n:'Paquete #1',  t:'1 mes',  tipo:'paq', p:500,
-   d:'1 disciplina · 1 hr · 8 clases/mes',
-   num_discs:1, clases_mes:8,  horas:1,   meses:1},
-  {id:'P2',n:'Paquete #2',  t:'1 mes',  tipo:'paq', p:700,
-   d:'2 disciplinas intensivas · 2 hrs · 8 clases/mes c/u',
-   num_discs:2, clases_mes:8,  horas:2,   meses:1},
-  {id:'P3',n:'Paquete #3',  t:'1 mes',  tipo:'paq', p:800,
-   d:'2 disciplinas · 1 hr · 8 clases/mes c/u',
-   num_discs:2, clases_mes:8,  horas:1,   meses:1},
-  {id:'P4',n:'Paquete #4',  t:'1 mes',  tipo:'paq', p:1000,
-   d:'3 disciplinas · 1 hr · 8 clases/mes c/u',
-   num_discs:3, clases_mes:8,  horas:1,   meses:1},
-  {id:'PV',n:'Paquete VIP', t:'1 mes',  tipo:'paq', p:1100,
-   d:'Clases ilimitadas',
-   num_discs:99,clases_mes:99, horas:1,   meses:1, vip:1},
-  {id:'M1',n:'Membresía #1',t:'6 meses',tipo:'mem', p:2500,
-   d:'1 disciplina · 1 hr · 8 clases/mes · 6 meses',
-   num_discs:1, clases_mes:8,  horas:1,   meses:6},
-  {id:'M2',n:'Membresía #2',t:'6 meses',tipo:'mem', p:3500,
-   d:'2 disciplinas intensivas · 2 hrs · 8 clases/mes c/u · 6 meses',
-   num_discs:2, clases_mes:8,  horas:2,   meses:6},
-  {id:'M3',n:'Membresía #3',t:'6 meses',tipo:'mem', p:4000,
-   d:'2 disciplinas · 1 hr · 8 clases/mes c/u · 6 meses',
-   num_discs:2, clases_mes:8,  horas:1,   meses:6},
-  {id:'M4',n:'Membresía #4',t:'6 meses',tipo:'mem', p:5000,
-   d:'3 disciplinas · 1 hr · 8 clases/mes c/u · 6 meses',
-   num_discs:3, clases_mes:8,  horas:1,   meses:6},
-  {id:'M5',n:'Membresía #5',t:'12 meses',tipo:'mem',p:4800,
-   d:'1 disciplina · 1 hr · 8 clases/mes · 1 año',
-   num_discs:1, clases_mes:8,  horas:1,   meses:12},
+  /* ── PAQUETES (mensual) ──────────────────────────────────────
+     clases_mes = clases por disciplina por mes
+     num_discs  = disciplinas incluidas
+     horas      = duración de clase en horas
+     dias_sem   = días de clase por semana
+     vip        = sin límite                                    */
+  {id:'P1', n:'Paquete #1',   t:'1 mes',   tipo:'paq', p:500,
+   d:'1 disciplina · 2 clases/semana · 8 hrs/mes',
+   num_discs:1, clases_mes:8,  horas:1,  dias_sem:2, meses:1},
+  {id:'P2', n:'Paquete #2',   t:'1 mes',   tipo:'paq', p:700,
+   d:'2 disciplinas intensivas · 2 hrs c/u · 4 clases/mes c/u',
+   num_discs:2, clases_mes:4,  horas:2,  dias_sem:1, meses:1, intensivo:1},
+  {id:'P3', n:'Paquete #3',   t:'1 mes',   tipo:'paq', p:800,
+   d:'2 disciplinas · 4 clases/semana · 16 hrs/mes',
+   num_discs:2, clases_mes:16, horas:1,  dias_sem:4, meses:1},
+  {id:'P4', n:'Paquete #4',   t:'1 mes',   tipo:'paq', p:1000,
+   d:'3 disciplinas · 6 clases/semana · 24 hrs/mes',
+   num_discs:3, clases_mes:24, horas:1,  dias_sem:6, meses:1},
+  {id:'PV', n:'Paquete V.I.P',t:'1 mes',   tipo:'paq', p:1100,
+   d:'Clases ilimitadas en todas las disciplinas',
+   num_discs:99,clases_mes:99, horas:1,  dias_sem:6, meses:1, vip:1},
+
+  /* ── MEMBRESÍAS ─────────────────────────────────────────────*/
+  {id:'M1', n:'Membresía #1', t:'6 meses', tipo:'mem', p:2500,
+   d:'1 disciplina · 2 clases/semana · 8 hrs/mes · 6 meses',
+   num_discs:1, clases_mes:8,  horas:1,  dias_sem:2, meses:6},
+  {id:'M2', n:'Membresía #2', t:'6 meses', tipo:'mem', p:3500,
+   d:'2 disciplinas intensivas · 2 hrs c/u · 4 clases/mes c/u · 6 meses',
+   num_discs:2, clases_mes:4,  horas:2,  dias_sem:1, meses:6, intensivo:1},
+  {id:'M3', n:'Membresía #3', t:'6 meses', tipo:'mem', p:4000,
+   d:'2 disciplinas · 4 clases/semana · 16 hrs/mes · 6 meses',
+   num_discs:2, clases_mes:16, horas:1,  dias_sem:4, meses:6},
+  {id:'M4', n:'Membresía #4', t:'6 meses', tipo:'mem', p:5000,
+   d:'3 disciplinas · 6 clases/semana · 24 hrs/mes · 6 meses',
+   num_discs:3, clases_mes:24, horas:1,  dias_sem:6, meses:6},
+  {id:'M5', n:'Membresía #5', t:'12 meses',tipo:'mem', p:4800,
+   d:'Anualidad · 2 hrs/semana · 8 clases/mes · 12 meses',
+   num_discs:1, clases_mes:8,  horas:2,  dias_sem:2, meses:12},
+
+  /* ── OTROS ──────────────────────────────────────────────────*/
+  {id:'INS',n:'Inscripción Anual',t:'Anual', tipo:'otro',p:200,
+   d:'Inscripción anual requerida para nuevos alumnos',
+   num_discs:0, clases_mes:0,  horas:0,  dias_sem:0, meses:12},
   {id:'TL21',n:'Taller 21 Días de Sanidad Interior',t:'21 sesiones',tipo:'otro',p:500,
    d:'Cuerpo, Mente y Espíritu en Restauración · Lun/Mié/Jue 5:00–6:30 pm · Inicia 15 Jun 2026 · Grupo privado WA + Mentoría grupal',
-   num_discs:1, clases_mes:12, horas:1.5, meses:1, taller:1,
+   num_discs:1, clases_mes:12, horas:1.5, dias_sem:3, meses:1, taller:1,
    impartido_por:'Dulce Carolina Ríos Juárez — Mentora en Sanidad Emocional',
    lugar:'Edificio Alpha · Av. Universidad 252, La Loma, Zacatecas Centro',
    inicio:'2026-06-15'},
-  {id:'CL',n:'Clase suelta', t:'Por hora',tipo:'cl', p:100,
-   d:'$100 por hora'},
-  {id:'OT',n:'Otro / Taller',t:'Libre',  tipo:'otro',p:0,
-   d:'Taller, curso, evento especial — precio libre', libre:1}
+  {id:'CL', n:'Clase x Hora',  t:'Por hora',tipo:'cl',  p:100,
+   d:'$100 por hora · clase suelta',
+   num_discs:1, clases_mes:1,  horas:1,  dias_sem:1, meses:0},
+  {id:'OT', n:'Otro / Taller', t:'Libre',   tipo:'otro', p:0,
+   d:'Taller, curso, evento especial — precio libre', libre:1,
+   num_discs:0, clases_mes:0,  horas:0,  dias_sem:0, meses:1}
 ];
 /* ══════════════════════ ESTADO GLOBAL ══════════════════════ */
 let DB={alumnos:[],citas:[],visLog:[]};
@@ -1784,19 +1799,6 @@ function diasHastaVencimiento(a){
   var v = calcVencimientoEfectivo(a); if(!v) return null;
   var hoy=new Date(); hoy.setHours(0,0,0,0);
   return Math.ceil((v.getTime()-hoy.getTime())/86400000);
-}
-
-/* Día exacto de vencimiento de pago en el mes indicado
-   (puede caer distinto cada mes según días del mes) */
-function fechaVencimientoMes(a, año, mes){
-  var plan = PLANES.find(function(p){ return p.n===a.planActual; });
-  if(!plan) return null;
-  var pts = String(a.fechaAlta||'').split('T')[0].split('-');
-  if(pts.length<3) return null;
-  var dia = parseInt(pts[2]);
-  var diasEnMes = new Date(año, mes+1, 0).getDate();
-  var diaEf = Math.min(dia, diasEnMes);
-  return new Date(año, mes, diaEf);
 }
 
 
@@ -2399,16 +2401,30 @@ function verPerfil(f){
       waBtn.style.borderColor = 'rgba(37,211,102,.3)';
     }
   }
-  /* Show próximo pago info */
+  /* Show próximo pago info in top bar */
   var dp = diasParaPago(a);
   var np = calcProximoPago(a);
+  var plan = PLANES.find(function(p){ return p.n===a.planActual; });
   var diaPagoEl = document.getElementById('pf-proximo-pago');
-  if(diaPagoEl && np){
-    var npStr = np.toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
-    var dpColor = dp===null?'var(--muted)':dp<0?'#f09595':dp<=7?'#fabd75':'#7ec445';
-    var dpStr = dp===null?'Sin plan':dp<0?'Pago atrasado '+Math.abs(dp)+'d':dp===0?'Paga HOY':'En '+dp+' días';
-    diaPagoEl.style.display='block';
-    diaPagoEl.innerHTML = '💰 Próximo pago: <strong>'+npStr+'</strong> · <span style="color:'+dpColor+'">'+dpStr+'</span>';
+  if(diaPagoEl){
+    if(np && a.planActual){
+      var npStr    = np.toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+      var dpColor  = dp===null?'var(--muted)':dp<0?'#f09595':dp<=3?'#f09595':dp<=7?'#fabd75':'#7ec445';
+      var dpStr    = dp===null?'Sin plan':dp<0?'⚠ Atrasado '+Math.abs(dp)+'d':dp===0?'💰 HOY':dp===1?'💰 Mañana':'En '+dp+' días';
+      var diaFijo  = diaPagoFijo(a);
+      var planInfo = plan ? ' · '+plan.t+(plan.meses>1?' (cada '+plan.meses+' meses)':'') : '';
+      diaPagoEl.style.display='block';
+      diaPagoEl.innerHTML =
+        '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px">'
+        +'<div><span style="font-size:11px;color:rgba(255,255,255,.5)">💰 Próx. pago </span>'
+        +'<strong style="color:'+dpColor+'">'+npStr+'</strong>'
+        +(diaFijo?'<span style="font-size:10px;color:rgba(255,255,255,.4)"> · día fijo: '+diaFijo+planInfo+'</span>':'')
+        +'</div>'
+        +'<span style="font-size:12px;font-weight:700;color:'+dpColor+'">'+dpStr+'</span>'
+        +'</div>';
+    } else {
+      diaPagoEl.style.display='none';
+    }
   }
   window.scrollTo(0,0);
 }
@@ -2615,10 +2631,18 @@ function attachVboxListeners(a){
 function getVisMes(a){return(a.visitas||[]).filter(v=>mesStr(v)===mesCur()).length;}
 function renderPagosHist(a){
   var c = document.getElementById('pf-pagos');
-  var pagos = a.pagos||[];
-  if(!pagos.length){ c.innerHTML='<p style="font-size:12px;color:var(--muted)">Sin pagos.</p>'; return; }
+  if(!c) return;
 
-  /* Saldos pendientes banner */
+  /* ── TIMELINE WIDGET (always shown if plan exists) ── */
+  var timelineHtml = a.planActual ? renderPaymentTimeline(a) : '';
+
+  var pagos = a.pagos||[];
+  if(!pagos.length){
+    c.innerHTML = timelineHtml + '<p style="font-size:12px;color:var(--muted);padding:.5rem 0">Sin pagos registrados aún.</p>';
+    return;
+  }
+
+  /* ── Saldos pendientes ── */
   var saldoActivo = (a.saldos||[]).filter(function(s){ return !s.pagado; });
   var promoActiva = (a.promos||[]).filter(function(p){ return !p.agotado && p.usos_restantes!==0; });
   var saldoBanner = '';
@@ -2651,19 +2675,21 @@ function renderPagosHist(a){
       +'</div>';
   }
 
-  /* Get original indices (pagos are shown in reverse) */
-  var totalPagos = pagos.length;
+  /* ── Historial de pagos ── */
+  var histTitle = '<div style="font-size:11px;font-weight:700;color:var(--blanco);margin-bottom:.5rem;display:flex;align-items:center;gap:6px">📋 Historial de pagos <span style="font-size:10px;color:var(--muted);font-weight:400">('+pagos.length+' registros)</span></div>';
+
   var rows = [...pagos].map(function(x, origIdx){ return {x:x, origIdx:origIdx}; }).reverse().map(function(item){
     var x = item.x; var origIdx = item.origIdx;
     var badge = x.completo===false || (x.saldo&&x.saldo>0)
       ? '<span style="background:rgba(133,79,11,.25);color:#fabd75;font-size:9px;padding:1px 5px;border-radius:4px;font-weight:700">PARCIAL</span> '
       : (x.completo ? '<span style="background:rgba(59,109,17,.2);color:#7ec445;font-size:9px;padding:1px 5px;border-radius:4px;font-weight:600">OK</span> ' : '');
-    var saldoStr = (x.saldo && x.saldo>0) ? ' <span style="color:#fabd75;font-size:10px">+$'+x.saldo.toLocaleString('es-MX')+' pend.</span>' : '';
+    var saldoStr    = (x.saldo && x.saldo>0) ? ' <span style="color:#fabd75;font-size:10px">+$'+x.saldo.toLocaleString('es-MX')+' pend.</span>' : '';
     var saldoLiqStr = (x.saldosLiquid && x.saldosLiquid>0) ? ' <span style="color:#7ec445;font-size:10px">✓ $'+x.saldosLiquid.toLocaleString('es-MX')+' liq.</span>' : '';
-    var descStr  = x.descuento ? ' <span style="color:var(--muted);font-size:10px">(-$'+x.descuento.toLocaleString('es-MX')+(x.descNota?' · '+x.descNota:'')+')</span>' : '';
+    var descStr     = x.descuento ? ' <span style="color:var(--muted);font-size:10px">(-$'+x.descuento.toLocaleString('es-MX')+(x.descNota?' · '+x.descNota:'')+')</span>' : '';
+    var editBadge   = x._editado ? ' <span style="font-size:9px;color:rgba(255,255,255,.3)">✏'+x._editado+'</span>' : '';
     return '<div class="pago-row" style="flex-wrap:wrap;gap:4px;align-items:center">'
       +'<span style="font-size:11px;color:var(--muted);white-space:nowrap">'+x.fecha+'</span>'
-      +'<span style="color:var(--muted);font-size:11px;flex:1;min-width:0">'+badge+esc(x.plan||'')+'</span>'
+      +'<span style="color:var(--muted);font-size:11px;flex:1;min-width:0">'+badge+esc(x.plan||'')+editBadge+'</span>'
       +'<span class="pago-monto" style="white-space:nowrap">$'+x.monto.toLocaleString('es-MX')+descStr+saldoStr+saldoLiqStr+'</span>'
       +'<span style="color:var(--muted);font-size:10px">'+esc(x.metodo||'')+'</span>'
       +'<div style="display:flex;gap:4px;flex-shrink:0">'
@@ -2673,7 +2699,7 @@ function renderPagosHist(a){
       +'</div>';
   }).join('');
 
-  c.innerHTML = saldoBanner + rows;
+  c.innerHTML = timelineHtml + saldoBanner + histTitle + rows;
 }
 
 /* ═══════════════════════════════════════
@@ -4607,34 +4633,278 @@ function resumenClasesAnual(a, año){
   return resultado;
 }
 
-/* ─── FECHA DE PAGO FIJA (siempre el día del alta) ─── */
+/* ═══════════════════════════════════════════════════════════════
+   SISTEMA DE FECHAS DE PAGO
+   ─────────────────────────────────────────────────────────────
+   REGLA PRINCIPAL: el día de pago es siempre el mismo día del
+   mes en que el alumno se registró (fechaAlta), sin excepción.
 
+   • Paquetes (1 mes): pago cada mes, mismo día.
+   • Membresías 6 meses: un SOLO pago cada 6 meses.
+   • Membresía anual: un SOLO pago al año.
+   • Si el mes no tiene ese día (ej: día 31 en febrero),
+     se usa el último día del mes.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Parsea una fecha YYYY-MM-DD sin desplazamiento de zona horaria */
+function parseFechaLocal(f){
+  if(!f) return null;
+  var s=String(f).split('T')[0]; var p=s.split('-');
+  if(p.length<3) return null;
+  var d=new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/* Día de pago fijo (número) basado en fechaAlta */
 function diaPagoFijo(a){
-  var pts=String(a.fechaAlta||'').split('T')[0].split('-');
-  return pts.length>=3 ? parseInt(pts[2]) : null;
+  var d=parseFechaLocal(a.fechaAlta); return d ? d.getDate() : null;
 }
 
+/* Obtiene la fecha de pago exacta para un mes/año dado,
+   ajustando si el día no existe en ese mes */
+function fechaPagoEnMes(a, año, mes){
+  var dia = diaPagoFijo(a); if(!dia) return null;
+  var diasEnMes = new Date(año, mes+1, 0).getDate();
+  return new Date(año, mes, Math.min(dia, diasEnMes));
+}
+/* Alias para compatibilidad */
+function fechaVencimientoMes(a, año, mes){ return fechaPagoEnMes(a, año, mes); }
+
+/* Genera todas las fechas de pago desde el alta hasta el vencimiento.
+   Para membresías: una fecha cada N meses.
+   Para paquetes: una fecha cada mes. */
+function generarFechasPago(a){
+  var plan = PLANES.find(function(p){ return p.n===a.planActual; });
+  if(!plan || !a.fechaAlta) return [];
+
+  var inicio = parseFechaLocal(a.fechaAlta); if(!inicio) return [];
+  var fin    = parseFechaLocal(a.fechaExpira);
+  if(!fin){
+    /* Si no hay fechaExpira, generar solo los próximos 12 meses */
+    fin = new Date(inicio); fin.setFullYear(fin.getFullYear()+1);
+  }
+
+  var intervaloMeses = plan.meses||1; /* 1=mensual, 6=semestral, 12=anual */
+  var dia = inicio.getDate();
+  var fechas = [];
+  var cursor = new Date(inicio.getFullYear(), inicio.getMonth(), dia);
+
+  /* Primera fecha de pago: el mes siguiente al alta */
+  cursor = new Date(cursor.getFullYear(), cursor.getMonth() + intervaloMeses, dia);
+
+  var limite = new Date(fin); limite.setMonth(limite.getMonth()+1);
+  var maxIter = 50;
+  while(cursor <= limite && maxIter-- > 0){
+    var diasEnMes = new Date(cursor.getFullYear(), cursor.getMonth()+1, 0).getDate();
+    var diaEf = Math.min(dia, diasEnMes);
+    fechas.push(new Date(cursor.getFullYear(), cursor.getMonth(), diaEf));
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth() + intervaloMeses, dia);
+  }
+  return fechas;
+}
+
+/* Próxima fecha de pago (Date) desde hoy */
 function proximaFechaPagoFija(a){
-  var pts=String(a.fechaAlta||'').split('T')[0].split('-');
-  if(pts.length<3) return null;
-  var dia=parseInt(pts[2]);
-  var altaD=new Date(parseInt(pts[0]),parseInt(pts[1])-1,dia);
-  var hoy=new Date(); hoy.setHours(0,0,0,0);
-  /* Avanzar mes a mes desde la fecha de alta hasta encontrar la próxima fecha de pago futura */
-  var next=new Date(altaD);
-  while(next<=hoy) next=new Date(next.getFullYear(),next.getMonth()+1,dia);
-  return next;
+  var fechas = generarFechasPago(a);
+  if(!fechas.length){
+    /* Fallback: next month same day */
+    var dia = diaPagoFijo(a); if(!dia) return null;
+    var hoy = new Date(); hoy.setHours(0,0,0,0);
+    var next = new Date(hoy.getFullYear(), hoy.getMonth(), dia);
+    if(next <= hoy) next = new Date(hoy.getFullYear(), hoy.getMonth()+1, dia);
+    return next;
+  }
+  var hoy = new Date(); hoy.setHours(0,0,0,0);
+  return fechas.find(function(f){ return f > hoy; }) || fechas[fechas.length-1];
 }
 
+/* Días hasta la próxima fecha de pago */
 function diasAlProximoPago(a){
-  var np=proximaFechaPagoFija(a); if(!np) return null;
+  var np = proximaFechaPagoFija(a); if(!np) return null;
   var hoy=new Date(); hoy.setHours(0,0,0,0);
   return Math.ceil((np-hoy)/86400000);
 }
 
+/* Aliases usados en toda la app */
 function calcProximoPago(a){ return proximaFechaPagoFija(a); }
 function diasParaPago(a){    return diasAlProximoPago(a); }
 function diaDepago(a){       return diaPagoFijo(a); }
+
+/* calcVencimiento: devuelve la fecha de expiración del plan actual */
+function calcVencimiento(a){
+  var fin = parseFechaLocal(a.fechaExpira);
+  if(fin) return fin;
+  return proximaFechaPagoFija(a);
+}
+
+/* Genera HTML del widget de línea de tiempo de pagos */
+function renderPaymentTimeline(a){
+  var plan = PLANES.find(function(p){ return p.n===a.planActual; });
+  if(!plan || !a.fechaAlta) return '';
+
+  var hoy    = new Date(); hoy.setHours(0,0,0,0);
+  var fechas = generarFechasPago(a);
+  var pagosReg = (a.pagos||[]);
+  var MESES_S  = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+  /* Map registered payment dates */
+  var pagosDates = {};
+  pagosReg.forEach(function(p){
+    var d = parseFechaLocal(p.fecha);
+    if(d) pagosDates[d.getFullYear()+'-'+(d.getMonth()+1)] = p;
+  });
+
+  /* Alta info */
+  var altaDate  = parseFechaLocal(a.fechaAlta);
+  var diaFijo   = diaPagoFijo(a);
+  var np        = proximaFechaPagoFija(a);
+  var diasNP    = diasAlProximoPago(a);
+  var finPlan   = parseFechaLocal(a.fechaExpira);
+
+  /* Color helpers */
+  var npColor = diasNP===null?'var(--muted)':diasNP<0?'#f09595':diasNP===0?'#f09595':diasNP<=7?'#fabd75':'#7ec445';
+
+  var html = '<div style="background:var(--bg2);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;margin-bottom:.75rem">'
+
+  /* ── Header ── */
+  + '<div style="background:linear-gradient(135deg,rgba(212,83,126,.2),rgba(0,0,0,0));padding:.85rem 1rem;border-bottom:1px solid rgba(255,255,255,.07)">'
+  + '<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px">'
+
+  /* Left: plan info */
+  + '<div>'
+  + '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Plan actual</div>'
+  + '<div style="font-size:16px;font-weight:700;color:var(--blanco)">'+esc(plan.n)+'</div>'
+  + '<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(plan.d)+'</div>'
+  + '</div>'
+
+  /* Right: price */
+  + '<div style="text-align:right">'
+  + '<div style="font-size:10px;color:var(--muted)">Costo</div>'
+  + '<div style="font-size:20px;font-weight:700;color:var(--rosa)">$'+plan.p.toLocaleString('es-MX')+'</div>'
+  + '<div style="font-size:10px;color:var(--muted)">c/'+(plan.meses===1?'mes':plan.meses+'m')+'</div>'
+  + '</div>'
+  + '</div>'
+
+  /* Key dates row */
+  + '<div style="display:flex;gap:12px;margin-top:.75rem;flex-wrap:wrap">'
+
+  /* Alta */
+  + '<div style="background:rgba(255,255,255,.05);border-radius:8px;padding:6px 10px;min-width:90px">'
+  + '<div style="font-size:9px;color:var(--muted);margin-bottom:1px">INSCRIPCIÓN</div>'
+  + '<div style="font-size:12px;font-weight:700;color:var(--blanco)">'+(altaDate?altaDate.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):'—')+'</div>'
+  + '<div style="font-size:10px;color:var(--muted)">Día fijo: <strong style="color:var(--blanco)">'+diaFijo+'</strong></div>'
+  + '</div>'
+
+  /* Próximo pago */
+  + '<div style="background:rgba(255,255,255,.05);border-radius:8px;padding:6px 10px;min-width:110px;border:1px solid '+(diasNP!==null&&diasNP<=7?npColor+'55':'transparent')+'">'
+  + '<div style="font-size:9px;color:var(--muted);margin-bottom:1px">PRÓXIMO PAGO</div>'
+  + '<div style="font-size:12px;font-weight:700;color:'+npColor+'">'+(np?np.toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'}):'—')+'</div>'
+  + '<div style="font-size:10px;color:'+npColor+';font-weight:600">'
+  + (diasNP===null?'Sin plan':diasNP<0?'⚠ Atrasado '+Math.abs(diasNP)+'d':diasNP===0?'💰 HOY':diasNP===1?'💰 Mañana':'En '+diasNP+' días')
+  + '</div></div>'
+
+  /* Vencimiento plan */
+  + (finPlan?'<div style="background:rgba(255,255,255,.05);border-radius:8px;padding:6px 10px;min-width:90px">'
+  + '<div style="font-size:9px;color:var(--muted);margin-bottom:1px">FIN DE PLAN</div>'
+  + '<div style="font-size:12px;font-weight:700;color:var(--blanco)">'+finPlan.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})+'</div>'
+  + '<div style="font-size:10px;color:var(--muted)">'+plan.t+'</div>'
+  + '</div>':'')
+
+  + '</div>'
+  + '</div>' /* end header */
+
+  /* ── Timeline de pagos ── */
+  + '<div style="padding:.85rem 1rem">'
+  + '<div style="font-size:11px;font-weight:700;color:var(--blanco);margin-bottom:.6rem;display:flex;align-items:center;gap:6px">'
+  + '📅 Calendario de pagos'
+  + '<span style="font-size:10px;color:var(--muted);font-weight:400"> · Día '+diaFijo+' de cada '+(plan.meses===1?'mes':plan.meses+'m')+'</span>'
+  + '</div>'
+  + '<div style="display:flex;gap:4px;overflow-x:auto;padding-bottom:4px">';
+
+  /* Show all payment dates */
+  if(fechas.length){
+    fechas.forEach(function(f){
+      var mKey = f.getFullYear()+'-'+(f.getMonth()+1);
+      var pagReg = pagosDates[mKey];
+      var esPasada = f < hoy;
+      var esHoy = f.toDateString()===hoy.toDateString();
+      var esProxima = np && f.toDateString()===np.toDateString();
+
+      var estado, bg, col, brd, icon;
+      if(pagReg && pagReg.completo){
+        estado='PAGADO'; bg='rgba(59,109,17,.25)'; col='#7ec445';
+        brd='1px solid rgba(59,109,17,.4)'; icon='✓';
+      } else if(pagReg && !pagReg.completo){
+        estado='PARCIAL'; bg='rgba(133,79,11,.25)'; col='#fabd75';
+        brd='1px solid rgba(133,79,11,.4)'; icon='◑';
+      } else if(esProxima){
+        estado='PRÓXIMO'; bg='rgba(212,83,126,.25)'; col='var(--rosa)';
+        brd='2px solid var(--rosa)'; icon='💰';
+      } else if(esPasada){
+        estado='VENCIDO'; bg='rgba(163,45,45,.2)'; col='#f09595';
+        brd='1px solid rgba(163,45,45,.3)'; icon='⚠';
+      } else {
+        estado='FUTURO'; bg='rgba(255,255,255,.04)'; col='rgba(255,255,255,.4)';
+        brd='1px solid rgba(255,255,255,.06)'; icon='○';
+      }
+
+      html += '<div style="flex-shrink:0;width:64px;background:'+bg+';border:'+brd+';border-radius:10px;padding:6px 4px;text-align:center;cursor:default" title="'+f.toLocaleDateString('es-MX')+' · '+estado+(pagReg?' · $'+pagReg.monto.toLocaleString('es-MX'):'')+'">'
+        +'<div style="font-size:14px;line-height:1">'+icon+'</div>'
+        +'<div style="font-size:11px;font-weight:700;color:'+col+';margin-top:2px">'+MESES_S[f.getMonth()]+'</div>'
+        +'<div style="font-size:13px;font-weight:900;color:'+col+'">'+f.getDate()+'</div>'
+        +'<div style="font-size:8px;font-weight:700;color:'+col+';margin-top:1px">'+f.getFullYear()+'</div>'
+        +(pagReg?'<div style="font-size:8px;color:'+col+';margin-top:2px">$'+(pagReg.monto/1000).toFixed(1)+'k</div>':'')
+        +'</div>';
+    });
+  } else {
+    html += '<div style="font-size:12px;color:var(--muted);padding:.5rem">Sin fechas de pago calculadas.</div>';
+  }
+
+  html += '</div>' /* end flex timeline */
+
+  /* ── Leyenda ── */
+  + '<div style="display:flex;gap:10px;margin-top:.5rem;flex-wrap:wrap">'
+  + ['✓ Pagado:#7ec445','◑ Parcial:#fabd75','💰 Próximo:var(--rosa)','⚠ Vencido:#f09595','○ Futuro:rgba(255,255,255,.3)'].map(function(s){
+      var p=s.split(':'); return '<span style="font-size:10px;color:'+p[1]+'">'+p[0]+'</span>';
+    }).join('')
+  + '</div>'
+  + '</div>' /* end body */
+  + '</div>'; /* end card */
+
+  /* ── Saldos pendientes ── */
+  var saldosPend = (a.saldos||[]).filter(function(s){ return !s.pagado; });
+  if(saldosPend.length){
+    var totalPend = saldosPend.reduce(function(t,s){ return t+s.monto; },0);
+    html += '<div style="background:rgba(133,79,11,.2);border:1px solid #fabd75;border-radius:10px;padding:.75rem 1rem;margin-bottom:.75rem">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">'
+      +'<div style="font-size:12px;font-weight:700;color:#fabd75">⚠ Saldos pendientes acumulados</div>'
+      +'<span style="font-size:18px;font-weight:900;color:#fabd75">$'+totalPend.toLocaleString('es-MX')+'</span>'
+      +'</div>'
+      +'<div style="font-size:11px;color:rgba(250,189,117,.7);margin-bottom:.5rem">'
+      +saldosPend.map(function(s){
+        return '• '+esc(s.motivo||'Saldo')+' · <strong style="color:#fabd75">$'+s.monto.toLocaleString('es-MX')+'</strong>';
+      }).join('<br>')
+      +'</div>'
+      +'<div style="display:flex;gap:7px;flex-wrap:wrap">'
+      +'<button onclick="liquidarSaldo()" style="padding:6px 14px;background:#fabd75;color:#000;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">💵 Pagar ahora</button>'
+      +'<button onclick="abrirSaldoModal()" style="padding:6px 12px;background:rgba(133,79,11,.3);color:#fabd75;border:1px solid #fabd75;border-radius:7px;font-size:12px;cursor:pointer;font-family:var(--font)">⚙ Gestionar</button>'
+      +'</div></div>';
+  }
+
+  /* ── Promos activas ── */
+  var promos = (a.promos||[]).filter(function(p){ return !p.agotado && p.usos_restantes!==0; });
+  if(promos.length){
+    html += '<div style="background:rgba(0,212,255,.07);border:1px solid rgba(0,212,255,.2);border-radius:10px;padding:.65rem .9rem;margin-bottom:.75rem">'
+      +'<div style="font-size:11px;font-weight:700;color:var(--cyan);margin-bottom:.3rem">🎁 Promociones activas</div>'
+      +promos.map(function(p){
+        var ts=p.tipo==='desc_monto'?'-$'+p.valor:p.tipo==='desc_pct'?'-'+p.valor+'%':p.tipo==='mes_gratis'?p.valor+' mes'+(p.valor!==1?'es':'')+' gratis':'Ajuste';
+        return '<div style="font-size:11px;color:var(--muted)">• <strong style="color:var(--cyan)">'+ts+'</strong> — '+esc(p.motivo||'')+(p.usos_restantes>0?' ('+p.usos_restantes+' uso'+(p.usos_restantes!==1?'s':'')+')':' (indefinido)')+'</div>';
+      }).join('')
+      +'</div>';
+  }
+
+  return html;
+}
 
 /* ─── ACUMULACIÓN AUTOMÁTICA DE MESES VENCIDOS ─── */
 /* Recorre todos los meses desde el alta hasta hoy.
@@ -4708,17 +4978,6 @@ function autoAcumularSaldosPendientes(a){
   return changed;
 }
 
-/* calcVencimiento: legacy — devuelve próxima fecha de pago */
-function calcVencimiento(a){
-  var np=proximaFechaPagoFija(a); return np || null;
-}
-function parseFechaLocal(f){
-  /* Parse YYYY-MM-DD without timezone shift */
-  if(!f) return null;
-  var s=String(f).split('T')[0]; var p=s.split('-');
-  if(p.length<3) return null;
-  return new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));
-}
 function badgeVigencia(a){
   var d=diasRestantes(a.fechaExpira); if(d===null) return '';
   if(d<0)   return '<span style="background:rgba(163,45,45,.25);color:#f09595;font-size:9px;padding:2px 7px;border-radius:5px;font-weight:700;margin-left:4px">VENCIDO</span>';
