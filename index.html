@@ -925,6 +925,22 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
       </div>
       <div id="pm-promos-lista" style="margin-top:.4rem"></div>
     </div>
+    <!-- MESES ADELANTADOS Y MESES DE REGALO -->
+    <div style="background:linear-gradient(135deg,rgba(0,212,255,.08),rgba(212,83,126,.08));border:1px solid rgba(0,212,255,.25);border-radius:var(--r2);padding:.75rem;margin-bottom:.75rem">
+      <div class="ct" style="margin-bottom:.5rem">📅 Pago adelantado / Meses de regalo</div>
+      <div class="g2">
+        <div class="field">
+          <label>Meses que paga (adelantado)</label>
+          <input type="number" id="pm-meses-adelantados" min="1" value="1" oninput="pmCalcTotal()" style="background:var(--bg2);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:14px;font-weight:700;outline:none;width:100%">
+        </div>
+        <div class="field">
+          <label>Meses de regalo (promo)</label>
+          <input type="number" id="pm-meses-regalo" min="0" value="0" oninput="pmCalcTotal()" style="background:var(--bg2);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--cyan);font-size:14px;font-weight:700;outline:none;width:100%">
+        </div>
+      </div>
+      <div id="pm-meses-resumen" style="font-size:11px;color:var(--muted);margin-top:.5rem;padding-top:.5rem;border-top:1px solid rgba(255,255,255,.08)"></div>
+    </div>
+
     <div style="background:var(--bg3);border-radius:var(--r2);padding:.75rem;margin-bottom:.75rem">
       <div class="ct" style="margin-bottom:.4rem">Pago</div>
       <div class="g2">
@@ -1776,6 +1792,48 @@ function calcFechaExpira(fechaAlta, planId){
   if(isNaN(d.getTime())) return null;
   d.setMonth(d.getMonth() + meses);
   return d.toISOString().split('T')[0];
+}
+
+/* Suma N meses a una fecha (string YYYY-MM-DD), evitando desfase de zona horaria.
+   Retorna string YYYY-MM-DD. */
+function sumarMeses(fechaStr, meses){
+  if(!fechaStr) return null;
+  var pts = String(fechaStr).split('T')[0].split('-');
+  if(pts.length<3) return null;
+  var d = new Date(parseInt(pts[0]),parseInt(pts[1])-1,parseInt(pts[2]));
+  if(isNaN(d.getTime())) return null;
+  d.setMonth(d.getMonth() + meses);
+  return d.toISOString().split('T')[0];
+}
+
+/* Formatea YYYY-MM-DD a texto largo en español: "15 de junio de 2026" */
+function formatFechaLarga(fechaStr){
+  if(!fechaStr) return '—';
+  var pts = String(fechaStr).split('T')[0].split('-');
+  if(pts.length<3) return fechaStr;
+  var d = new Date(parseInt(pts[0]),parseInt(pts[1])-1,parseInt(pts[2]));
+  if(isNaN(d.getTime())) return fechaStr;
+  return d.toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+}
+
+/* Calcula la nueva fecha de vencimiento considerando:
+   - plan.meses (duración base del plan)
+   - mesesAdelantados (cuántos períodos del plan está pagando de una vez)
+   - mesesRegalo (meses extra de promoción/regalo)
+   Toma como base la fecha de vencimiento ANTERIOR si sigue vigente
+   (para no perder tiempo ya pagado), o la fecha del pago si ya venció. */
+function calcNuevaFechaExpiraConExtras(alumno, plan, fechaPago, mesesAdelantados, mesesRegalo){
+  if(!plan) return null;
+  var mesesTotales = (plan.meses||1) * (mesesAdelantados||1) + (mesesRegalo||0);
+  var baseFecha = fechaPago;
+
+  /* Si el alumno ya tiene una fecha de vigencia futura, sumar desde ahí
+     (para no perder el tiempo restante que ya había pagado) */
+  if(alumno && alumno.fechaExpira){
+    var dv = diasRestantes(alumno.fechaExpira);
+    if(dv !== null && dv > 0) baseFecha = alumno.fechaExpira;
+  }
+  return sumarMeses(baseFecha, mesesTotales);
 }
 
 /* Calcula cuándo vencerá el paquete por clases agotadas (calendario).
@@ -3755,7 +3813,8 @@ function pmRenderDiscs(){
 function pmCalcTotal(){
   if(pmManual){ pmRenderTotal(); return; }
   var plan = PLANES.find(function(p){ return p.id === pmPlan; });
-  pmSubtotal = plan ? (plan.libre ? pmSubtotal : plan.p) : 0;
+  var mesesAdel = parseInt(document.getElementById('pm-meses-adelantados').value)||1;
+  pmSubtotal = plan ? (plan.libre ? pmSubtotal : plan.p * mesesAdel) : 0;
   pmRenderTotal();
 }
 
@@ -3812,6 +3871,39 @@ function pmRenderTotal(){
   if(dRow)  dRow.style.display  = descTotal > 0 ? 'flex' : 'none';
   if(dDisp) dDisp.textContent   = '-$'+descTotal.toLocaleString('es-MX');
   if(totEl) totEl.textContent   = '$'+total.toLocaleString('es-MX');
+
+  /* ── Resumen de meses adelantados + regalo ── */
+  pmActualizarResumenMeses();
+}
+
+function pmActualizarResumenMeses(){
+  var resumenEl = document.getElementById('pm-meses-resumen');
+  if(!resumenEl || !pmAlumno) return;
+  var plan = PLANES.find(function(p){ return p.id === pmPlan; });
+  var mesesAdelEl = document.getElementById('pm-meses-adelantados');
+  var mesesRegEl  = document.getElementById('pm-meses-regalo');
+  var mesesAdel = parseInt(mesesAdelEl ? mesesAdelEl.value : 1)||1;
+  var mesesReg  = parseInt(mesesRegEl  ? mesesRegEl.value  : 0)||0;
+
+  if(!plan || !plan.meses || (mesesAdel<=1 && mesesReg<=0)){
+    resumenEl.innerHTML = '';
+    return;
+  }
+
+  var fechaBaseEl = document.getElementById('pm-fecha');
+  var fechaBase = (fechaBaseEl && fechaBaseEl.value) || today();
+  var mesesTotales = (plan.meses * mesesAdel) + mesesReg;
+  var nuevaExpira = sumarMeses(fechaBase, mesesTotales);
+
+  var partes = [];
+  partes.push('<strong style="color:var(--blanco)">'+mesesAdel+' mes'+(mesesAdel!==1?'es':'')+' pagado'+(mesesAdel!==1?'s':'')+'</strong>');
+  if(mesesReg>0) partes.push('<strong style="color:var(--cyan)">+ '+mesesReg+' mes'+(mesesReg!==1?'es':'')+' de regalo 🎁</strong>');
+
+  resumenEl.innerHTML =
+    '<div style="display:flex;flex-direction:column;gap:3px">'
+    +'<div>'+partes.join(' ')+' = <strong style="color:var(--rosa)">'+mesesTotales+' mes'+(mesesTotales!==1?'es':'')+' de vigencia</strong></div>'
+    +'<div>📅 Nueva fecha de vencimiento: <strong style="color:#7ec445">'+formatFechaLarga(nuevaExpira)+'</strong></div>'
+    +'</div>';
 }
 
 /* Show active promos in payment modal */
@@ -3856,11 +3948,13 @@ async function pmGuardar(){
   if(!pmAlumno){ cerrarPagoModal(); return; }
 
   var plan      = PLANES.find(function(p){ return p.id === pmPlan; });
+  var mesesAdel = parseInt(document.getElementById('pm-meses-adelantados').value)||1;
+  var mesesReg  = parseInt(document.getElementById('pm-meses-regalo').value)||0;
   var descMonto = parseFloat(document.getElementById('pm-desc-monto').value)||0;
   var descPct   = parseFloat(document.getElementById('pm-desc-pct').value)||0;
   var descNota  = document.getElementById('pm-desc-nota').value.trim();
   var manualVal = parseFloat(document.getElementById('pm-monto-manual').value)||0;
-  var subtotal  = pmManual ? manualVal : (plan ? (plan.libre ? pmSubtotal : plan.p) : pmSubtotal);
+  var subtotal  = pmManual ? manualVal : (plan ? (plan.libre ? pmSubtotal : plan.p * mesesAdel) : pmSubtotal);
   var descTotal = descMonto + Math.round(subtotal * descPct / 100);
   var montoFull = Math.max(0, subtotal - descTotal);
 
@@ -3903,7 +3997,9 @@ async function pmGuardar(){
     ref:            document.getElementById('pm-ref').value,
     notas:          document.getElementById('pm-notas').value,
     tipo:           plan ? plan.tipo : 'manual',
-    completo:       esPagoCompleto
+    completo:       esPagoCompleto,
+    mesesAdelantados: mesesAdel > 1 ? mesesAdel : undefined,
+    mesesRegalo:      mesesReg > 0 ? mesesReg : undefined
   };
 
   /* Detectar saldos de meses anteriores ANTES de registrar el pago */
@@ -3912,7 +4008,25 @@ async function pmGuardar(){
   pmAlumno.pagos = pmAlumno.pagos || [];
   pmAlumno.pagos.push(pago);
   if(pmDiscs.length > 0) pmAlumno.disciplinas = pmDiscs;
-  if(plan){ pmAlumno.planActual = plan.n; pmAlumno.fechaExpira = calcFechaExpira(fecha, plan.id); }
+  if(plan && esPagoCompleto){
+    pmAlumno.planActual = plan.n;
+    pmAlumno.fechaExpira = calcNuevaFechaExpiraConExtras(pmAlumno, plan, fecha, mesesAdel, mesesReg);
+  } else if(plan){
+    pmAlumno.planActual = plan.n;
+  }
+
+  /* Registrar promoción de meses gratis si se otorgó */
+  if(mesesReg > 0){
+    if(!pmAlumno.promos) pmAlumno.promos=[];
+    pmAlumno.promos.push({
+      tipo: 'mes_gratis',
+      valor: mesesReg,
+      usos_restantes: 0,  /* ya fue aplicado, queda como registro histórico */
+      agotado: true,
+      motivo: descNota || (mesesReg+' mes'+(mesesReg!==1?'es':'')+' de regalo aplicado'+(mesesReg!==1?'s':'')+' en pago de '+(plan?plan.n:'plan')),
+      fecha: fecha
+    });
+  }
 
   /* Auto-accumulate all previous unpaid months BEFORE marking this one paid */
   autoAcumularSaldosPendientes(pmAlumno);
