@@ -67,7 +67,7 @@ body{padding-bottom:70px}
 .ps{font-size:12px;color:var(--muted);margin-bottom:1.25rem}
 
 /* CARDS */
-.card{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:1rem;margin-bottom:.75rem}
+.card{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:1.1rem;margin-bottom:.85rem;box-shadow:var(--shadow-sm)}
 .ct{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--rosa);font-weight:700;margin-bottom:.75rem}
 
 /* GRID */
@@ -424,6 +424,8 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
       <button class="tpill" id="als-f-vence7" onclick="alsSetFiltro('vence7')">🔔 Vencen en 7d</button>
       <button class="tpill" id="als-f-vigentes" onclick="alsSetFiltro('vigentes')">✓ Vigentes</button>
       <button class="tpill" id="als-f-sinpago" onclick="alsSetFiltro('sinpago')">💸 Sin pago</button>
+      <button class="tpill" id="als-f-intensiva" onclick="alsSetFiltro('intensiva')">⚡ Intensiva</button>
+      <button class="tpill" id="als-f-normal" onclick="alsSetFiltro('normal')">Normal</button>
     </div>
     <!-- Filtro por disciplina y plan -->
     <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -449,6 +451,7 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
       <div class="pf-av" id="pf-av">--</div>
       <div class="pf-info">
         <div class="pf-name" id="pf-name">—</div>
+        <div id="pf-modalidad" style="margin:3px 0"></div>
         <div class="pf-disc" id="pf-disc">—</div>
         <div class="pf-folio" id="pf-folio">—</div>
       </div>
@@ -2206,7 +2209,7 @@ var alsFiltroActual = 'todos';
 
 function alsSetFiltro(f){
   alsFiltroActual = f;
-  ['todos','vencidos','vence7','vigentes','sinpago'].forEach(function(x){
+  ['todos','vencidos','vence7','vigentes','sinpago','intensiva','normal'].forEach(function(x){
     var b=document.getElementById('als-f-'+x); if(b) b.classList.toggle('on',x===f);
   });
   renderAls();
@@ -2258,6 +2261,8 @@ function renderAls(){
     if(alsFiltroActual==='vence7')    return dp!==null && dp>=0 && dp<=7;
     if(alsFiltroActual==='vigentes')  return dv!==null && dv>=0;
     if(alsFiltroActual==='sinpago')   return !(a.pagos||[]).length;
+    if(alsFiltroActual==='intensiva'){ var m=getModalidadAlumno(a); return m==='intensiva'||m==='ambas'; }
+    if(alsFiltroActual==='normal'){    var m2=getModalidadAlumno(a); return m2==='normal'||m2==='ambas'; }
     return true;
   });
 
@@ -2309,11 +2314,15 @@ function renderAls(){
     const saldosPend = (a.saldos||[]).filter(s=>!s.pagado);
     const totalSaldo = saldosPend.reduce((t,s)=>t+s.monto,0);
 
+    /* Modalidad: normal / intensiva / ambas */
+    const modBadge = modalidadBadge(a, 'sm');
+
     return `<div class="arow" style="flex-wrap:wrap;gap:4px;flex-direction:column" data-f="${a.folio}">
       <div style="display:flex;align-items:flex-start;gap:8px">
         <div style="flex:1;min-width:0;cursor:pointer" onclick="verPerfil('${a.folio}')">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             <span class="arow-name">${a.nombre} ${a.apellidos}</span>
+            ${modBadge}
             ${dv!==null&&dv<0?'<span style="font-size:9px;background:rgba(163,45,45,.3);color:#f09595;border-radius:4px;padding:1px 5px;font-weight:700">VENCIDO</span>':''}
             ${totalSaldo>0?`<span style="font-size:9px;background:rgba(133,79,11,.3);color:#fabd75;border-radius:4px;padding:1px 5px;font-weight:700">Saldo $${totalSaldo.toLocaleString('es-MX')}</span>`:''}
           </div>
@@ -2347,6 +2356,8 @@ function verPerfil(f){
   document.getElementById('pf-wrap').style.display='block';
   document.getElementById('pf-av').textContent=initials(a.nombre,a.apellidos);
   document.getElementById('pf-name').textContent=a.nombre+' '+a.apellidos;
+  var modEl = document.getElementById('pf-modalidad');
+  if(modEl) modEl.innerHTML = modalidadBadge(a);
   document.getElementById('pf-disc').textContent=(a.disciplinas||[]).join(' · ');
   document.getElementById('pf-folio').textContent='Folio: '+a.folio+' · Alta: '+a.fechaAlta;
   document.getElementById('pf-tel').textContent=a.tel;
@@ -4606,6 +4617,48 @@ function clasesRestantesMes(a){
   var plan=PLANES.find(function(p){ return p.n===a.planActual; });
   var max=plan?(plan.vip?999:(plan.clases_mes||8)):8;
   return Math.max(0, max - clasesConsumidas(a,hoy.getFullYear(),hoy.getMonth()));
+}
+
+/* Determina la modalidad de clase del alumno: 'normal', 'intensiva', 'ambas' o null.
+   Se basa en el plan actual y, si ha tenido planes de ambos tipos en su historial
+   de pagos, se marca como 'ambas'. */
+function getModalidadAlumno(a){
+  var planActual = PLANES.find(function(p){ return p.n===a.planActual; });
+  var tieneNormal = false, tieneIntensiva = false;
+
+  if(planActual){
+    if(planActual.intensivo) tieneIntensiva = true;
+    else if(planActual.tipo==='paq' || planActual.tipo==='mem') tieneNormal = true;
+  }
+
+  /* Revisar historial de pagos para detectar combinación de modalidades */
+  (a.pagos||[]).forEach(function(p){
+    var pl = PLANES.find(function(x){ return x.n===p.plan; });
+    if(!pl) return;
+    if(pl.intensivo) tieneIntensiva = true;
+    else if(pl.tipo==='paq' || pl.tipo==='mem') tieneNormal = true;
+  });
+
+  if(tieneNormal && tieneIntensiva) return 'ambas';
+  if(tieneIntensiva) return 'intensiva';
+  if(tieneNormal) return 'normal';
+  return null;
+}
+
+/* Devuelve un badge HTML visual para la modalidad */
+function modalidadBadge(a, size){
+  var mod = getModalidadAlumno(a);
+  if(!mod) return '';
+  size = size || 'normal';
+  var fontSize = size==='sm' ? '8px' : '9px';
+  var padding  = size==='sm' ? '1px 5px' : '2px 7px';
+  if(mod==='ambas'){
+    return '<span style="background:linear-gradient(90deg,rgba(212,83,126,.3),rgba(0,212,255,.3));color:#fff;font-size:'+fontSize+';padding:'+padding+';border-radius:4px;font-weight:700;white-space:nowrap">⚡ NORMAL + INTENSIVA</span>';
+  }
+  if(mod==='intensiva'){
+    return '<span style="background:rgba(212,83,126,.25);color:var(--rosa2);font-size:'+fontSize+';padding:'+padding+';border-radius:4px;font-weight:700;white-space:nowrap">⚡ INTENSIVA</span>';
+  }
+  return '<span style="background:rgba(0,212,255,.15);color:var(--cyan);font-size:'+fontSize+';padding:'+padding+';border-radius:4px;font-weight:600;white-space:nowrap">NORMAL</span>';
 }
 
 /* Genera resumen de clases de un alumno para TODO el año actual o un rango */
