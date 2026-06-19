@@ -82,6 +82,7 @@ body{padding-bottom:70px}
 .field input,.field select,.field textarea{background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:10px 11px;color:var(--blanco);font-size:14px;outline:none;transition:border .15s;width:100%}
 .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--rosa);box-shadow:0 0 0 3px rgba(212,83,126,.1)}
 .field select option{background:var(--bg3)}
+.field select optgroup{background:var(--bg2);color:var(--rosa);font-weight:700;font-style:normal}
 .field textarea{resize:vertical;min-height:65px}
 
 /* PILLS */
@@ -1222,7 +1223,12 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
     <div class="card" style="background:var(--bg3)">
       <div class="ct">Plan y estado</div>
       <div class="g2">
-        <div class="field"><label>Plan activo</label><input type="text" id="e-plan"></div>
+        <div class="field">
+          <label>Plan activo</label>
+          <select id="e-plan" style="background:var(--bg2);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:13px;outline:none;width:100%">
+            <option value="">— Sin plan —</option>
+          </select>
+        </div>
         <div class="field"><label>Estado</label>
           <select id="e-estado">
             <option>Activo</option><option>Inactivo</option><option>Becado</option><option>Suspendido</option>
@@ -3186,6 +3192,30 @@ function abrirEdit(){
   S.editFolio = a.folio;
   S.eDiscs = [...(a.disciplinas||[])];
   S.eHors  = [...(a.horarios||[])];
+
+  /* Poblar select de planes, agrupados por tipo */
+  var planSel = document.getElementById('e-plan');
+  if(planSel){
+    var grupos = {paq:'📦 Paquetes', mem:'🎫 Membresías', cl:'⏱ Clase suelta', otro:'⭐ Talleres / Otro'};
+    var orden = ['paq','mem','cl','otro'];
+    var html = '<option value="">— Sin plan —</option>';
+    orden.forEach(function(tipo){
+      var planesTipo = PLANES.filter(function(p){ return p.tipo===tipo; });
+      if(!planesTipo.length) return;
+      html += '<optgroup label="'+grupos[tipo]+'">';
+      planesTipo.forEach(function(p){
+        var extra = p.intensivo ? ' ⚡' : '';
+        html += '<option value="'+esc(p.n)+'">'+esc(p.n)+extra+' — $'+p.p.toLocaleString('es-MX')+' ('+p.t+')</option>';
+      });
+      html += '</optgroup>';
+    });
+    /* Si el plan actual ya no existe en PLANES (renombrado/borrado), agregarlo como opción */
+    if(a.planActual && !PLANES.some(function(p){ return p.n===a.planActual; })){
+      html += '<option value="'+esc(a.planActual)+'">'+esc(a.planActual)+' (actual)</option>';
+    }
+    planSel.innerHTML = html;
+  }
+
   var fields = {
     'e-nom':   a.nombre,      'e-ap':    a.apellidos,
     'e-tel':   a.tel,         'e-email': a.email||'',
@@ -3217,7 +3247,19 @@ async function guardarEdit(){
   a.email      = document.getElementById('e-email').value;
   a.fnac       = document.getElementById('e-fnac').value;
   a.emergencia = document.getElementById('e-emer').value;
-  a.planActual = document.getElementById('e-plan').value;
+
+  var nuevoPlan = document.getElementById('e-plan').value;
+  var planCambio = nuevoPlan !== a.planActual;
+  a.planActual = nuevoPlan;
+
+  /* Si el plan cambió manualmente, recalcular fecha de vencimiento desde hoy */
+  if(planCambio && nuevoPlan){
+    var planObj = PLANES.find(function(p){ return p.n===nuevoPlan; });
+    if(planObj) a.fechaExpira = calcFechaExpira(today(), planObj.id);
+  } else if(planCambio && !nuevoPlan){
+    a.fechaExpira = null;
+  }
+
   a.estado     = document.getElementById('e-estado').value;
   a.notas      = document.getElementById('e-notas').value;
   if(S.eDiscs.length) a.disciplinas = S.eDiscs;
