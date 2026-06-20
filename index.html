@@ -470,12 +470,13 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
     <div class="pf-body">
       <div class="info-grid">
         <div><div class="ig-lbl">Teléfono</div><div class="ig-val" id="pf-tel">—</div></div>
-        <div><div class="ig-lbl">Horarios</div><div class="ig-val" id="pf-hor">—</div></div>
         <div><div class="ig-lbl">Plan</div><div class="ig-val" id="pf-plan">—</div></div>
         <div><div class="ig-lbl">Vigencia</div><div class="ig-val" id="pf-vig">—</div></div>
         <div><div class="ig-lbl">Último pago</div><div class="ig-val" id="pf-monto">—</div></div>
         <div><div class="ig-lbl">Alta</div><div class="ig-val" id="pf-alta">—</div></div>
       </div>
+      <!-- Horarios por disciplina, claramente organizados -->
+      <div id="pf-horarios-disc" style="margin-bottom:.75rem"></div>
       <div class="vis-title">Visitas del mes por disciplina</div>
       <div class="vis-grid" id="pf-vis"></div>
       <div class="vis-count">Total este mes: <span id="pf-cnt">0</span> visitas</div>
@@ -906,10 +907,17 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
         <span id="pm-saldos-total" style="font-size:14px;font-weight:700;color:#fabd75">$0</span>
       </div>
       <div id="pm-saldos-detalle" style="font-size:11px;color:var(--muted);margin-bottom:.5rem"></div>
-      <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
-        <input type="checkbox" id="pm-saldos-incluir" checked onchange="pmCalcTotal()" style="accent-color:#fabd75;width:16px;height:16px">
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-bottom:.5rem">
+        <input type="checkbox" id="pm-saldos-incluir" checked onchange="pmToggleSaldosModo()" style="accent-color:#fabd75;width:16px;height:16px">
         <span style="color:#fabd75;font-weight:600">Incluir saldos pendientes en este pago</span>
       </label>
+      <!-- Selector de mes específico a pagar (pago manual de un mes en particular) -->
+      <div id="pm-mes-especifico-wrap" style="display:none;margin-top:.4rem;padding-top:.5rem;border-top:1px solid rgba(250,189,117,.25)">
+        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:.3rem">¿Pagar solo UN mes específico en lugar de todos?</label>
+        <select id="pm-mes-especifico" onchange="pmCalcTotal()" style="background:var(--bg2);border:1px solid rgba(250,189,117,.4);border-radius:var(--r2);padding:8px 10px;color:#fabd75;font-size:12px;outline:none;width:100%">
+          <option value="">— Pagar todos los saldos juntos —</option>
+        </select>
+      </div>
     </div>
 
     <!-- DESCUENTO / PROMOCIÓN -->
@@ -1288,60 +1296,61 @@ const DISCS = {
 };
 const PLANES=[
   /* ── PAQUETES (mensual) ──────────────────────────────────────
-     clases_mes = clases por disciplina por mes
-     num_discs  = disciplinas incluidas
-     horas      = duración de clase en horas
-     dias_sem   = días de clase por semana
-     vip        = sin límite                                    */
+     clases_mes_disc = clases POR DISCIPLINA por mes (el dato real)
+     clases_mes      = TOTAL de clases del paquete (clases_mes_disc × num_discs) — solo informativo
+     num_discs       = disciplinas incluidas
+     horas           = duración de clase en horas
+     dias_sem        = días de clase por semana (por disciplina)
+     vip             = sin límite                                    */
   {id:'P1', n:'Paquete #1',   t:'1 mes',   tipo:'paq', p:500,
-   d:'1 disciplina · 2 clases/semana · 8 hrs/mes',
-   num_discs:1, clases_mes:8,  horas:1,  dias_sem:2, meses:1},
+   d:'1 disciplina · 2 clases/semana · 8 clases/mes',
+   num_discs:1, clases_mes_disc:8,  clases_mes:8,  horas:1,  dias_sem:2, meses:1},
   {id:'P2', n:'Paquete #2',   t:'1 mes',   tipo:'paq', p:700,
    d:'2 disciplinas intensivas · 2 hrs c/u · 4 clases/mes c/u',
-   num_discs:2, clases_mes:4,  horas:2,  dias_sem:1, meses:1, intensivo:1},
+   num_discs:2, clases_mes_disc:4,  clases_mes:8,  horas:2,  dias_sem:1, meses:1, intensivo:1},
   {id:'P3', n:'Paquete #3',   t:'1 mes',   tipo:'paq', p:800,
-   d:'2 disciplinas · 4 clases/semana · 16 hrs/mes',
-   num_discs:2, clases_mes:16, horas:1,  dias_sem:4, meses:1},
+   d:'2 disciplinas · 8 clases/mes c/u (16 clases totales)',
+   num_discs:2, clases_mes_disc:8,  clases_mes:16, horas:1,  dias_sem:2, meses:1},
   {id:'P4', n:'Paquete #4',   t:'1 mes',   tipo:'paq', p:1000,
-   d:'3 disciplinas · 6 clases/semana · 24 hrs/mes',
-   num_discs:3, clases_mes:24, horas:1,  dias_sem:6, meses:1},
+   d:'3 disciplinas · 8 clases/mes c/u (24 clases totales)',
+   num_discs:3, clases_mes_disc:8,  clases_mes:24, horas:1,  dias_sem:2, meses:1},
   {id:'PV', n:'Paquete V.I.P',t:'1 mes',   tipo:'paq', p:1100,
    d:'Clases ilimitadas en todas las disciplinas',
-   num_discs:99,clases_mes:99, horas:1,  dias_sem:6, meses:1, vip:1},
+   num_discs:99,clases_mes_disc:99, clases_mes:99, horas:1,  dias_sem:6, meses:1, vip:1},
 
   /* ── MEMBRESÍAS ─────────────────────────────────────────────*/
   {id:'M1', n:'Membresía #1', t:'6 meses', tipo:'mem', p:2500,
-   d:'1 disciplina · 2 clases/semana · 8 hrs/mes · 6 meses',
-   num_discs:1, clases_mes:8,  horas:1,  dias_sem:2, meses:6},
+   d:'1 disciplina · 2 clases/semana · 8 clases/mes · 6 meses',
+   num_discs:1, clases_mes_disc:8,  clases_mes:8,  horas:1,  dias_sem:2, meses:6},
   {id:'M2', n:'Membresía #2', t:'6 meses', tipo:'mem', p:3500,
    d:'2 disciplinas intensivas · 2 hrs c/u · 4 clases/mes c/u · 6 meses',
-   num_discs:2, clases_mes:4,  horas:2,  dias_sem:1, meses:6, intensivo:1},
+   num_discs:2, clases_mes_disc:4,  clases_mes:8,  horas:2,  dias_sem:1, meses:6, intensivo:1},
   {id:'M3', n:'Membresía #3', t:'6 meses', tipo:'mem', p:4000,
-   d:'2 disciplinas · 4 clases/semana · 16 hrs/mes · 6 meses',
-   num_discs:2, clases_mes:16, horas:1,  dias_sem:4, meses:6},
+   d:'2 disciplinas · 8 clases/mes c/u (16 totales) · 6 meses',
+   num_discs:2, clases_mes_disc:8,  clases_mes:16, horas:1,  dias_sem:2, meses:6},
   {id:'M4', n:'Membresía #4', t:'6 meses', tipo:'mem', p:5000,
-   d:'3 disciplinas · 6 clases/semana · 24 hrs/mes · 6 meses',
-   num_discs:3, clases_mes:24, horas:1,  dias_sem:6, meses:6},
+   d:'3 disciplinas · 8 clases/mes c/u (24 totales) · 6 meses',
+   num_discs:3, clases_mes_disc:8,  clases_mes:24, horas:1,  dias_sem:2, meses:6},
   {id:'M5', n:'Membresía #5', t:'12 meses',tipo:'mem', p:4800,
    d:'Anualidad · 2 hrs/semana · 8 clases/mes · 12 meses',
-   num_discs:1, clases_mes:8,  horas:2,  dias_sem:2, meses:12},
+   num_discs:1, clases_mes_disc:8,  clases_mes:8,  horas:2,  dias_sem:2, meses:12},
 
   /* ── OTROS ──────────────────────────────────────────────────*/
   {id:'INS',n:'Inscripción Anual',t:'Anual', tipo:'otro',p:200,
    d:'Inscripción anual requerida para nuevos alumnos',
-   num_discs:0, clases_mes:0,  horas:0,  dias_sem:0, meses:12},
+   num_discs:0, clases_mes_disc:0, clases_mes:0,  horas:0,  dias_sem:0, meses:12},
   {id:'TL21',n:'Taller 21 Días de Sanidad Interior',t:'21 sesiones',tipo:'otro',p:500,
    d:'Cuerpo, Mente y Espíritu en Restauración · Lun/Mié/Jue 5:00–6:30 pm · Inicia 15 Jun 2026 · Grupo privado WA + Mentoría grupal',
-   num_discs:1, clases_mes:12, horas:1.5, dias_sem:3, meses:1, taller:1,
+   num_discs:1, clases_mes_disc:12, clases_mes:12, horas:1.5, dias_sem:3, meses:1, taller:1,
    impartido_por:'Dulce Carolina Ríos Juárez — Mentora en Sanidad Emocional',
    lugar:'Edificio Alpha · Av. Universidad 252, La Loma, Zacatecas Centro',
    inicio:'2026-06-15'},
   {id:'CL', n:'Clase x Hora',  t:'Por hora',tipo:'cl',  p:100,
    d:'$100 por hora · clase suelta',
-   num_discs:1, clases_mes:1,  horas:1,  dias_sem:1, meses:0},
+   num_discs:1, clases_mes_disc:1,  clases_mes:1,  horas:1,  dias_sem:1, meses:0},
   {id:'OT', n:'Otro / Taller', t:'Libre',   tipo:'otro', p:0,
    d:'Taller, curso, evento especial — precio libre', libre:1,
-   num_discs:0, clases_mes:0,  horas:0,  dias_sem:0, meses:1}
+   num_discs:0, clases_mes_disc:0, clases_mes:0,  horas:0,  dias_sem:0, meses:1}
 ];
 /* ══════════════════════ ESTADO GLOBAL ══════════════════════ */
 let DB={alumnos:[],citas:[],visLog:[]};
@@ -1842,7 +1851,7 @@ function calcNuevaFechaExpiraConExtras(alumno, plan, fechaPago, mesesAdelantados
 function calcFechaVencePorClases(a){
   var plan = PLANES.find(function(p){ return p.n===a.planActual; });
   if(!plan || plan.vip) return null;
-  var maxMes = plan.clases_mes||8;
+  var maxMes = plan.clases_mes_disc || plan.clases_mes || 8;
   var hoy = new Date();
   var diasMes = calcDiasClaseMes(a, hoy.getFullYear(), hoy.getMonth());
   if(!diasMes.length) return null;
@@ -2363,12 +2372,14 @@ function renderAls(){
     const dpStr = dp===null?'':dp<0?'⚠ Atrasado':dp===0?'💰 Paga hoy':'Paga en '+dp+'d';
     const dvStr = dv===null?'':dv<0?'VENCIDO hace '+Math.abs(dv)+'d':dv===0?'Vence HOY':'Vence en '+dv+'d';
 
-    /* Class progress this month */
+    /* Class progress this month — desglosado POR DISCIPLINA */
     const plan = PLANES.find(p=>p.n===a.planActual);
-    const maxC = plan?(plan.vip?null:plan.clases_mes||8):null;
-    const cons = maxC ? clasesConsumidas(a) : null;
-    const pct  = maxC ? Math.min(100,Math.round(cons/maxC*100)) : 0;
-    const barColor = pct>=100?'#f09595':pct>=75?'#fabd75':'#7ec445';
+    const maxDiscC = plan?(plan.vip?null:(plan.clases_mes_disc||plan.clases_mes||8)):null;
+    const discList = (a.disciplinas||[]);
+    const discProgress = (plan && maxDiscC && discList.length) ? discList.map(d=>{
+      const consD = clasesConsumidas(a, undefined, undefined, d);
+      return {disc:d, cons:consD, max:maxDiscC, pct:Math.min(100,Math.round(consD/maxDiscC*100))};
+    }) : [];
 
     /* Next payment date this month / year */
     const np = proximaFechaPagoFija(a);
@@ -2395,10 +2406,17 @@ function renderAls(){
             ${dpStr?`<span style="font-size:10px;color:${dpColor};font-weight:600">${dpStr}${npStr?' ('+npStr+')':''}</span>`:''}
             ${dvStr&&dv!==null&&dv<=10?`<span style="font-size:10px;color:${dvColor}">· ${dvStr}</span>`:''}
           </div>
-          ${maxC?`<div style="margin-top:4px;background:rgba(255,255,255,.07);border-radius:4px;height:4px;overflow:hidden">
-            <div style="height:100%;width:${pct}%;background:${barColor};border-radius:4px;transition:width .3s"></div>
-          </div>
-          <div style="font-size:9px;color:var(--muted);margin-top:2px">${cons}/${maxC} clases · ${Math.max(0,maxC-cons)} restantes</div>`:''}
+          ${discProgress.length?discProgress.map(dp2=>{
+            const barColor2 = dp2.pct>=100?'#f09595':dp2.pct>=75?'#fabd75':'#7ec445';
+            return `<div style="margin-top:4px">
+              <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted)">
+                <span>${dp2.disc}</span><span>${dp2.cons}/${dp2.max}</span>
+              </div>
+              <div style="background:rgba(255,255,255,.07);border-radius:4px;height:4px;overflow:hidden;margin-top:1px">
+                <div style="height:100%;width:${dp2.pct}%;background:${barColor2};border-radius:4px;transition:width .3s"></div>
+              </div>
+            </div>`;
+          }).join(''):''}
         </div>
         <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:3px">
           <div class="arow-folio" onclick="verPerfil('${a.folio}')">${a.folio}</div>
@@ -2425,7 +2443,7 @@ function verPerfil(f){
   document.getElementById('pf-disc').textContent=(a.disciplinas||[]).join(' · ');
   document.getElementById('pf-folio').textContent='Folio: '+a.folio+' · Alta: '+a.fechaAlta;
   document.getElementById('pf-tel').textContent=a.tel;
-  document.getElementById('pf-hor').textContent=(a.horarios||[]).map(k=>k.split('|||')[1]).join(', ')||'—';
+  renderHorariosDisciplina(a);
   document.getElementById('pf-plan').textContent=a.planActual||'—';
   const ul=(a.pagos||[]).slice(-1)[0];
   var vigInfo = vigenciaLabel(a);
@@ -2503,6 +2521,59 @@ function verPerfil(f){
   }
   window.scrollTo(0,0);
 }
+
+/* Muestra de forma visible y organizada los horarios y días de clase
+   de cada disciplina en la que el alumno está inscrito. */
+function renderHorariosDisciplina(a){
+  var c = document.getElementById('pf-horarios-disc');
+  if(!c) return;
+  var discs = a.disciplinas||[];
+  var horarios = a.horarios||[]; /* formato: "disciplina|||horario" */
+
+  if(!discs.length){ c.innerHTML=''; return; }
+
+  /* Agrupar horarios guardados por disciplina */
+  var porDisc = {};
+  horarios.forEach(function(h){
+    var pp = h.split('|||');
+    var d = pp[0], hor = pp[1]||'';
+    if(!porDisc[d]) porDisc[d]=[];
+    if(hor) porDisc[d].push(hor);
+  });
+
+  var ICONOS = {
+    'Pole Sport':'🎪','Pole Exotic':'💃','Pole Espiral':'🌀',"Pole Kid's":'🧒',
+    'Danza Aérea Telas':'🎀','Elementos Aéreos':'🪢','Enlogación/Flex':'🤸',
+    'Yoga':'🧘','Twerk':'🍑','Jumping y Baile':'🤾','Ritmos Latinos':'💃',
+    'Defensa Personal':'🥋','Música/Vocalización':'🎤','Heels':'👠'
+  };
+
+  c.innerHTML = '<div class="ig-lbl" style="margin-bottom:.4rem">📅 Horarios inscritos</div>'
+    +'<div style="display:flex;flex-direction:column;gap:6px">'
+    +discs.map(function(d){
+      var icono = ICONOS[d] || (DISCS[d]&&DISCS[d].taller ? '⭐' : '📋');
+      var horsGuardados = porDisc[d] || [];
+      /* Si no hay horario guardado explícito, usar el default de la disciplina */
+      var horsDefault = (DISCS[d] && DISCS[d].hors) ? DISCS[d].hors.map(function(h){
+        return h.g + (h.h&&h.h.length ? ' · '+h.h.join(', ') : '');
+      }) : [];
+      var horsAMostrar = horsGuardados.length ? horsGuardados : horsDefault;
+
+      return '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:.55rem .7rem;display:flex;align-items:flex-start;gap:8px">'
+        +'<span style="font-size:16px;line-height:1.3">'+icono+'</span>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:12px;font-weight:700;color:var(--rosa)">'+esc(d)+'</div>'
+        +(horsAMostrar.length
+          ? horsAMostrar.map(function(h){
+              return '<div style="font-size:11px;color:var(--blanco);margin-top:2px">🕐 '+esc(h)+'</div>';
+            }).join('')
+          : '<div style="font-size:11px;color:var(--muted);margin-top:2px">Sin horario asignado</div>')
+        +'</div>'
+        +'</div>';
+    }).join('')
+    +'</div>';
+}
+
 function renderVisGrid(a){
   if(!a) return;
   var g    = document.getElementById('pf-vis');
@@ -2513,7 +2584,7 @@ function renderVisGrid(a){
   var hoyDate = new Date();
   var hoyMes  = mesCur();
   var plan    = PLANES.find(function(p){ return p.n===a.planActual; });
-  var maxMes  = plan ? (plan.vip ? 999 : (plan.clases_mes||8)) : 8;
+  var maxMes  = plan ? (plan.vip ? 999 : (plan.clases_mes_disc || plan.clases_mes || 8)) : 8;
   var vip     = plan ? !!plan.vip : false;
 
   var WD = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
@@ -2564,9 +2635,10 @@ function renderVisGrid(a){
       var clasesCons = clasesConsumidas(a);
       var dvClase = Math.round((vencPorClases - hoyDate)/86400000);
       var claseColor = clasesCons>=maxMes?'#f09595':dvClase<=3?'#fabd75':'var(--cyan)';
+      var porDiscTxt = (plan && plan.num_discs>1) ? ' por disciplina' : '';
       vencInfo.push('<div style="font-size:11px;color:'+claseColor+'">'
-        +'📦 Vence por clases: <strong>'+vencPorClases.toLocaleDateString('es-MX',{day:'2-digit',month:'long'})+'</strong>'
-        +' (clase '+maxMes+'/'+maxMes+')'
+        +'📦 Vence por clases'+porDiscTxt+': <strong>'+vencPorClases.toLocaleDateString('es-MX',{day:'2-digit',month:'long'})+'</strong>'
+        +' (clase '+maxMes+'/'+maxMes+porDiscTxt+')'
         +(clasesCons>=maxMes?' · <strong style="color:#f09595">LÍMITE ALCANZADO</strong>':'')
         +'</div>');
     }
@@ -2578,10 +2650,10 @@ function renderVisGrid(a){
   /* Per-discipline calendar */
   disciplinas.forEach(function(disc){
     var diasCal = calcDiasClaseMes(a, hoyDate.getFullYear(), hoyDate.getMonth());
-    /* Filter days for this discipline based on weekday pattern (same for all discs for now) */
     var clasesPas = clasesPasadasMes(a, hoyDate.getFullYear(), hoyDate.getMonth());
     var visitasDisc = visLog.filter(function(v){ return v.disc===disc; });
-    var asistidas = visitasDisc.length;
+    var asistidas = clasesAsistidasMes(a, hoyDate.getFullYear(), hoyDate.getMonth(), disc) || visitasDisc.length;
+    var maxDisc = plan ? (plan.vip ? 999 : (plan.clases_mes_disc||plan.clases_mes||8)) : 8;
 
     calHtml += '<div style="background:var(--bg3);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:.65rem .75rem;margin-bottom:.5rem">'
       +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem;flex-wrap:wrap;gap:4px">'
@@ -2618,7 +2690,7 @@ function renderVisGrid(a){
       /* Visit boxes */
       +(asistidas>0||clasesPas>0?
         '<div class="vboxes" style="margin-top:.5rem">'
-        +Array.from({length:maxMes},function(_,i){
+        +Array.from({length:maxDisc},function(_,i){
           var done = i<asistidas;
           var pasadaSinReg = !done && i<clasesPas;
           var v = done ? visitasDisc[i] : null;
@@ -2657,10 +2729,16 @@ function renderVisGrid(a){
     +'<div style="font-size:10px;color:var(--muted);margin-top:3px">Clases/mes · p.## = día de pago · ✓ = consumidas</div>'
     +'</div>';
 
+  /* Total real: suma de consumidas en cada disciplina vs el total del paquete */
+  var totalConsumidasTodas = disciplinas.reduce(function(sum, d){
+    return sum + clasesConsumidas(a, hoyDate.getFullYear(), hoyDate.getMonth(), d==='—'?undefined:d);
+  }, 0);
+  var maxTotalPaquete = plan ? (plan.vip ? 999 : (plan.clases_mes || maxMes)) : maxMes;
+
   g.innerHTML = calHtml + anualHtml;
   if(!visLog.length && visRaw.length) attachVboxListeners(a);
-  if(cnt)  cnt.textContent  = totalVis+' asistidas / '+clasesConsumidas(a)+' consumidas';
-  if(prog) prog.style.width = Math.min(100,Math.round((clasesConsumidas(a)/Math.max(1,maxMes))*100))+'%';
+  if(cnt)  cnt.textContent  = totalVis+' asistidas / '+totalConsumidasTodas+' consumidas de '+maxTotalPaquete;
+  if(prog) prog.style.width = Math.min(100,Math.round((totalConsumidasTodas/Math.max(1,maxTotalPaquete))*100))+'%';
 }
 
 function buildFlatGrid(visRaw, maxMes){
@@ -3833,6 +3911,27 @@ function pmGetPromoActiva(){
   return promos[0];
 }
 
+/* Muestra/oculta el selector de "mes específico" según el checkbox de incluir saldos */
+function pmToggleSaldosModo(){
+  var cbIncluir = document.getElementById('pm-saldos-incluir');
+  var wrap = document.getElementById('pm-mes-especifico-wrap');
+  var saldosPend = pmGetSaldosPendientes();
+  if(wrap){
+    /* Solo mostrar selector si hay 2+ saldos pendientes (si hay 1 no hace falta elegir) */
+    wrap.style.display = (cbIncluir && cbIncluir.checked && saldosPend.length>1) ? 'block' : 'none';
+  }
+  pmCalcTotal();
+}
+
+/* Devuelve el saldo específico seleccionado en el dropdown, o null si es "todos" */
+function pmGetSaldoEspecificoSeleccionado(){
+  var sel = document.getElementById('pm-mes-especifico');
+  if(!sel || sel.value===''){ return null; }
+  var idx = parseInt(sel.value);
+  var saldosPend = pmGetSaldosPendientes();
+  return saldosPend[idx] || null;
+}
+
 function pmRenderTotal(){
   var descMonto = parseFloat(document.getElementById('pm-desc-monto').value)||0;
   var descPct   = parseFloat(document.getElementById('pm-desc-pct').value)||0;
@@ -3843,6 +3942,7 @@ function pmRenderTotal(){
   var saldosBanner = document.getElementById('pm-saldos-banner');
   var saldosPend = pmGetSaldosPendientes();
   var totalSaldos = saldosPend.reduce(function(t,s){ return t+s.monto; },0);
+
   if(saldosPend.length && saldosBanner){
     saldosBanner.style.display='block';
     document.getElementById('pm-saldos-total').textContent='$'+totalSaldos.toLocaleString('es-MX');
@@ -3851,11 +3951,27 @@ function pmRenderTotal(){
     }).join('<br>');
     var cbIncluir = document.getElementById('pm-saldos-incluir');
     incluirSaldos = cbIncluir ? cbIncluir.checked : false;
+
+    /* Poblar selector de mes específico (solo si hay más de 1 saldo) */
+    var selEsp = document.getElementById('pm-mes-especifico');
+    if(selEsp && saldosPend.length>1){
+      var prevVal = selEsp.value;
+      selEsp.innerHTML = '<option value="">— Pagar todos los saldos juntos ($'+totalSaldos.toLocaleString('es-MX')+') —</option>'
+        + saldosPend.map(function(s,i){
+            return '<option value="'+i+'">'+esc(s.motivo||s.plan||'Saldo')+' ('+s.fecha+') — $'+s.monto.toLocaleString('es-MX')+'</option>';
+          }).join('');
+      selEsp.value = prevVal; /* preservar selección si sigue existiendo */
+    }
   } else if(saldosBanner){
     saldosBanner.style.display='none';
   }
 
-  var saldoIncluido = incluirSaldos ? totalSaldos : 0;
+  /* ¿Se eligió pagar un mes específico en lugar de todos? */
+  var saldoEspecifico = incluirSaldos ? pmGetSaldoEspecificoSeleccionado() : null;
+  var saldoIncluido = incluirSaldos
+    ? (saldoEspecifico ? saldoEspecifico.monto : totalSaldos)
+    : 0;
+
   var total = Math.max(0, pmSubtotal + saldoIncluido - descTotal);
 
   var subEl  = document.getElementById('pm-subtotal');
@@ -3867,7 +3983,7 @@ function pmRenderTotal(){
 
   if(subEl) subEl.textContent = '$'+(pmManual?pmSubtotal:pmSubtotal).toLocaleString('es-MX');
   if(sRow)  sRow.style.display  = saldoIncluido > 0 ? 'flex' : 'none';
-  if(sDisp) sDisp.textContent   = '+$'+saldoIncluido.toLocaleString('es-MX');
+  if(sDisp) sDisp.textContent   = (saldoEspecifico ? '+$'+saldoEspecifico.monto.toLocaleString('es-MX')+' (1 mes)' : '+$'+saldoIncluido.toLocaleString('es-MX'));
   if(dRow)  dRow.style.display  = descTotal > 0 ? 'flex' : 'none';
   if(dDisp) dDisp.textContent   = '-$'+descTotal.toLocaleString('es-MX');
   if(totEl) totEl.textContent   = '$'+total.toLocaleString('es-MX');
@@ -3958,11 +4074,14 @@ async function pmGuardar(){
   var descTotal = descMonto + Math.round(subtotal * descPct / 100);
   var montoFull = Math.max(0, subtotal - descTotal);
 
-  /* Saldos pendientes acumulados */
+  /* Saldos pendientes acumulados — soporta pagar TODOS o UNO específico */
   var cbIncluir = document.getElementById('pm-saldos-incluir');
   var incluirSaldos = cbIncluir ? cbIncluir.checked : false;
   var saldosPend = pmGetSaldosPendientes();
-  var totalSaldosIncluidos = incluirSaldos ? saldosPend.reduce(function(t,s){ return t+s.monto; },0) : 0;
+  var saldoEspecifico = incluirSaldos ? pmGetSaldoEspecificoSeleccionado() : null;
+  var totalSaldosIncluidos = incluirSaldos
+    ? (saldoEspecifico ? saldoEspecifico.monto : saldosPend.reduce(function(t,s){ return t+s.monto; },0))
+    : 0;
 
   var montoPagado = manualVal > 0 ? manualVal : (montoFull + totalSaldosIncluidos);
   var fecha     = document.getElementById('pm-fecha').value || today();
@@ -4031,9 +4150,19 @@ async function pmGuardar(){
   /* Auto-accumulate all previous unpaid months BEFORE marking this one paid */
   autoAcumularSaldosPendientes(pmAlumno);
 
-  /* Liquidar saldos pendientes si se incluyeron */
+  /* Liquidar saldos pendientes — TODOS o solo el específico seleccionado */
   if(incluirSaldos && saldosPend.length){
-    (pmAlumno.saldos||[]).forEach(function(s){ if(!s.pagado){ s.pagado=true; s.fechaPago=fecha; } });
+    if(saldoEspecifico){
+      /* Marcar solo el saldo específico como pagado (buscar por referencia de fecha+motivo) */
+      var saldoRef = saldoEspecifico;
+      var sObj = (pmAlumno.saldos||[]).find(function(s){
+        return !s.pagado && s.fecha===saldoRef.fecha && s.monto===saldoRef.monto && (s.motivo||'')===(saldoRef.motivo||'');
+      });
+      if(sObj){ sObj.pagado=true; sObj.fechaPago=fecha; }
+    } else {
+      /* Marcar todos los saldos pendientes como pagados */
+      (pmAlumno.saldos||[]).forEach(function(s){ if(!s.pagado){ s.pagado=true; s.fechaPago=fecha; } });
+    }
   }
 
   /* Registrar nuevo saldo si pago parcial */
@@ -4075,7 +4204,11 @@ async function pmGuardar(){
     reinicioMsg = ' · ✅ Asistencias reiniciadas';
   }
   if(saldoNuevo > 0) reinicioMsg += ' · ⚠ Saldo pendiente: $'+saldoNuevo.toLocaleString('es-MX');
-  if(totalSaldosIncluidos > 0) reinicioMsg += ' · ✓ Saldos ant. liquidados ($'+totalSaldosIncluidos.toLocaleString('es-MX')+')';
+  if(totalSaldosIncluidos > 0){
+    reinicioMsg += saldoEspecifico
+      ? ' · ✓ Mes liquidado: '+(saldoEspecifico.motivo||saldoEspecifico.plan||'Saldo')+' ($'+totalSaldosIncluidos.toLocaleString('es-MX')+')'
+      : ' · ✓ Saldos ant. liquidados ($'+totalSaldosIncluidos.toLocaleString('es-MX')+')';
+  }
 
   S.writeLock = true;
   saveLocal();
@@ -4692,7 +4825,7 @@ function esc(s){
    clases_mes ≥ 13 → todos los días hábiles */
 function inferDiasSemana(a){
   var plan = PLANES.find(function(p){ return p.n===a.planActual; });
-  var cm = plan ? (plan.clases_mes||8) : 8;
+  var cm = plan ? (plan.clases_mes_disc||plan.clases_mes||8) : 8;
   var pts = String(a.fechaAlta||'').split('T')[0].split('-');
   if(pts.length<3) return [];
   var alta = new Date(parseInt(pts[0]),parseInt(pts[1])-1,parseInt(pts[2]));
@@ -4711,12 +4844,12 @@ function inferDiasSemana(a){
   return dias.filter(function(d){ return d>=0&&d<=6; });
 }
 
-/* Retorna un array de Date con los días de clase de un mes dado.
-   Se limita a clases_mes clases por mes. */
+/* Retorna un array de Date con los días de clase de un mes dado PARA UNA DISCIPLINA.
+   Se limita a clases_mes_disc clases por disciplina por mes (NO al total del paquete). */
 function calcDiasClaseMes(a, año, mes){
   var plan = PLANES.find(function(p){ return p.n===a.planActual; });
   if(!plan) return [];
-  var maxClases = plan.vip ? 999 : (plan.clases_mes||8);
+  var maxClases = plan.vip ? 999 : (plan.clases_mes_disc || plan.clases_mes || 8);
   var diasSem   = inferDiasSemana(a);
   if(!diasSem.length) return [];
 
@@ -4737,42 +4870,46 @@ function calcDiasClaseMes(a, año, mes){
   return dias;
 }
 
-/* Clases que ya "pasaron" en el mes (por el calendario), hayan o no asistido */
+/* Clases que ya "pasaron" en el mes (por el calendario), hayan o no asistido.
+   Es el mismo cálculo para cualquier disciplina del plan (mismo patrón semanal). */
 function clasesPasadasMes(a, año, mes){
   if(año===undefined){ var h=new Date(); año=h.getFullYear(); mes=h.getMonth(); }
   var hoy2 = new Date(); hoy2.setHours(23,59,59,0);
   return calcDiasClaseMes(a,año,mes).filter(function(d){ return d<=hoy2; }).length;
 }
 
-/* Clases registradas con visita real */
-function clasesAsistidasMes(a, año, mes){
+/* Clases registradas con visita real PARA UNA DISCIPLINA ESPECÍFICA.
+   Si no se pasa 'disc', cuenta todas las visitas del mes (sin separar por disciplina). */
+function clasesAsistidasMes(a, año, mes, disc){
   if(año===undefined){ var h=new Date(); año=h.getFullYear(); mes=h.getMonth(); }
   var mesKey = mes+'-'+año;
   var fromLog = (DB.visLog||[]).filter(function(v){
     if(v.folio!==a.folio) return false;
+    if(disc && v.disc!==disc) return false;
     var vf=v.fecha||''; var pp=vf.split('-');
     if(pp.length<3) return false;
     return ((parseInt(pp[1])-1)+'-'+parseInt(pp[0])) === mesKey;
   }).length;
-  var fromRaw = (a.visitas||[]).filter(function(v){
+  var fromRaw = disc ? 0 : (a.visitas||[]).filter(function(v){
     return mesStr(typeof v==='string'?v:(v.ts||'')) === mesKey;
   }).length;
   return fromLog || fromRaw;
 }
 
-/* Clases consumidas = max(asistidas, pasadas por calendario).
-   Las clases se descuentan aunque no haya registro de visita. */
-function clasesConsumidas(a, año, mes){
+/* Clases consumidas POR DISCIPLINA = max(asistidas en esa disciplina, pasadas por calendario).
+   Las clases se descuentan aunque no haya registro de visita.
+   Si no se pasa 'disc', se asume una sola disciplina (comportamiento legacy). */
+function clasesConsumidas(a, año, mes, disc){
   if(año===undefined){ var h=new Date(); año=h.getFullYear(); mes=h.getMonth(); }
-  return Math.max(clasesAsistidasMes(a,año,mes), clasesPasadasMes(a,año,mes));
+  return Math.max(clasesAsistidasMes(a,año,mes,disc), clasesPasadasMes(a,año,mes));
 }
 
-/* Clases restantes este mes */
-function clasesRestantesMes(a){
+/* Clases restantes este mes PARA UNA DISCIPLINA (usa clases_mes_disc, no el total) */
+function clasesRestantesMes(a, disc){
   var hoy=new Date();
   var plan=PLANES.find(function(p){ return p.n===a.planActual; });
-  var max=plan?(plan.vip?999:(plan.clases_mes||8)):8;
-  return Math.max(0, max - clasesConsumidas(a,hoy.getFullYear(),hoy.getMonth()));
+  var max=plan?(plan.vip?999:(plan.clases_mes_disc||plan.clases_mes||8)):8;
+  return Math.max(0, max - clasesConsumidas(a,hoy.getFullYear(),hoy.getMonth(),disc));
 }
 
 /* Determina la modalidad de clase del alumno: 'normal', 'intensiva', 'ambas' o null.
