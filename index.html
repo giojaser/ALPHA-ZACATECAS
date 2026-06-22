@@ -2840,6 +2840,22 @@ function renderPagosHist(a){
     var saldoLiqStr = (x.saldosLiquid && x.saldosLiquid>0) ? ' <span style="color:#7ec445;font-size:10px">✓ $'+x.saldosLiquid.toLocaleString('es-MX')+' liq.</span>' : '';
     var descStr     = x.descuento ? ' <span style="color:var(--muted);font-size:10px">(-$'+x.descuento.toLocaleString('es-MX')+(x.descNota?' · '+x.descNota:'')+')</span>' : '';
     var editBadge   = x._editado ? ' <span style="font-size:9px;color:rgba(255,255,255,.3)">✏'+x._editado+'</span>' : '';
+
+    /* Mostrar explícitamente qué meses cubre este pago (pagados + regalo) */
+    var mesesLineHtml = '';
+    if((x.mesesCubiertos && x.mesesCubiertos.length) || (x.mesesCubiertosRegalo && x.mesesCubiertosRegalo.length)){
+      var NOMBRES_MES = {'01':'Ene','02':'Feb','03':'Mar','04':'Abr','05':'May','06':'Jun','07':'Jul','08':'Ago','09':'Sep','10':'Oct','11':'Nov','12':'Dic'};
+      var fmtMes = function(mk){ var pp=mk.split('-'); return (NOMBRES_MES[pp[1]]||pp[1])+' '+pp[0]; };
+      var partes = [];
+      if(x.mesesCubiertos && x.mesesCubiertos.length){
+        partes.push('<span style="color:#7ec445">✓ Pagado: '+x.mesesCubiertos.map(fmtMes).join(', ')+'</span>');
+      }
+      if(x.mesesCubiertosRegalo && x.mesesCubiertosRegalo.length){
+        partes.push('<span style="color:var(--cyan)">🎁 Regalo: '+x.mesesCubiertosRegalo.map(fmtMes).join(', ')+'</span>');
+      }
+      mesesLineHtml = '<div style="font-size:10px;width:100%;margin-top:2px;padding-left:2px">'+partes.join(' · ')+'</div>';
+    }
+
     return '<div class="pago-row" style="flex-wrap:wrap;gap:4px;align-items:center">'
       +'<span style="font-size:11px;color:var(--muted);white-space:nowrap">'+x.fecha+'</span>'
       +'<span style="color:var(--muted);font-size:11px;flex:1;min-width:0">'+badge+esc(x.plan||'')+editBadge+'</span>'
@@ -2849,6 +2865,7 @@ function renderPagosHist(a){
         +'<button onclick="abrirEditPago('+origIdx+')" title="Editar pago" style="background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.3);color:var(--cyan);border-radius:5px;width:26px;height:26px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;font-family:var(--font)">✏️</button>'
         +'<button onclick="eliminarPagoDirecto('+origIdx+')" title="Eliminar pago" style="background:rgba(163,45,45,.2);border:1px solid rgba(163,45,45,.3);color:#f09595;border-radius:5px;width:26px;height:26px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;font-family:var(--font)">🗑</button>'
       +'</div>'
+      +mesesLineHtml
       +'</div>';
   }).join('');
 
@@ -4103,6 +4120,32 @@ async function pmGuardar(){
   var tipoPlanes = ['paq','mem'];
   var esPaqueteOMem = plan && tipoPlanes.includes(plan.tipo);
 
+  /* ── Calcular la lista EXPLÍCITA de meses (YYYY-MM) que cubre este pago ──
+     Esto incluye los meses pagados (mesesAdel × plan.meses) y los meses de
+     regalo (mesesReg), contados consecutivamente a partir de la fecha base
+     (la fecha de vencimiento previa si sigue vigente, o la fecha del pago). */
+  var mesesPagadosLista = [];
+  var mesesRegaloLista  = [];
+  if(plan && esPagoCompleto){
+    var baseParaMeses = fecha;
+    if(pmAlumno.fechaExpira){
+      var dvPrev = diasRestantes(pmAlumno.fechaExpira);
+      if(dvPrev !== null && dvPrev > 0) baseParaMeses = pmAlumno.fechaExpira;
+    }
+    var totalMesesPagados = plan.meses * mesesAdel;
+    var cursorMes = baseParaMeses;
+    for(var im=0; im<totalMesesPagados; im++){
+      var pp = String(cursorMes).split('T')[0].split('-');
+      mesesPagadosLista.push(pp[0]+'-'+pp[1]);
+      cursorMes = sumarMeses(cursorMes, 1);
+    }
+    for(var ir=0; ir<mesesReg; ir++){
+      var pr = String(cursorMes).split('T')[0].split('-');
+      mesesRegaloLista.push(pr[0]+'-'+pr[1]);
+      cursorMes = sumarMeses(cursorMes, 1);
+    }
+  }
+
   var pago = {
     fecha:          fecha,
     plan:           plan ? plan.n : 'Pago manual',
@@ -4118,11 +4161,10 @@ async function pmGuardar(){
     tipo:           plan ? plan.tipo : 'manual',
     completo:       esPagoCompleto,
     mesesAdelantados: mesesAdel > 1 ? mesesAdel : undefined,
-    mesesRegalo:      mesesReg > 0 ? mesesReg : undefined
+    mesesRegalo:      mesesReg > 0 ? mesesReg : undefined,
+    mesesCubiertos:   mesesPagadosLista.length ? mesesPagadosLista : undefined,
+    mesesCubiertosRegalo: mesesRegaloLista.length ? mesesRegaloLista : undefined
   };
-
-  /* Detectar saldos de meses anteriores ANTES de registrar el pago */
-  var prevChanged = autoAcumularSaldosPendientes(pmAlumno);
 
   pmAlumno.pagos = pmAlumno.pagos || [];
   pmAlumno.pagos.push(pago);
@@ -4134,7 +4176,24 @@ async function pmGuardar(){
     pmAlumno.planActual = plan.n;
   }
 
-  /* Registrar promoción de meses gratis si se otorgó */
+  /* Si alguno de los meses cubiertos (pagados o regalo) ya tenía un saldo
+     pendiente generado automáticamente, marcarlo como pagado para que no
+     siga apareciendo como adeudo. */
+  var todosMesesCubiertos = mesesPagadosLista.concat(mesesRegaloLista);
+  if(todosMesesCubiertos.length && pmAlumno.saldos && pmAlumno.saldos.length){
+    pmAlumno.saldos.forEach(function(s){
+      if(s.pagado) return;
+      var sMes = String(s.fecha||'').split('T')[0].split('-').slice(0,2).join('-');
+      if(todosMesesCubiertos.indexOf(sMes) >= 0){
+        s.pagado = true;
+        s.fechaPago = fecha;
+        s.pagadoPor = mesesRegaloLista.indexOf(sMes)>=0 ? 'promo_mes_gratis' : 'pago_adelantado';
+      }
+    });
+  }
+
+  /* Registrar promoción de meses gratis si se otorgó — guardando el MES REAL
+     que cubre el regalo (no la fecha en que se otorgó la promo) */
   if(mesesReg > 0){
     if(!pmAlumno.promos) pmAlumno.promos=[];
     pmAlumno.promos.push({
@@ -4143,7 +4202,8 @@ async function pmGuardar(){
       usos_restantes: 0,  /* ya fue aplicado, queda como registro histórico */
       agotado: true,
       motivo: descNota || (mesesReg+' mes'+(mesesReg!==1?'es':'')+' de regalo aplicado'+(mesesReg!==1?'s':'')+' en pago de '+(plan?plan.n:'plan')),
-      fecha: fecha
+      fecha: fecha,
+      mesesCubiertos: mesesRegaloLista
     });
   }
 
@@ -5272,21 +5332,34 @@ function autoAcumularSaldosPendientes(a){
   var yaReg={};
   (a.saldos||[]).forEach(function(s){ if(s.expiraRef) yaReg[s.expiraRef]=true; });
 
-  /* Meses que SÍ tienen pago completo registrado */
+  /* Meses que SÍ tienen pago completo registrado.
+     Usa la lista EXPLÍCITA de meses cubiertos (mesesCubiertos) cuando existe
+     (pagos con meses adelantados), y si no existe usa solo el mes del pago
+     (comportamiento legacy para pagos simples de 1 mes). */
   var mesesPagados={};
   (a.pagos||[]).forEach(function(p){
     if(!p.completo && !p.tipo) return; /* solo pagos completos o con tipo */
-    var pp=String(p.fecha||'').split('T')[0].split('-');
-    if(pp.length>=2){
-      /* El pago cubre el mes en que se realizó Y el mes que "compra" */
-      mesesPagados[pp[0]+'-'+pp[1]]=true;
+    if(p.mesesCubiertos && p.mesesCubiertos.length){
+      p.mesesCubiertos.forEach(function(mk){ mesesPagados[mk]=true; });
+    } else {
+      var pp=String(p.fecha||'').split('T')[0].split('-');
+      if(pp.length>=2) mesesPagados[pp[0]+'-'+pp[1]]=true;
+    }
+    /* Los meses de regalo adjuntos al pago también cuentan como pagados */
+    if(p.mesesCubiertosRegalo && p.mesesCubiertosRegalo.length){
+      p.mesesCubiertosRegalo.forEach(function(mk){ mesesPagados[mk]=true; });
     }
   });
 
-  /* Promos de mes gratis activas: generan una lista de meses exentos */
+  /* Promos de mes gratis activas: generan una lista de meses exentos.
+     Usa mesesCubiertos (el mes REAL que cubre el regalo) cuando existe;
+     si no, cae al comportamiento legacy de usar p.fecha. */
   var mesexentos={};
   (a.promos||[]).forEach(function(p){
-    if(!p.agotado && p.tipo==='mes_gratis' && p.fecha){
+    if(p.tipo!=='mes_gratis') return;
+    if(p.mesesCubiertos && p.mesesCubiertos.length){
+      p.mesesCubiertos.forEach(function(mk){ mesexentos[mk]=true; });
+    } else if(!p.agotado && p.fecha){
       var pp=String(p.fecha).split('T')[0].split('-');
       if(pp.length>=2) mesexentos[pp[0]+'-'+pp[1]]=true;
     }
