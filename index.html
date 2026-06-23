@@ -936,15 +936,15 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
     <!-- MESES ADELANTADOS Y MESES DE REGALO (OPCIONAL) -->
     <div style="background:linear-gradient(135deg,rgba(0,212,255,.08),rgba(212,83,126,.08));border:1px solid rgba(0,212,255,.25);border-radius:var(--r2);padding:.75rem;margin-bottom:.75rem">
       <div class="ct" style="margin-bottom:.3rem">📅 Pago adelantado / Meses de regalo</div>
-      <div style="font-size:10px;color:var(--muted);margin-bottom:.5rem">Opcional — deja en 1 mes y 0 regalo si es un pago normal de un solo mes.</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:.5rem">Opcional — deja ambos en 0 si es un pago normal de un solo mes. Solo mueve esto si el alumno paga varios meses por adelantado o le regalas mes(es) de promoción.</div>
       <div class="g2">
         <div class="field">
-          <label>Meses que paga (adelantado)</label>
-          <input type="number" id="pm-meses-adelantados" min="1" value="1" autocomplete="off" oninput="pmCalcTotal()" style="background:var(--bg2);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:14px;font-weight:700;outline:none;width:100%">
+          <label>Meses extra adelantados (0 = solo este mes)</label>
+          <input type="number" id="pm-meses-adelantados" min="0" value="0" placeholder="0" autocomplete="off" oninput="pmCalcTotal()" style="background:var(--bg2);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:14px;font-weight:700;outline:none;width:100%">
         </div>
         <div class="field">
           <label>Meses de regalo (promo)</label>
-          <input type="number" id="pm-meses-regalo" min="0" value="0" autocomplete="off" oninput="pmCalcTotal()" style="background:var(--bg2);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--cyan);font-size:14px;font-weight:700;outline:none;width:100%">
+          <input type="number" id="pm-meses-regalo" min="0" value="0" placeholder="0" autocomplete="off" oninput="pmCalcTotal()" style="background:var(--bg2);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--cyan);font-size:14px;font-weight:700;outline:none;width:100%">
         </div>
       </div>
       <div id="pm-meses-resumen" style="font-size:11px;color:var(--muted);margin-top:.5rem;padding-top:.5rem;border-top:1px solid rgba(255,255,255,.08)"></div>
@@ -1056,6 +1056,9 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
       </div>
       <button onclick="cerrarSaldoModal()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer">×</button>
     </div>
+
+    <!-- Resumen visual de meses que debe -->
+    <div id="sm-resumen-meses"></div>
 
     <!-- Saldos pendientes -->
     <div style="margin-bottom:1rem">
@@ -1271,13 +1274,14 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
 </div>
 
 <script>/* ══════════════════════ DATOS DE DISCIPLINAS ══════════════════════ */
-const DISCS_KEYS = ['Pole Sport','Pole Exotic','Pole Espiral',"Pole Kid's",'Danza Aérea Telas','Elementos Aéreos','Enlogación/Flex','Yoga','Twerk','Jumping y Baile','Ritmos Latinos','Defensa Personal','Música/Vocalización','Heels','21 Días de Sanidad Interior','Otra disciplina'];
+const DISCS_KEYS = ['Pole Sport','Pole Exotic','Pole Espiral',"Pole Kid's",'Danza Aérea Telas','Iniciación a la Danza Aérea en Telas','Elementos Aéreos','Enlogación/Flex','Yoga','Twerk','Jumping y Baile','Ritmos Latinos','Defensa Personal','Música/Vocalización','Heels','21 Días de Sanidad Interior','Pole Fitness Mamá e Hija','Curso Intensivo de Uñas','Curso Intensivo de Maquillaje','Otra disciplina'];
 const DISCS = {
   'Pole Sport':{precio:500,hors:[{g:'Lunes y Miércoles',h:['6:00–7:00 pm','7:00–8:00 pm']},{g:'Martes y Jueves',h:['6:00–7:00 am','7:00–8:00 am','5:00–6:00 pm','6:00–7:00 pm','7:00–8:00 pm']},{g:'Intensivo – Sábado',h:['2:00–4:00 pm'],it:1},{g:'Domingos',h:['2:00–4:00 pm']}]},
   'Pole Exotic':{precio:500,hors:[{g:'Lunes y Miércoles',h:['8:00–9:00 pm']},{g:'Intensivo – Sábado',h:['12:00–2:00 pm'],it:1}]},
   'Pole Espiral':{precio:500,hors:[{g:'Intensivo – Martes',h:['5:00–7:00 pm'],it:1}]},
   "Pole Kid's":{precio:500,hors:[{g:'Lunes y Miércoles',h:['5:00–6:00 pm']}]},
   'Danza Aérea Telas':{precio:500,hors:[{g:'Multinivel Lun/Mié',h:['6:00–7:00 pm']},{g:'Principiantes Mar/Jue',h:['4:00–5:00 pm']},{g:'Intensivo – Sábado',h:['11:00–1:00 pm'],it:1}]},
+  'Iniciación a la Danza Aérea en Telas':{precio:500,hors:[{g:'Lunes y Miércoles',h:['4:00–5:00 pm']}]},
   'Elementos Aéreos':{precio:500,hors:[{g:'Lunes y Miércoles',h:['4:00–5:00 pm']},{g:'Intensivo – Sábado',h:['10:00–12:00 pm'],it:1}]},
   'Enlogación/Flex':{precio:500,hors:[{g:'Lunes y Miércoles',h:['5:00–6:00 pm']}]},
   'Yoga':{precio:500,hors:[{g:'Martes y Jueves',h:['10:15–11:15 am']},{g:'Lunes y Miércoles',h:['9:00–10:00 pm']}]},
@@ -1293,6 +1297,9 @@ const DISCS = {
     {g:'Imparte: Dulce Carolina Ríos Juárez',h:['Mentora en Sanidad Emocional']},
     {g:'Lugar: Edificio Alpha',h:['Av. Universidad 252, La Loma, Zacatecas']}
   ]},
+  'Pole Fitness Mamá e Hija':{precio:600,hors:[{g:'Lunes y Miércoles',h:['7:00–8:00 pm']}]},
+  'Curso Intensivo de Uñas':{precio:1000,taller:1,hors:[{g:'Sábados',h:['3:00–6:00 pm'],it:1}]},
+  'Curso Intensivo de Maquillaje':{precio:1200,taller:1,hors:[{g:'Martes y Jueves',h:['4:00–7:00 pm'],it:1}]},
   'Otra disciplina':{precio:0,libre:1,hors:[]}
 };
 const PLANES=[
@@ -1349,6 +1356,15 @@ const PLANES=[
   {id:'CL', n:'Clase x Hora',  t:'Por hora',tipo:'cl',  p:100,
    d:'$100 por hora · clase suelta',
    num_discs:1, clases_mes_disc:1,  clases_mes:1,  horas:1,  dias_sem:1, meses:0},
+  {id:'PFMH', n:'Pole Fitness Mamá e Hija', t:'1 mes', tipo:'paq', p:600,
+   d:'Lunes y Miércoles · 7:00–8:00 pm · 8 clases/mes',
+   num_discs:1, clases_mes_disc:8, clases_mes:8, horas:1, dias_sem:2, meses:1},
+  {id:'UNAS', n:'Curso Intensivo de Uñas', t:'1 mes', tipo:'otro', p:1000,
+   d:'Sábados · 3:00–6:00 pm (3 hrs) · Curso intensivo',
+   num_discs:1, clases_mes_disc:4, clases_mes:4, horas:3, dias_sem:1, meses:1, taller:1, intensivo:1},
+  {id:'MKUP', n:'Curso Intensivo de Maquillaje', t:'1 mes', tipo:'otro', p:1200,
+   d:'Martes y Jueves · 4:00–7:00 pm (3 hrs) · Curso intensivo',
+   num_discs:1, clases_mes_disc:8, clases_mes:8, horas:3, dias_sem:2, meses:1, taller:1, intensivo:1},
   {id:'OT', n:'Otro / Taller', t:'Libre',   tipo:'otro', p:0,
    d:'Taller, curso, evento especial — precio libre', libre:1,
    num_discs:0, clases_mes_disc:0, clases_mes:0,  horas:0,  dias_sem:0, meses:1}
@@ -2544,7 +2560,7 @@ function renderHorariosDisciplina(a){
 
   var ICONOS = {
     'Pole Sport':'🎪','Pole Exotic':'💃','Pole Espiral':'🌀',"Pole Kid's":'🧒',
-    'Danza Aérea Telas':'🎀','Elementos Aéreos':'🪢','Enlogación/Flex':'🤸',
+    'Danza Aérea Telas':'🎀','Iniciación a la Danza Aérea en Telas':'🎀','Elementos Aéreos':'🪢','Enlogación/Flex':'🤸',
     'Yoga':'🧘','Twerk':'🍑','Jumping y Baile':'🤾','Ritmos Latinos':'💃',
     'Defensa Personal':'🥋','Música/Vocalización':'🎤','Heels':'👠'
   };
@@ -3096,11 +3112,42 @@ function abrirSaldoModal(){
   var a = S.alumno; if(!a) return;
   var infoEl = document.getElementById('sm-alumno-info');
   if(infoEl) infoEl.textContent = a.nombre+' '+a.apellidos+' · '+a.folio;
+  smRenderResumenMeses();
   smRenderSaldos();
   smRenderPromos();
   smCancelarEditPromo();
   showAlert('al-sm','','');
   document.getElementById('saldo-modal').classList.add('on');
+}
+
+/* Resumen visual rápido: badges con los meses exactos que el alumno debe */
+function smRenderResumenMeses(){
+  var c = document.getElementById('sm-resumen-meses'); if(!c) return;
+  var a = S.alumno; if(!a){ c.innerHTML=''; return; }
+  var pendientes = (a.saldos||[]).filter(function(s){ return !s.pagado; });
+  if(!pendientes.length){
+    c.innerHTML = '<div style="font-size:12px;color:#7ec445;font-weight:600;padding:.5rem 0">✓ Sin meses pendientes — al corriente</div>';
+    return;
+  }
+  var MESES_S = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  var totalDeuda = pendientes.reduce(function(t,s){ return t+s.monto; },0);
+
+  /* Ordenar por fecha (más antiguo primero) */
+  var ordenados = pendientes.slice().sort(function(x,y){ return (x.fecha||'').localeCompare(y.fecha||''); });
+
+  c.innerHTML = '<div style="background:rgba(163,45,45,.15);border:1px solid rgba(163,45,45,.35);border-radius:10px;padding:.65rem .75rem;margin-bottom:.75rem">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.45rem">'
+    + '<span style="font-size:11px;font-weight:700;color:#f09595">📛 MESES QUE DEBE ('+ordenados.length+')</span>'
+    + '<span style="font-size:14px;font-weight:700;color:#f09595">$'+totalDeuda.toLocaleString('es-MX')+'</span>'
+    + '</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:5px">'
+    + ordenados.map(function(s){
+        var pp = String(s.fecha||'').split('-');
+        var mesLabel = (pp.length>=2) ? MESES_S[parseInt(pp[1])-1]+' '+pp[0] : (s.fecha||'?');
+        return '<span style="background:rgba(163,45,45,.35);color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;border:1px solid rgba(240,149,149,.4)">'+mesLabel+'</span>';
+      }).join('')
+    + '</div>'
+    + '</div>';
 }
 
 function cerrarSaldoModal(){
@@ -3138,6 +3185,7 @@ function smAgregarSaldo(){
   var idx = DB.alumnos.findIndex(function(x){return x.folio===a.folio;});
   if(idx>=0) DB.alumnos[idx]=a;
   saveDB();
+  smRenderResumenMeses();
   smRenderSaldos();
   renderPagosHist(a);
 }
@@ -3147,7 +3195,7 @@ async function smPagarSaldo(idx){
   a.saldos[idx].pagado=true; a.saldos[idx].fechaPago=today();
   var i = DB.alumnos.findIndex(function(x){return x.folio===a.folio;});
   if(i>=0) DB.alumnos[i]=a;
-  await saveDB(); smRenderSaldos(); renderPagosHist(a);
+  await saveDB(); smRenderResumenMeses(); smRenderSaldos(); renderPagosHist(a);
 }
 
 async function smEliminarSaldo(idx){
@@ -3156,7 +3204,7 @@ async function smEliminarSaldo(idx){
   a.saldos.splice(idx,1);
   var i=DB.alumnos.findIndex(function(x){return x.folio===a.folio;});
   if(i>=0) DB.alumnos[i]=a;
-  await saveDB(); smRenderSaldos(); renderPagosHist(a);
+  await saveDB(); smRenderResumenMeses(); smRenderSaldos(); renderPagosHist(a);
 }
 
 function smRenderPromos(){
@@ -3805,9 +3853,10 @@ function abrirPagoModal(modo){
   ['pm-metodo','pm-ref','pm-notas','pm-desc-monto','pm-desc-pct','pm-desc-nota','pm-monto-manual'].forEach(function(id){
     var el = document.getElementById(id); if(el) el.value='';
   });
-  /* Reset SIEMPRE meses adelantados/regalo — opcionales, nunca deben quedar pegados de un pago anterior */
+  /* Reset SIEMPRE meses adelantados/regalo a 0 — pago normal por defecto.
+     0 en "adelantados" se interpreta como 1 mes normal al calcular. */
   var mesesAdelEl = document.getElementById('pm-meses-adelantados');
-  if(mesesAdelEl) mesesAdelEl.value = '1';
+  if(mesesAdelEl) mesesAdelEl.value = '0';
   var mesesRegEl = document.getElementById('pm-meses-regalo');
   if(mesesRegEl) mesesRegEl.value = '0';
   var resumenMesesEl = document.getElementById('pm-meses-resumen');
@@ -3923,8 +3972,9 @@ function pmRenderDiscs(){
 function pmCalcTotal(){
   if(pmManual){ pmRenderTotal(); return; }
   var plan = PLANES.find(function(p){ return p.id === pmPlan; });
-  var mesesAdel = parseInt(document.getElementById('pm-meses-adelantados').value)||1;
-  pmSubtotal = plan ? (plan.libre ? pmSubtotal : plan.p * mesesAdel) : 0;
+  var mesesExtra = parseInt(document.getElementById('pm-meses-adelantados').value)||0;
+  var mesesAPagar = 1 + Math.max(0, mesesExtra); /* siempre cubre al menos el mes actual */
+  pmSubtotal = plan ? (plan.libre ? pmSubtotal : plan.p * mesesAPagar) : 0;
   pmRenderTotal();
 }
 
@@ -4030,21 +4080,22 @@ function pmActualizarResumenMeses(){
   var plan = PLANES.find(function(p){ return p.id === pmPlan; });
   var mesesAdelEl = document.getElementById('pm-meses-adelantados');
   var mesesRegEl  = document.getElementById('pm-meses-regalo');
-  var mesesAdel = parseInt(mesesAdelEl ? mesesAdelEl.value : 1)||1;
-  var mesesReg  = parseInt(mesesRegEl  ? mesesRegEl.value  : 0)||0;
+  var mesesExtra = parseInt(mesesAdelEl ? mesesAdelEl.value : 0)||0;
+  var mesesReg   = parseInt(mesesRegEl  ? mesesRegEl.value  : 0)||0;
+  var mesesPagados = 1 + Math.max(0, mesesExtra); /* siempre cuenta el mes actual + extras */
 
-  if(!plan || !plan.meses || (mesesAdel<=1 && mesesReg<=0)){
+  if(!plan || !plan.meses || (mesesExtra<=0 && mesesReg<=0)){
     resumenEl.innerHTML = '';
     return;
   }
 
   var fechaBaseEl = document.getElementById('pm-fecha');
   var fechaBase = (fechaBaseEl && fechaBaseEl.value) || today();
-  var mesesTotales = (plan.meses * mesesAdel) + mesesReg;
+  var mesesTotales = (plan.meses * mesesPagados) + mesesReg;
   var nuevaExpira = sumarMeses(fechaBase, mesesTotales);
 
   var partes = [];
-  partes.push('<strong style="color:var(--blanco)">'+mesesAdel+' mes'+(mesesAdel!==1?'es':'')+' pagado'+(mesesAdel!==1?'s':'')+'</strong>');
+  partes.push('<strong style="color:var(--blanco)">'+mesesPagados+' mes'+(mesesPagados!==1?'es':'')+' pagado'+(mesesPagados!==1?'s':'')+'</strong>');
   if(mesesReg>0) partes.push('<strong style="color:var(--cyan)">+ '+mesesReg+' mes'+(mesesReg!==1?'es':'')+' de regalo 🎁</strong>');
 
   resumenEl.innerHTML =
@@ -4095,9 +4146,10 @@ function pmAplicarPromo(idx){
 async function pmGuardar(){
   if(!pmAlumno){ cerrarPagoModal(); return; }
 
-  var plan      = PLANES.find(function(p){ return p.id === pmPlan; });
-  var mesesAdel = parseInt(document.getElementById('pm-meses-adelantados').value)||1;
-  var mesesReg  = parseInt(document.getElementById('pm-meses-regalo').value)||0;
+  var plan        = PLANES.find(function(p){ return p.id === pmPlan; });
+  var mesesExtra  = parseInt(document.getElementById('pm-meses-adelantados').value)||0;
+  var mesesAdel   = 1 + Math.max(0, mesesExtra); /* total de meses pagados de una vez (mínimo 1) */
+  var mesesReg    = parseInt(document.getElementById('pm-meses-regalo').value)||0;
   var descMonto = parseFloat(document.getElementById('pm-desc-monto').value)||0;
   var descPct   = parseFloat(document.getElementById('pm-desc-pct').value)||0;
   var descNota  = document.getElementById('pm-desc-nota').value.trim();
@@ -4175,7 +4227,8 @@ async function pmGuardar(){
     notas:          document.getElementById('pm-notas').value,
     tipo:           plan ? plan.tipo : 'manual',
     completo:       esPagoCompleto,
-    mesesAdelantados: mesesAdel > 1 ? mesesAdel : undefined,
+    mesesAdelantados: mesesAdel > 1 ? mesesAdel : undefined, /* total de meses pagados de una vez (incluye el actual) */
+    mesesExtra:       mesesExtra > 0 ? mesesExtra : undefined, /* solo los meses EXTRA además del actual */
     mesesRegalo:      mesesReg > 0 ? mesesReg : undefined,
     mesesCubiertos:   mesesPagadosLista.length ? mesesPagadosLista : undefined,
     mesesCubiertosRegalo: mesesRegaloLista.length ? mesesRegaloLista : undefined
