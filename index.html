@@ -1267,6 +1267,10 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
       <div class="ct">Plan y estado</div>
       <div class="g2">
         <div class="field">
+          <label>Fecha de registro (alta) ⚠️</label>
+          <input type="date" id="e-fecha-alta">
+        </div>
+        <div class="field">
           <label>Plan activo</label>
           <select id="e-plan" style="background:var(--bg2);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:9px 11px;color:var(--blanco);font-size:13px;outline:none;width:100%">
             <option value="">— Sin plan —</option>
@@ -1278,6 +1282,9 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
           </select>
         </div>
         <div class="field full"><label>Notas</label><textarea id="e-notas" style="min-height:60px"></textarea></div>
+      </div>
+      <div id="e-fecha-alta-warning" style="display:none;font-size:11px;color:#fabd75;background:rgba(133,79,11,.15);border:1px solid rgba(250,189,117,.3);border-radius:8px;padding:.5rem .7rem;margin-top:.6rem;line-height:1.5">
+        ⚠️ Cambiar la fecha de registro recalculará el día fijo de pago y las clases del mes según el nuevo calendario. Úsalo solo para corregir un error de captura, no para "mover" la vigencia del alumno.
       </div>
     </div>
     <div class="btn-row" style="padding-top:.75rem;margin-top:.5rem">
@@ -3458,7 +3465,8 @@ function abrirEdit(){
     'e-nom':   a.nombre,      'e-ap':    a.apellidos,
     'e-tel':   a.tel,         'e-email': a.email||'',
     'e-fnac':  a.fnac||'',    'e-emer':  a.emergencia||'',
-    'e-plan':  a.planActual||'', 'e-notas': a.notas||''
+    'e-plan':  a.planActual||'', 'e-notas': a.notas||'',
+    'e-fecha-alta': a.fechaAlta||''
   };
   Object.keys(fields).forEach(function(id){
     var el = document.getElementById(id);
@@ -3466,6 +3474,18 @@ function abrirEdit(){
   });
   var estadoEl = document.getElementById('e-estado');
   if(estadoEl) estadoEl.value = a.estado||'Activo';
+
+  /* Mostrar advertencia solo si el usuario realmente modifica la fecha de alta */
+  var fechaAltaEl = document.getElementById('e-fecha-alta');
+  var warningEl = document.getElementById('e-fecha-alta-warning');
+  if(fechaAltaEl && warningEl){
+    var fechaOriginal = a.fechaAlta||'';
+    warningEl.style.display = 'none';
+    fechaAltaEl.oninput = function(){
+      warningEl.style.display = (this.value !== fechaOriginal) ? 'block' : 'none';
+    };
+  }
+
   buildDiscGrid('e-disc-grid', S.eDiscs, handleDiscEdit);
   buildHorsMulti('e-hors-cont','e-hors-disp','e-hors-card', S.eDiscs, S.eHors);
   var ov = document.getElementById('edit-ov');
@@ -3485,6 +3505,30 @@ async function guardarEdit(){
   a.email      = document.getElementById('e-email').value;
   a.fnac       = document.getElementById('e-fnac').value;
   a.emergencia = document.getElementById('e-emer').value;
+
+  /* ── Corrección manual de fecha de registro (alta) ──
+     Si el admin corrige la fecha de alta (ej: error de captura),
+     se recalcula el día fijo de pago y, si el alumno tiene un plan
+     vigente, se ajusta fechaExpira para conservar la MISMA cantidad
+     de días de vigencia que tenía antes del cambio (no se regala ni
+     se quita tiempo, solo se corrige la fecha base). */
+  var nuevaFechaAlta = document.getElementById('e-fecha-alta').value;
+  var fechaAltaCambio = nuevaFechaAlta && nuevaFechaAlta !== a.fechaAlta;
+  var diasVigenciaPrevios = null;
+  if(fechaAltaCambio && a.fechaExpira){
+    var hoyD = new Date(); hoyD.setHours(0,0,0,0);
+    var expD = parseFechaLocal(a.fechaExpira);
+    if(expD) diasVigenciaPrevios = Math.round((expD - hoyD)/86400000);
+  }
+  if(fechaAltaCambio){
+    a.fechaAlta = nuevaFechaAlta;
+    if(diasVigenciaPrevios !== null){
+      /* Conservar los mismos días de vigencia restante, solo recalculados desde hoy */
+      var hoyD2 = new Date(); hoyD2.setHours(0,0,0,0);
+      var nuevaExp = new Date(hoyD2); nuevaExp.setDate(nuevaExp.getDate()+diasVigenciaPrevios);
+      a.fechaExpira = nuevaExp.toISOString().split('T')[0];
+    }
+  }
 
   var nuevoPlan = document.getElementById('e-plan').value;
   var planCambio = nuevoPlan !== a.planActual;
@@ -3507,7 +3551,9 @@ async function guardarEdit(){
   try{
     await saveDB();
     S.alumno = a;
-    showAlert('al-edit','✓ Cambios guardados correctamente','ok');
+    var msg = '✓ Cambios guardados correctamente';
+    if(fechaAltaCambio) msg += ' · Fecha de registro corregida a '+formatFechaLarga(nuevaFechaAlta);
+    showAlert('al-edit',msg,'ok');
     cerrarEdit();
     verPerfil(a.folio);
   } catch(e){
