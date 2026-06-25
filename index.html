@@ -1904,29 +1904,21 @@ function calcNuevaFechaExpiraConExtras(alumno, plan, fechaPago, mesesAdelantados
 /* Calcula cuándo vencerá el paquete por clases agotadas (calendario).
    Retorna la fecha (Date) en que se consumirá la clase número clases_mes del mes.
    Si ya se alcanzó este mes, retorna el pasado. */
+/* DEPRECADO: ya NO se usa para determinar vencimiento.
+   Se conserva solo para fines informativos (mostrar cuántas clases
+   lleva consumidas), pero NUNCA vence la mensualidad por esto.
+   El único criterio de vencimiento es la fecha fija mensual. */
 function calcFechaVencePorClases(a){
-  var plan = PLANES.find(function(p){ return p.n===a.planActual; });
-  if(!plan || plan.vip) return null;
-  var maxMes = plan.clases_mes_disc || plan.clases_mes || 8;
-  var hoy = new Date();
-  var diasMes = calcDiasClaseMes(a, hoy.getFullYear(), hoy.getMonth());
-  if(!diasMes.length) return null;
-  /* Día en que se termina la clase número maxMes */
-  var diaVence = diasMes[maxMes-1];
-  return diaVence || diasMes[diasMes.length-1];
+  return null;
 }
 
-/* Vence lo que ocurra PRIMERO: fecha calendario O clases agotadas */
+/* Vencimiento efectivo = ÚNICAMENTE por fecha (día fijo según fecha de
+   registro/inscripción). Ya no se vence por cantidad de clases tomadas. */
 function calcVencimientoEfectivo(a){
-  var vFecha = proximaFechaPagoFija(a);   /* próximo pago por fecha */
-  var vClase = calcFechaVencePorClases(a); /* vence cuando se agotan clases */
-  if(!vFecha && !vClase) return null;
-  if(!vFecha) return vClase;
-  if(!vClase) return vFecha;
-  return vClase < vFecha ? vClase : vFecha;
+  return proximaFechaPagoFija(a);
 }
 
-/* Días hasta el vencimiento efectivo */
+/* Días hasta el vencimiento efectivo (por fecha, no por clases) */
 function diasHastaVencimiento(a){
   var v = calcVencimientoEfectivo(a); if(!v) return null;
   var hoy=new Date(); hoy.setHours(0,0,0,0);
@@ -2063,6 +2055,25 @@ function buildHorsMulti(contId,dispId,cardId,discs,selHors){
         </label>`;
       });
     });
+    /* ── Día extra individual (fuera de los grupos predeterminados) ── */
+    const allHoras = [];
+    data.hors.forEach(g=>{ g.h.forEach(h=>{ if(!allHoras.includes(h)) allHoras.push(h); }); });
+    if(allHoras.length){
+      const discKey = encodeURIComponent(d);
+      html+=`<div class="hor-extra-add" data-disc-extra="${discKey}" data-cont="${contId}" data-disp="${dispId}" data-card="${cardId}" style="margin:.4rem 0 .6rem;padding:.55rem;background:rgba(0,212,255,.06);border:1px dashed rgba(0,212,255,.3);border-radius:8px">
+        <div style="font-size:10px;color:var(--cyan);font-weight:600;margin-bottom:.35rem">+ Agregar día individual extra para ${d}</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <select class="hor-extra-dia" style="flex:1;min-width:100px;background:var(--bg2);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:6px 8px;color:var(--blanco);font-size:12px;outline:none">
+            <option value="Lunes">Lunes</option><option value="Martes">Martes</option><option value="Miércoles">Miércoles</option>
+            <option value="Jueves">Jueves</option><option value="Viernes">Viernes</option><option value="Sábado">Sábado</option><option value="Domingo">Domingo</option>
+          </select>
+          <select class="hor-extra-hora" style="flex:1;min-width:110px;background:var(--bg2);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:6px 8px;color:var(--blanco);font-size:12px;outline:none">
+            ${allHoras.map(h=>`<option value="${h}">${h}</option>`).join('')}
+          </select>
+          <button type="button" class="hor-extra-btn" style="padding:6px 12px;background:var(--cyan);color:#000;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font)">+ Agregar</button>
+        </div>
+      </div>`;
+    }
   });
   cont.innerHTML=html;
   cont.querySelectorAll('.hchk').forEach(chk=>{
@@ -2077,6 +2088,28 @@ function buildHorsMulti(contId,dispId,cardId,discs,selHors){
       updateSum();
     });
   });
+  /* Listener para agregar día extra individual */
+  cont.querySelectorAll('.hor-extra-add').forEach(function(box){
+    const disc = decodeURIComponent(box.dataset.discExtra);
+    const cid = box.dataset.cont, did = box.dataset.disp, kid = box.dataset.card;
+    const btn = box.querySelector('.hor-extra-btn');
+    const selDia = box.querySelector('.hor-extra-dia');
+    const selHora = box.querySelector('.hor-extra-hora');
+    btn.addEventListener('click', function(){
+      const dia = selDia.value, hora = selHora.value;
+      const key = disc+'|||'+hora+'|||'+dia+' (individual)';
+      const arr = getHorsArr(cid);
+      if(!arr.includes(key)){
+        arr.push(key);
+        const discsArr = cid==='r-hors-cont'?S.rDiscs:cid==='e-hors-cont'?S.eDiscs:S.cDiscs;
+        buildHorsMulti(cid,did,kid,discsArr,arr);
+        updateSum();
+      } else {
+        btn.textContent = 'Ya agregado';
+        setTimeout(function(){ btn.textContent = '+ Agregar'; }, 1200);
+      }
+    });
+  });
   buildDispHors(dispId,selHors,contId,cardId);
 }
 function getHorsArr(cid){return cid==='r-hors-cont'?S.rHors:cid==='c-hors-cont'?S.cHors:S.eHors;}
@@ -2085,7 +2118,10 @@ function buildDispHors(dispId,arr,contId,cardId){
   if(!arr.length){d.innerHTML='<span style="font-size:12px;color:var(--muted)">Ninguno seleccionado</span>';return;}
   d.innerHTML=arr.map(k=>{
     const parts=k.split('|||'); const ek=encodeURIComponent(k);
-    return `<span class="sh-tag">${parts[0]}: ${parts[1]}<button onclick="qHor('${ek}','${contId}','${dispId}','${cardId}')">✕</button></span>`;
+    const esIndividual = (parts[2]||'').includes('(individual)');
+    const tagStyle = esIndividual ? ' style="background:rgba(0,212,255,.15);border-color:rgba(0,212,255,.3)"' : '';
+    const extraBadge = esIndividual ? ' <span style="font-size:9px;color:var(--cyan)">★ extra</span>' : '';
+    return `<span class="sh-tag"${tagStyle}>${parts[0]}: ${parts[1]}${extraBadge}<button onclick="qHor('${ek}','${contId}','${dispId}','${cardId}')">✕</button></span>`;
   }).join('');
 }
 function qHor(ek,contId,dispId,cardId){
@@ -2668,42 +2704,26 @@ function renderVisGrid(a){
 
   var calHtml = '';
 
-  /* Header: Fecha exacta de vencimiento de pago este mes */
+  /* Header: Fecha exacta de vencimiento de pago este mes (ÚNICO criterio: fecha) */
   var fechaVencMes = fechaVencimientoMes(a, hoyDate.getFullYear(), hoyDate.getMonth());
   var fechaVencNext = (function(){
     var nm = hoyDate.getMonth()+1 > 11 ? 0 : hoyDate.getMonth()+1;
     var ny = hoyDate.getMonth()+1 > 11 ? hoyDate.getFullYear()+1 : hoyDate.getFullYear();
     return fechaVencimientoMes(a, ny, nm);
   })();
-  var vencPorClases = calcFechaVencePorClases(a);
 
-  if(fechaVencMes || vencPorClases){
-    var vencInfo = [];
-    if(fechaVencMes){
-      var dvMes = Math.round((fechaVencMes - hoyDate)/86400000);
-      var dvColor = dvMes<0?'#f09595':dvMes<=5?'#fabd75':'#7ec445';
-      vencInfo.push('<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">'
-        +'<div>'
-        +'<span style="font-size:11px;color:var(--muted)">📅 Vencimiento pago: </span>'
-        +'<strong style="color:'+dvColor+'">'+fechaVencMes.toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'})+'</strong>'
-        +(dvMes<0?' <span style="font-size:10px;color:#f09595">(hace '+Math.abs(dvMes)+'d)</span>':dvMes===0?' <span style="font-size:10px;color:#f09595">HOY</span>':' <span style="font-size:10px;color:'+dvColor+'">en '+dvMes+'d</span>')
-        +'</div>'
-        +(fechaVencNext?'<div style="font-size:10px;color:var(--muted)">Próx: '+fechaVencNext.toLocaleDateString('es-MX',{day:'2-digit',month:'short'})+'</div>':'')
-        +'</div>');
-    }
-    if(vencPorClases && !vip){
-      var clasesCons = clasesConsumidas(a);
-      var dvClase = Math.round((vencPorClases - hoyDate)/86400000);
-      var claseColor = clasesCons>=maxMes?'#f09595':dvClase<=3?'#fabd75':'var(--cyan)';
-      var porDiscTxt = (plan && plan.num_discs>1) ? ' por disciplina' : '';
-      vencInfo.push('<div style="font-size:11px;color:'+claseColor+'">'
-        +'📦 Vence por clases'+porDiscTxt+': <strong>'+vencPorClases.toLocaleDateString('es-MX',{day:'2-digit',month:'long'})+'</strong>'
-        +' (clase '+maxMes+'/'+maxMes+porDiscTxt+')'
-        +(clasesCons>=maxMes?' · <strong style="color:#f09595">LÍMITE ALCANZADO</strong>':'')
-        +'</div>');
-    }
+  if(fechaVencMes){
+    var dvMes = Math.round((fechaVencMes - hoyDate)/86400000);
+    var dvColor = dvMes<0?'#f09595':dvMes<=5?'#fabd75':'#7ec445';
     calHtml += '<div style="background:var(--bg3);border-radius:8px;padding:.6rem .75rem;margin-bottom:.5rem">'
-      + vencInfo.join('<div style="height:4px"></div>')
+      +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">'
+      +'<div>'
+      +'<span style="font-size:11px;color:var(--muted)">📅 Vencimiento pago: </span>'
+      +'<strong style="color:'+dvColor+'">'+fechaVencMes.toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'})+'</strong>'
+      +(dvMes<0?' <span style="font-size:10px;color:#f09595">(hace '+Math.abs(dvMes)+'d)</span>':dvMes===0?' <span style="font-size:10px;color:#f09595">HOY</span>':' <span style="font-size:10px;color:'+dvColor+'">en '+dvMes+'d</span>')
+      +'</div>'
+      +(fechaVencNext?'<div style="font-size:10px;color:var(--muted)">Próx: '+fechaVencNext.toLocaleDateString('es-MX',{day:'2-digit',month:'short'})+'</div>':'')
+      +'</div>'
       + '</div>';
   }
 
