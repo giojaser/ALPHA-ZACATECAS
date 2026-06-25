@@ -978,6 +978,7 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
     </div>
     <div style="background:var(--rosa-xl);border:1px solid var(--rosa);border-radius:var(--r2);padding:.85rem;margin-bottom:.75rem">
       <div style="display:flex;justify-content:space-between"><span style="font-size:12px;color:var(--muted)">Subtotal plan</span><span id="pm-subtotal" style="font-weight:600">$0</span></div>
+      <div id="pm-extra-hor-row" style="display:none;margin-top:2px"></div>
       <div id="pm-saldo-row" style="display:none;justify-content:space-between;margin-top:3px"><span style="font-size:12px;color:#fabd75">+ Saldos pendientes</span><span id="pm-saldo-display" style="color:#fabd75;font-weight:600">+$0</span></div>
       <div id="pm-desc-row" style="display:none;justify-content:space-between;margin-top:3px"><span style="font-size:12px;color:var(--muted)">Descuento</span><span id="pm-desc-display" style="color:#7ec445">-$0</span></div>
       <div style="display:flex;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px solid rgba(212,83,126,.3)"><span style="font-weight:700">Total a cobrar</span><span id="pm-total" style="font-size:20px;font-weight:700;color:var(--rosa)">$0</span></div>
@@ -2070,8 +2071,10 @@ function buildHorsMulti(contId,dispId,cardId,discs,selHors){
           <select class="hor-extra-hora" style="flex:1;min-width:110px;background:var(--bg2);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:6px 8px;color:var(--blanco);font-size:12px;outline:none">
             ${allHoras.map(h=>`<option value="${h}">${h}</option>`).join('')}
           </select>
+          <input type="number" class="hor-extra-costo" placeholder="$ extra (opcional)" min="0" style="flex:1;min-width:120px;background:var(--bg2);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:6px 8px;color:var(--rosa);font-size:12px;font-weight:600;outline:none">
           <button type="button" class="hor-extra-btn" style="padding:6px 12px;background:var(--cyan);color:#000;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font)">+ Agregar</button>
         </div>
+        <div style="font-size:9px;color:var(--muted);margin-top:.3rem">Si este día extra tiene un costo adicional al plan, escríbelo. Se guardará y se reflejará en cada pago futuro hasta que lo elimines.</div>
       </div>`;
     }
   });
@@ -2088,18 +2091,29 @@ function buildHorsMulti(contId,dispId,cardId,discs,selHors){
       updateSum();
     });
   });
-  /* Listener para agregar día extra individual */
+  /* Listener para agregar día extra individual (con costo opcional) */
   cont.querySelectorAll('.hor-extra-add').forEach(function(box){
     const disc = decodeURIComponent(box.dataset.discExtra);
     const cid = box.dataset.cont, did = box.dataset.disp, kid = box.dataset.card;
     const btn = box.querySelector('.hor-extra-btn');
     const selDia = box.querySelector('.hor-extra-dia');
     const selHora = box.querySelector('.hor-extra-hora');
+    const inpCosto = box.querySelector('.hor-extra-costo');
     btn.addEventListener('click', function(){
       const dia = selDia.value, hora = selHora.value;
-      const key = disc+'|||'+hora+'|||'+dia+' (individual)';
+      const costo = parseFloat(inpCosto.value)||0;
+      /* Formato: disciplina|||hora|||día (individual)|||costo:N  (costo solo si > 0) */
+      const diaLabel = dia+' (individual)';
+      const key = costo>0
+        ? disc+'|||'+hora+'|||'+diaLabel+'|||costo:'+costo
+        : disc+'|||'+hora+'|||'+diaLabel;
       const arr = getHorsArr(cid);
-      if(!arr.includes(key)){
+      /* Buscar duplicado ignorando el costo, para no repetir el mismo día/hora */
+      const yaExiste = arr.some(function(k){
+        const p = k.split('|||');
+        return p[0]===disc && p[1]===hora && p[2]===diaLabel;
+      });
+      if(!yaExiste){
         arr.push(key);
         const discsArr = cid==='r-hors-cont'?S.rDiscs:cid==='e-hors-cont'?S.eDiscs:S.cDiscs;
         buildHorsMulti(cid,did,kid,discsArr,arr);
@@ -2113,16 +2127,63 @@ function buildHorsMulti(contId,dispId,cardId,discs,selHors){
   buildDispHors(dispId,selHors,contId,cardId);
 }
 function getHorsArr(cid){return cid==='r-hors-cont'?S.rHors:cid==='c-hors-cont'?S.cHors:S.eHors;}
+
+/* Suma de todos los costos extra (individuales) guardados en un array de horarios */
+function sumarCostosExtraHorarios(horariosArr){
+  if(!horariosArr || !horariosArr.length) return 0;
+  return horariosArr.reduce(function(total, k){
+    var p = String(k).split('|||');
+    var costoPart = p[3]||'';
+    var m = costoPart.match(/^costo:([\d.]+)$/);
+    return total + (m ? parseFloat(m[1]) : 0);
+  }, 0);
+}
+
+/* Devuelve array legible de {disc, hora, dia, costo} solo de los horarios individuales con costo extra */
+function getHorariosExtraConCosto(horariosArr){
+  if(!horariosArr) return [];
+  return horariosArr.map(function(k){
+    var p = String(k).split('|||');
+    var costoPart = p[3]||'';
+    var m = costoPart.match(/^costo:([\d.]+)$/);
+    if(!m) return null;
+    return { key:k, disc:p[0], hora:p[1], dia:(p[2]||'').replace(' (individual)',''), costo:parseFloat(m[1]) };
+  }).filter(Boolean);
+}
+
 function buildDispHors(dispId,arr,contId,cardId){
   const d=document.getElementById(dispId); if(!d) return;
   if(!arr.length){d.innerHTML='<span style="font-size:12px;color:var(--muted)">Ninguno seleccionado</span>';return;}
   d.innerHTML=arr.map(k=>{
     const parts=k.split('|||'); const ek=encodeURIComponent(k);
     const esIndividual = (parts[2]||'').includes('(individual)');
+    const costoPart = parts[3]||'';
+    const mCosto = costoPart.match(/^costo:([\d.]+)$/);
+    const costoExtra = mCosto ? parseFloat(mCosto[1]) : 0;
     const tagStyle = esIndividual ? ' style="background:rgba(0,212,255,.15);border-color:rgba(0,212,255,.3)"' : '';
     const extraBadge = esIndividual ? ' <span style="font-size:9px;color:var(--cyan)">★ extra</span>' : '';
-    return `<span class="sh-tag"${tagStyle}>${parts[0]}: ${parts[1]}${extraBadge}<button onclick="qHor('${ek}','${contId}','${dispId}','${cardId}')">✕</button></span>`;
+    const costoBadge = costoExtra>0 ? ` <span style="font-size:9px;color:var(--rosa);font-weight:700">+$${costoExtra.toLocaleString('es-MX')}</span>` : '';
+    /* Botón extra para quitar SOLO el costo (deja el día), visible solo si tiene costo */
+    const quitarCostoBtn = costoExtra>0
+      ? `<button title="Quitar solo el costo extra (mantener el día)" onclick="qCostoHor('${ek}','${contId}','${dispId}','${cardId}')" style="background:rgba(212,83,126,.2);color:var(--rosa);border:none;border-radius:3px;padding:0 4px;margin-left:2px;font-size:9px;cursor:pointer">−$</button>`
+      : '';
+    return `<span class="sh-tag"${tagStyle}>${parts[0]}: ${parts[1]}${extraBadge}${costoBadge}${quitarCostoBtn}<button title="Eliminar este día completo" onclick="qHor('${ek}','${contId}','${dispId}','${cardId}')">✕</button></span>`;
   }).join('');
+}
+
+/* Quita SOLO el costo extra de un horario individual, conservando el día/hora */
+function qCostoHor(ek,contId,dispId,cardId){
+  const key=decodeURIComponent(ek);
+  const arr=getHorsArr(contId);
+  const i=arr.indexOf(key);
+  if(i<0) return;
+  const parts=key.split('|||');
+  /* Reconstruir el key SIN el segmento de costo */
+  const nuevoKey = parts[0]+'|||'+parts[1]+'|||'+parts[2];
+  arr[i]=nuevoKey;
+  const discs=contId==='r-hors-cont'?S.rDiscs:contId==='e-hors-cont'?S.eDiscs:S.cDiscs;
+  buildHorsMulti(contId,dispId,cardId,discs,arr);
+  updateSum();
 }
 function qHor(ek,contId,dispId,cardId){
   const key=decodeURIComponent(ek); const arr=getHorsArr(contId);
@@ -2230,8 +2291,8 @@ async function guardar(){
       /* Update existing alumno */
       Object.assign(editExist,{nombre:nom,apellidos:ap,tel,
         email:document.getElementById('r-email').value});
-      if(S.rDiscs.length) editExist.disciplinas=S.rDiscs;
-      if(S.rHors.length)  editExist.horarios=S.rHors;
+      if(S.rDiscs.length) editExist.disciplinas=[...S.rDiscs];
+      editExist.horarios=[...S.rHors];
       if(S.rPlan) editExist.planActual=pl?pl.n:editExist.planActual;
       editExist.pagos.push(pago);
       /* Reset this month's visits when payment is registered */
@@ -2936,6 +2997,15 @@ function renderPagosHist(a){
       mesesLineHtml = '<div style="font-size:10px;width:100%;margin-top:2px;padding-left:2px">'+partes.join(' · ')+'</div>';
     }
 
+    /* Mostrar detalle del costo extra por días individuales si lo tuvo este pago */
+    var extraHorLineHtml = '';
+    if(x.costoExtraHorarios && x.costoExtraHorarios>0){
+      extraHorLineHtml = '<div style="font-size:10px;width:100%;margin-top:2px;padding-left:2px;color:var(--cyan)">'
+        + '★ Incluye días extra: +$'+x.costoExtraHorarios.toLocaleString('es-MX')
+        + (x.detalleExtraHorarios && x.detalleExtraHorarios.length ? ' ('+x.detalleExtraHorarios.join('; ')+')' : '')
+        + '</div>';
+    }
+
     return '<div class="pago-row" style="flex-wrap:wrap;gap:4px;align-items:center">'
       +'<span style="font-size:11px;color:var(--muted);white-space:nowrap">'+x.fecha+'</span>'
       +'<span style="color:var(--muted);font-size:11px;flex:1;min-width:0">'+badge+esc(x.plan||'')+editBadge+'</span>'
@@ -2946,6 +3016,7 @@ function renderPagosHist(a){
         +'<button onclick="eliminarPagoDirecto('+origIdx+')" title="Eliminar pago" style="background:rgba(163,45,45,.2);border:1px solid rgba(163,45,45,.3);color:#f09595;border-radius:5px;width:26px;height:26px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;font-family:var(--font)">🗑</button>'
       +'</div>'
       +mesesLineHtml
+      +extraHorLineHtml
       +'</div>';
   }).join('');
 
@@ -3564,8 +3635,11 @@ async function guardarEdit(){
 
   a.estado     = document.getElementById('e-estado').value;
   a.notas      = document.getElementById('e-notas').value;
-  if(S.eDiscs.length) a.disciplinas = S.eDiscs;
-  if(S.eHors.length)  a.horarios    = S.eHors;
+  /* Siempre sincronizar disciplinas y horarios con lo editado, incluso si
+     el usuario eliminó todos (length 0) — para que las eliminaciones
+     individuales de horarios/costos extra realmente queden guardadas. */
+  a.disciplinas = [...S.eDiscs];
+  a.horarios    = [...S.eHors];
   S.writeLock = true;
   saveLocal();
   try{
@@ -4076,7 +4150,11 @@ function pmCalcTotal(){
   var plan = PLANES.find(function(p){ return p.id === pmPlan; });
   var mesesExtra = parseInt(document.getElementById('pm-meses-adelantados').value)||0;
   var mesesAPagar = 1 + Math.max(0, mesesExtra); /* siempre cubre al menos el mes actual */
-  pmSubtotal = plan ? (plan.libre ? pmSubtotal : plan.p * mesesAPagar) : 0;
+  var costoBase = plan ? (plan.libre ? pmSubtotal : plan.p * mesesAPagar) : 0;
+  /* Sumar automáticamente costos extra de días individuales guardados en el alumno
+     (se cobran cada mes que pague, hasta que el costo o el día se eliminen) */
+  var costoExtraHors = pmAlumno ? sumarCostosExtraHorarios(pmAlumno.horarios) * mesesAPagar : 0;
+  pmSubtotal = costoBase + costoExtraHors;
   pmRenderTotal();
 }
 
@@ -4166,6 +4244,24 @@ function pmRenderTotal(){
   var totEl  = document.getElementById('pm-total');
 
   if(subEl) subEl.textContent = '$'+(pmManual?pmSubtotal:pmSubtotal).toLocaleString('es-MX');
+
+  /* Mostrar desglose de días extra con costo (si los hay) */
+  var extraHorEl = document.getElementById('pm-extra-hor-row');
+  if(extraHorEl){
+    var extrasConCosto = pmAlumno ? getHorariosExtraConCosto(pmAlumno.horarios) : [];
+    if(extrasConCosto.length){
+      extraHorEl.style.display = 'block';
+      extraHorEl.innerHTML = '<div style="font-size:10px;color:var(--cyan);margin-top:3px">'
+        + extrasConCosto.map(function(e){
+            return '★ '+esc(e.disc)+' · '+esc(e.dia)+' '+esc(e.hora)+': <strong>+$'+e.costo.toLocaleString('es-MX')+'</strong>';
+          }).join('<br>')
+        + '</div>';
+    } else {
+      extraHorEl.style.display = 'none';
+      extraHorEl.innerHTML = '';
+    }
+  }
+
   if(sRow)  sRow.style.display  = saldoIncluido > 0 ? 'flex' : 'none';
   if(sDisp) sDisp.textContent   = (saldoEspecifico ? '+$'+saldoEspecifico.monto.toLocaleString('es-MX')+' (1 mes)' : '+$'+saldoIncluido.toLocaleString('es-MX'));
   if(dRow)  dRow.style.display  = descTotal > 0 ? 'flex' : 'none';
@@ -4315,6 +4411,10 @@ async function pmGuardar(){
     }
   }
 
+  /* Costo extra de días individuales vigentes al momento del pago */
+  var extrasConCostoPago = getHorariosExtraConCosto(pmAlumno.horarios);
+  var totalCostoExtraHorarios = sumarCostosExtraHorarios(pmAlumno.horarios) * mesesAdel;
+
   var pago = {
     fecha:          fecha,
     plan:           plan ? plan.n : 'Pago manual',
@@ -4333,7 +4433,11 @@ async function pmGuardar(){
     mesesExtra:       mesesExtra > 0 ? mesesExtra : undefined, /* solo los meses EXTRA además del actual */
     mesesRegalo:      mesesReg > 0 ? mesesReg : undefined,
     mesesCubiertos:   mesesPagadosLista.length ? mesesPagadosLista : undefined,
-    mesesCubiertosRegalo: mesesRegaloLista.length ? mesesRegaloLista : undefined
+    mesesCubiertosRegalo: mesesRegaloLista.length ? mesesRegaloLista : undefined,
+    costoExtraHorarios: totalCostoExtraHorarios > 0 ? totalCostoExtraHorarios : undefined,
+    detalleExtraHorarios: extrasConCostoPago.length ? extrasConCostoPago.map(function(e){
+      return e.disc+' · '+e.dia+' '+e.hora+': $'+e.costo;
+    }) : undefined
   };
 
   pmAlumno.pagos = pmAlumno.pagos || [];
