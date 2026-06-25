@@ -306,6 +306,21 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
 <div id="p-reg" class="page on">
   <div class="pt">Registro</div>
   <div class="ps">Nuevo alumno o pago adicional</div>
+  <div id="banner-sin-nube" style="display:none;background:linear-gradient(135deg,rgba(163,45,45,.25),rgba(133,79,11,.2));border:1px solid #f09595;border-radius:var(--r2);padding:.85rem 1rem;margin-bottom:1rem">
+    <div style="display:flex;align-items:flex-start;gap:10px">
+      <span style="font-size:20px;line-height:1">⚠️</span>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:700;color:#f09595">Tus datos NO están respaldados en la nube</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.7);margin-top:3px;line-height:1.5">
+          Todo se guarda solo en este navegador. Si cambias de dispositivo, borras el caché, o abres una nueva versión de la app desde otra ruta/archivo, <strong>podrías perder el historial de alumnos y pagos</strong>.
+        </div>
+        <div style="display:flex;gap:6px;margin-top:.6rem;flex-wrap:wrap">
+          <button onclick="goPage('cfg',document.querySelector('[onclick*=cfg]'))" style="padding:6px 12px;background:var(--rosa);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font)">⚙ Configurar nube ahora</button>
+          <button onclick="exportarJSON()" style="padding:6px 12px;background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font)">💾 Descargar respaldo ahora</button>
+        </div>
+      </div>
+    </div>
+  </div>
   <div class="card">
     <div class="ct">Modalidad</div>
     <div class="toggle-row">
@@ -1422,6 +1437,18 @@ function restoreCustomData(){
 restoreCustomData();
 updateCloudUI();
 
+/* Advertencia al cerrar/recargar si hay alumnos registrados y NO hay nube
+   configurada — para evitar que se pierda el historial sin querer. */
+window.addEventListener('beforeunload', function(e){
+  var nubeConfigurada = (CFG.proveedor === 'jsonbin' && CFG.jbBin) || (CFG.proveedor === 'firebase' && CFG.fbUrl);
+  var hayDatos = (DB.alumnos||[]).length > 0;
+  if(!nubeConfigurada && hayDatos){
+    e.preventDefault();
+    e.returnValue = 'Tus datos solo están guardados en este navegador (sin nube). Si cierras o cambias de página podrías perder el historial. ¿Seguro que quieres salir?';
+    return e.returnValue;
+  }
+});
+
 /* ══════════════════════ CLOUD ══════════════════════ */
 
 /* JSONBin calls go through a CORS proxy so file:// and hosted URLs both work */
@@ -1716,6 +1743,11 @@ function updateCloudUI(){
     det.textContent = 'Sin nube configurada — ' + (DB.alumnos || []).length + ' alumnos en local.';
     setCloudStatus('', 'Solo local');
   }
+
+  /* Mostrar/ocultar banner de advertencia en la página de Registro */
+  var nubeConfigurada = (CFG.proveedor === 'jsonbin' && CFG.jbBin) || (CFG.proveedor === 'firebase' && CFG.fbUrl);
+  var banner = document.getElementById('banner-sin-nube');
+  if(banner) banner.style.display = nubeConfigurada ? 'none' : 'block';
 }
 
 /* ── Export / Import local ── */
@@ -2520,13 +2552,17 @@ function verPerfil(f){
     if(np && a.planActual){
       var npStr    = np.toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
       var dpColor  = dp===null?'var(--muted)':dp<0?'#f09595':dp<=3?'#f09595':dp<=7?'#fabd75':'#7ec445';
-      var dpStr    = dp===null?'Sin plan':dp<0?'⚠ Atrasado '+Math.abs(dp)+'d':dp===0?'💰 HOY':dp===1?'💰 Mañana':'En '+dp+' días';
+      var esVencido = dp!==null && dp<0;
+      var dpStr    = dp===null?'Sin plan':esVencido?'⚠ VENCIDO hace '+Math.abs(dp)+'d':dp===0?'💰 HOY':dp===1?'💰 Mañana':'En '+dp+' días';
       var diaFijo  = diaPagoFijo(a);
       var planInfo = plan ? ' · '+plan.t+(plan.meses>1?' (cada '+plan.meses+' meses)':'') : '';
+      var etiquetaFecha = esVencido ? '📛 Venció el ' : '💰 Próx. pago ';
+      diaPagoEl.style.background = esVencido ? 'rgba(163,45,45,.12)' : 'rgba(0,212,255,.08)';
+      diaPagoEl.style.borderBottom = esVencido ? '1px solid rgba(240,149,149,.25)' : '1px solid rgba(0,212,255,.15)';
       diaPagoEl.style.display='block';
       diaPagoEl.innerHTML =
         '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px">'
-        +'<div><span style="font-size:11px;color:rgba(255,255,255,.5)">💰 Próx. pago </span>'
+        +'<div><span style="font-size:11px;color:rgba(255,255,255,.5)">'+etiquetaFecha+'</span>'
         +'<strong style="color:'+dpColor+'">'+npStr+'</strong>'
         +(diaFijo?'<span style="font-size:10px;color:rgba(255,255,255,.4)"> · día fijo: '+diaFijo+planInfo+'</span>':'')
         +'</div>'
@@ -4346,6 +4382,15 @@ async function pmGuardar(){
       '✓ Pago $'+montoPagado.toLocaleString('es-MX')+' registrado'+reinicioMsg,'ok');
     S.alumno = pmAlumno;
     verPerfil(pmAlumno.folio);
+    /* Refrescar SIEMPRE el calendario de pagos admin y la lista de alumnos,
+       para que el estatus "Vencido/Pendiente" se actualice de inmediato
+       sin necesidad de cambiar de pestaña. */
+    var admPagosEl = document.getElementById('adm-pagos');
+    if(admPagosEl) admRenderPagos();
+    var admWaEl = document.getElementById('adm-wa');
+    if(admWaEl) admRenderWA();
+    if(document.getElementById('p-als') && document.getElementById('p-als').classList.contains('on')) renderAls();
+    if(document.getElementById('p-dash') && document.getElementById('p-dash').classList.contains('on')) renderDash();
     setTimeout(function(){ cerrarPagoModal(); }, 2200);
   } catch(e){
     showAlert('al-pm','Error al guardar: '+e.message,'err');
@@ -5144,9 +5189,12 @@ function fechaPagoEnMes(a, año, mes){
 /* Alias para compatibilidad */
 function fechaVencimientoMes(a, año, mes){ return fechaPagoEnMes(a, año, mes); }
 
-/* Genera todas las fechas de pago desde el alta hasta el vencimiento.
+/* Genera todas las fechas de pago desde el alta hasta el vencimiento real.
    Para membresías: una fecha cada N meses.
-   Para paquetes: una fecha cada mes. */
+   Para paquetes: una fecha cada mes.
+   IMPORTANTE: nunca genera fechas más allá de a.fechaExpira real, para
+   evitar mostrar una "próxima fecha de pago" futura cuando en realidad
+   el plan ya está vencido y no se ha renovado. */
 function generarFechasPago(a){
   var plan = PLANES.find(function(p){ return p.n===a.planActual; });
   if(!plan || !a.fechaAlta) return [];
@@ -5166,7 +5214,8 @@ function generarFechasPago(a){
   /* Primera fecha de pago: el mes siguiente al alta */
   cursor = new Date(cursor.getFullYear(), cursor.getMonth() + intervaloMeses, dia);
 
-  var limite = new Date(fin); limite.setMonth(limite.getMonth()+1);
+  /* El límite es EXACTAMENTE la fecha de vencimiento real (sin extender) */
+  var limite = new Date(fin);
   var maxIter = 50;
   while(cursor <= limite && maxIter-- > 0){
     var diasEnMes = new Date(cursor.getFullYear(), cursor.getMonth()+1, 0).getDate();
@@ -5177,19 +5226,25 @@ function generarFechasPago(a){
   return fechas;
 }
 
-/* Próxima fecha de pago (Date) desde hoy */
+/* Próxima fecha de pago (Date) desde hoy.
+   Si el plan YA VENCIÓ (fechaExpira en el pasado) y no se ha renovado,
+   la "próxima fecha de pago" ES la fecha de vencimiento misma —
+   nunca una fecha futura inventada, para no contradecir el badge de "Vencido". */
 function proximaFechaPagoFija(a){
+  var finReal = parseFechaLocal(a.fechaExpira);
+  var hoy = new Date(); hoy.setHours(0,0,0,0);
+
+  /* Si ya venció, el "próximo pago" es la fecha de vencimiento (ya pasada) */
+  if(finReal && finReal <= hoy) return finReal;
+
   var fechas = generarFechasPago(a);
   if(!fechas.length){
-    /* Fallback: next month same day */
-    var dia = diaPagoFijo(a); if(!dia) return null;
-    var hoy = new Date(); hoy.setHours(0,0,0,0);
+    var dia = diaPagoFijo(a); if(!dia) return finReal || null;
     var next = new Date(hoy.getFullYear(), hoy.getMonth(), dia);
     if(next <= hoy) next = new Date(hoy.getFullYear(), hoy.getMonth()+1, dia);
     return next;
   }
-  var hoy = new Date(); hoy.setHours(0,0,0,0);
-  return fechas.find(function(f){ return f > hoy; }) || fechas[fechas.length-1];
+  return fechas.find(function(f){ return f > hoy; }) || finReal || fechas[fechas.length-1];
 }
 
 /* Días hasta la próxima fecha de pago */
