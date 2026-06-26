@@ -831,12 +831,18 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
           <li>Lado izquierdo: <strong style="color:var(--blanco)">Realtime Database</strong> → Crear base de datos</li>
           <li>Elige la región más cercana → modo de prueba (30 días)</li>
           <li>Copia la URL (ej: https://mi-app-default-rtdb.firebaseio.com)</li>
-          <li>En Reglas pon: <code style="background:var(--bg);padding:2px 5px;border-radius:4px;font-size:11px">".read":true,".write":true</code></li>
+          <li>En <strong style="color:var(--blanco)">Authentication</strong> → Sign-in method → habilita <strong style="color:var(--blanco)">Anonymous</strong></li>
+          <li>En ⚙️ Configuración del proyecto → General → copia la <strong style="color:var(--blanco)">Clave de API web (apiKey)</strong></li>
+          <li>En Reglas de Realtime Database pon: <code style="background:var(--bg);padding:2px 5px;border-radius:4px;font-size:11px">".read":"auth != null",".write":"auth != null"</code></li>
         </ol>
       </div>
       <div class="field" style="margin-bottom:.75rem">
         <label>URL de Realtime Database</label>
         <input type="text" id="fb-url" placeholder="https://mi-app-default-rtdb.firebaseio.com" style="font-family:monospace;font-size:12px">
+      </div>
+      <div class="field" style="margin-bottom:.75rem">
+        <label>API Key de Firebase (Web API Key)</label>
+        <input type="text" id="fb-apikey" placeholder="AIzaSy..." style="font-family:monospace;font-size:12px">
       </div>
       <button class="btn-p" onclick="conectarFirebase()">Conectar Firebase</button>
     </div>
@@ -1404,7 +1410,7 @@ let S={
   scanCanvas:null,scanCtx:null,writeLock:false,saving:false,evAlumno:null
 };
 // Cloud config
-let CFG={proveedor:'local',jbKey:'',jbBin:'',fbUrl:''};
+let CFG={proveedor:'local',jbKey:'',jbBin:'',fbUrl:'',fbApiKey:''};
 
 function saveLocal(){
   try{
@@ -1683,15 +1689,41 @@ async function sincJSONBin(){
   }
 }
 
+/* ── Firebase Auth (anónimo, vía REST — sin SDK) ── */
+var _fbToken = null, _fbTokenExp = 0;
+
+async function fbGetToken(){
+  if(_fbToken && Date.now() < _fbTokenExp - 60000) return _fbToken;
+  if(!CFG.fbApiKey) throw new Error('Falta la API Key de Firebase (ver Configuración → Firebase)');
+  var r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + encodeURIComponent(CFG.fbApiKey), {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({returnSecureToken:true})
+  });
+  if(!r.ok) throw new Error('Auth Firebase ' + r.status + ' (revisa que Anonymous esté habilitado y la API Key sea correcta)');
+  var d = await r.json();
+  _fbToken = d.idToken;
+  _fbTokenExp = Date.now() + (parseInt(d.expiresIn,10)||3600) * 1000;
+  return _fbToken;
+}
+
+function fbAuthedUrl(path, token){
+  return CFG.fbUrl + path + '?auth=' + encodeURIComponent(token);
+}
+
 /* ── Firebase ── */
 async function conectarFirebase(){
   var url = (document.getElementById('fb-url').value || '').trim().replace(/\/$/, '');
+  var apiKey = (document.getElementById('fb-apikey').value || '').trim();
   if(!url){ showAlert('al-cfg','Ingresa la URL de Firebase','err'); return; }
-  CFG.fbUrl = url; CFG.proveedor = 'firebase';
+  if(!apiKey){ showAlert('al-cfg','Ingresa la API Key de Firebase (ver Configuración del proyecto → General)','err'); return; }
+  CFG.fbUrl = url; CFG.fbApiKey = apiKey; CFG.proveedor = 'firebase';
+  _fbToken = null; _fbTokenExp = 0; /* forzar nuevo token con la nueva config */
   setCloudStatus('sync','Conectando a Firebase...');
   try{
+    var token = await fbGetToken();
     /* Pull current data first */
-    var r = await fetch(CFG.fbUrl + '/alpha.json');
+    var r = await fetch(fbAuthedUrl('/alpha.json', token));
     if(!r.ok) throw new Error('Firebase GET ' + r.status);
     var d = await r.json();
     if(d && d.alumnos){ DB.alumnos = d.alumnos||[]; DB.citas = d.citas||[]; DB.visLog = d.visLog||[]; if(d._v) DB._v=d._v; if(d.customDiscs) DB.customDiscs=d.customDiscs; if(d.customPlanes) DB.customPlanes=d.customPlanes; }
@@ -1709,7 +1741,8 @@ async function conectarFirebase(){
 
 async function sincFirebase(){
   if(!CFG.fbUrl) return;
-  var r = await fetch(CFG.fbUrl + '/alpha.json', {
+  var token = await fbGetToken();
+  var r = await fetch(fbAuthedUrl('/alpha.json', token), {
     method: 'PUT',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify(DB)
@@ -1734,9 +1767,11 @@ function updateCloudUI(){
   const jbKeyEl = document.getElementById('jb-key');
   const jbBinEl = document.getElementById('jb-bin');
   const fbUrlEl = document.getElementById('fb-url');
+  const fbKeyEl = document.getElementById('fb-apikey');
   if(jbKeyEl && CFG.jbKey) jbKeyEl.value = CFG.jbKey;
   if(jbBinEl && CFG.jbBin) jbBinEl.value = CFG.jbBin;
   if(fbUrlEl && CFG.fbUrl) fbUrlEl.value = CFG.fbUrl;
+  if(fbKeyEl && CFG.fbApiKey) fbKeyEl.value = CFG.fbApiKey;
   const det = document.getElementById('cfg-status-detail');
   if(!det) return;
   if(CFG.proveedor === 'jsonbin' && CFG.jbBin){
@@ -1832,7 +1867,8 @@ async function saveDB(){
     }
   } else if(CFG.proveedor === 'firebase' && CFG.fbUrl){
     try{
-      var r = await fetch(CFG.fbUrl + '/alpha.json', {
+      var token = await fbGetToken();
+      var r = await fetch(fbAuthedUrl('/alpha.json', token), {
         method: 'PUT',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify(DB)
@@ -5026,87 +5062,103 @@ setTimeout(function(){
 
 /* ── Firebase Real-time Listener (SSE) ── */
 var fbEventSource = null;
+var _fbListenerRefresh = null;
 
 function startFirebaseListener(){
   if(!CFG.fbUrl) return;
   stopFirebaseListener();
 
-  var sseUrl = CFG.fbUrl + '/alpha.json';
-  try{
-    fbEventSource = new EventSource(sseUrl);
+  fbGetToken().then(function(token){
+    var sseUrl = fbAuthedUrl('/alpha.json', token);
+    try{
+      fbEventSource = new EventSource(sseUrl);
 
-    fbEventSource.addEventListener('put', function(e){
-      try{
-        var payload = JSON.parse(e.data);
-        var data = payload.data;
-        if(!data) return;
-        /* Version check: ignore if our local data is newer */
-        var incomingV = data._v || 0;
-        var localV    = DB._v  || 0;
-        if(S.writeLock && incomingV <= localV) return;
-        /* Apply update */
-        if(payload.path === '/'){
+      fbEventSource.addEventListener('put', function(e){
+        try{
+          var payload = JSON.parse(e.data);
+          var data = payload.data;
+          if(!data) return;
+          /* Version check: ignore if our local data is newer */
+          var incomingV = data._v || 0;
+          var localV    = DB._v  || 0;
+          if(S.writeLock && incomingV <= localV) return;
+          /* Apply update */
+          if(payload.path === '/'){
+            if(data.alumnos !== undefined) DB.alumnos = data.alumnos || [];
+            if(data.citas   !== undefined) DB.citas   = data.citas   || [];
+            if(data.visLog  !== undefined) DB.visLog  = data.visLog  || [];
+            if(data._v      !== undefined) DB._v      = data._v;
+          } else if(payload.path === '/alumnos'){
+            DB.alumnos = data || [];
+          } else if(payload.path === '/citas'){
+            DB.citas = data || [];
+          }
+          saveLocal();
+          refreshActiveView();
+          setCloudStatus('ok','Actualizado ' + new Date().toLocaleTimeString('es-MX'));
+        } catch(err){}
+      });
+
+      fbEventSource.addEventListener('patch', function(e){
+        try{
+          if(S.writeLock) return;
+          var payload = JSON.parse(e.data);
+          var data = payload.data;
+          if(!data) return;
           if(data.alumnos !== undefined) DB.alumnos = data.alumnos || [];
           if(data.citas   !== undefined) DB.citas   = data.citas   || [];
           if(data.visLog  !== undefined) DB.visLog  = data.visLog  || [];
           if(data._v      !== undefined) DB._v      = data._v;
-        } else if(payload.path === '/alumnos'){
-          DB.alumnos = data || [];
-        } else if(payload.path === '/citas'){
-          DB.citas = data || [];
-        }
-        saveLocal();
-        refreshActiveView();
-        setCloudStatus('ok','Actualizado ' + new Date().toLocaleTimeString('es-MX'));
-      } catch(err){}
-    });
+          saveLocal();
+          refreshActiveView();
+          setCloudStatus('ok','Actualizado ' + new Date().toLocaleTimeString('es-MX'));
+        } catch(err){}
+      });
 
-    fbEventSource.addEventListener('patch', function(e){
-      try{
-        if(S.writeLock) return;
-        var payload = JSON.parse(e.data);
-        var data = payload.data;
-        if(!data) return;
-        if(data.alumnos !== undefined) DB.alumnos = data.alumnos || [];
-        if(data.citas   !== undefined) DB.citas   = data.citas   || [];
-        if(data.visLog  !== undefined) DB.visLog  = data.visLog  || [];
-        if(data._v      !== undefined) DB._v      = data._v;
-        saveLocal();
-        refreshActiveView();
-        setCloudStatus('ok','Actualizado ' + new Date().toLocaleTimeString('es-MX'));
-      } catch(err){}
-    });
+      fbEventSource.onerror = function(){
+        setCloudStatus('sync', 'Reconectando...');
+        /* EventSource reconects automatically */
+      };
 
-    fbEventSource.onerror = function(){
-      setCloudStatus('sync', 'Reconectando...');
-      /* EventSource reconects automatically */
-    };
+      fbEventSource.onopen = function(){
+        setCloudStatus('ok', 'Firebase en tiempo real');
+      };
 
-    fbEventSource.onopen = function(){
-      setCloudStatus('ok', 'Firebase en tiempo real');
-    };
-
-  } catch(e){
-    /* SSE not supported - fall back to polling every 5 seconds */
-    setInterval(function(){
-      if(CFG.proveedor === 'firebase' && CFG.fbUrl){
-        fetch(CFG.fbUrl + '/alpha.json')
-          .then(function(r){ return r.json(); })
-          .then(function(d){
-            if(!d) return;
-            var changed = false;
-            if(d.alumnos && JSON.stringify(d.alumnos) !== JSON.stringify(DB.alumnos)){
-              DB.alumnos = d.alumnos; changed = true;
-            }
-            if(d.citas && JSON.stringify(d.citas) !== JSON.stringify(DB.citas)){
-              DB.citas = d.citas; changed = true;
-            }
-            if(changed){ saveLocal(); refreshActiveView(); setCloudStatus('ok','Actualizado'); }
+    } catch(e){
+      /* SSE not supported - fall back to polling every 5 seconds */
+      setInterval(function(){
+        if(CFG.proveedor === 'firebase' && CFG.fbUrl){
+          fbGetToken().then(function(tok){
+            return fetch(fbAuthedUrl('/alpha.json', tok));
           })
-          .catch(function(){});
-      }
-    }, 5000);
-  }
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+              if(!d) return;
+              var changed = false;
+              if(d.alumnos && JSON.stringify(d.alumnos) !== JSON.stringify(DB.alumnos)){
+                DB.alumnos = d.alumnos; changed = true;
+              }
+              if(d.citas && JSON.stringify(d.citas) !== JSON.stringify(DB.citas)){
+                DB.citas = d.citas; changed = true;
+              }
+              if(changed){ saveLocal(); refreshActiveView(); setCloudStatus('ok','Actualizado'); }
+            })
+            .catch(function(){});
+        }
+      }, 5000);
+    }
+  }).catch(function(e){
+    setCloudStatus('err', 'Error de autenticación: ' + e.message);
+  });
+
+  /* El idToken anónimo expira en ~1h; reconectamos el listener periódicamente con un token fresco */
+  clearInterval(_fbListenerRefresh);
+  _fbListenerRefresh = setInterval(function(){
+    if(CFG.proveedor === 'firebase' && CFG.fbUrl){
+      _fbToken = null; _fbTokenExp = 0;
+      startFirebaseListener();
+    }
+  }, 50 * 60 * 1000);
 }
 
 function stopFirebaseListener(){
