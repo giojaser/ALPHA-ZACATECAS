@@ -372,9 +372,27 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
       <div class="field"><label>Método</label>
         <select id="r-met"><option value="">Seleccionar</option><option>Efectivo</option><option>Transferencia</option><option>Tarjeta</option></select>
       </div>
-      <div class="field"><label>Monto ($MXN)</label><input type="number" id="r-monto" placeholder="0"></div>
+      <div class="field"><label>Monto ($MXN)</label><input type="number" id="r-monto" placeholder="0" oninput="updateSum()"></div>
       <div class="field"><label>Referencia</label><input type="text" id="r-ref"></div>
-      <div class="field full"><label>Notas</label><textarea id="r-notas" placeholder="Observaciones, descuentos..."></textarea></div>
+      <!-- Descuento al registrar -->
+      <div class="field">
+        <label>Descuento ($)</label>
+        <input type="number" id="r-desc-monto" placeholder="0" min="0" oninput="updateSumDesc()">
+      </div>
+      <div class="field">
+        <label>Descuento (%)</label>
+        <input type="number" id="r-desc-pct" placeholder="0" min="0" max="100" oninput="updateSumDesc()">
+      </div>
+      <div class="field full">
+        <label>Motivo del descuento</label>
+        <input type="text" id="r-desc-nota" placeholder="Ej: Promo, referido, descuento estudiante...">
+      </div>
+      <div class="field full"><label>Notas</label><textarea id="r-notas" placeholder="Observaciones..."></textarea></div>
+    </div>
+    <div id="r-total-box" style="display:none;background:var(--rosa-xl);border:1px solid var(--rosa);border-radius:var(--r2);padding:.65rem .85rem;margin-top:.5rem">
+      <div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--muted)">Precio plan</span><span id="r-precio-base">$0</span></div>
+      <div id="r-desc-row" style="display:none;justify-content:space-between;font-size:12px;margin-top:2px"><span style="color:var(--muted)">Descuento</span><span id="r-desc-display" style="color:#7ec445">-$0</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;margin-top:5px;padding-top:5px;border-top:1px solid rgba(212,83,126,.3)"><span>Total</span><span id="r-total-display" style="color:var(--rosa)">$0</span></div>
     </div>
   </div>
   <div class="card" id="sum-card" style="display:none">
@@ -831,18 +849,12 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
           <li>Lado izquierdo: <strong style="color:var(--blanco)">Realtime Database</strong> → Crear base de datos</li>
           <li>Elige la región más cercana → modo de prueba (30 días)</li>
           <li>Copia la URL (ej: https://mi-app-default-rtdb.firebaseio.com)</li>
-          <li>En <strong style="color:var(--blanco)">Authentication</strong> → Sign-in method → habilita <strong style="color:var(--blanco)">Anonymous</strong></li>
-          <li>En ⚙️ Configuración del proyecto → General → copia la <strong style="color:var(--blanco)">Clave de API web (apiKey)</strong></li>
-          <li>En Reglas de Realtime Database pon: <code style="background:var(--bg);padding:2px 5px;border-radius:4px;font-size:11px">".read":"auth != null",".write":"auth != null"</code></li>
+          <li>En Reglas pon: <code style="background:var(--bg);padding:2px 5px;border-radius:4px;font-size:11px">".read":true,".write":true</code></li>
         </ol>
       </div>
       <div class="field" style="margin-bottom:.75rem">
         <label>URL de Realtime Database</label>
         <input type="text" id="fb-url" placeholder="https://mi-app-default-rtdb.firebaseio.com" style="font-family:monospace;font-size:12px">
-      </div>
-      <div class="field" style="margin-bottom:.75rem">
-        <label>API Key de Firebase (Web API Key)</label>
-        <input type="text" id="fb-apikey" placeholder="AIzaSy..." style="font-family:monospace;font-size:12px">
       </div>
       <button class="btn-p" onclick="conectarFirebase()">Conectar Firebase</button>
     </div>
@@ -1410,22 +1422,40 @@ let S={
   scanCanvas:null,scanCtx:null,writeLock:false,saving:false,evAlumno:null
 };
 // Cloud config
-let CFG={proveedor:'local',jbKey:'',jbBin:'',fbUrl:'',fbApiKey:''};
+let CFG={proveedor:'local',jbKey:'',jbBin:'',fbUrl:''};
 
 function saveLocal(){
-  try{
-    localStorage.setItem('alpha_v3', JSON.stringify({DB:DB, CFG:CFG}));
-  } catch(e){
-    /* Storage quota exceeded - trim visLog */
-    if(e.name==='QuotaExceededError'||e.name==='NS_ERROR_DOM_QUOTA_REACHED'){
-      DB.visLog = (DB.visLog||[]).slice(-200);
-      try{ localStorage.setItem('alpha_v3', JSON.stringify({DB:DB, CFG:CFG})); }
-      catch(e2){ console.error('Storage full even after trim:', e2); }
+  var payload = JSON.stringify({DB:DB, CFG:CFG});
+  /* Guardar en MÚLTIPLES keys para que al abrir una nueva versión del archivo
+     se encuentren los datos aunque la key "oficial" haya cambiado */
+  var keys = ['alpha_v3','alpha_data'];
+  keys.forEach(function(k){
+    try{ localStorage.setItem(k, payload); }
+    catch(e){
+      if(e.name==='QuotaExceededError'||e.name==='NS_ERROR_DOM_QUOTA_REACHED'){
+        DB.visLog = (DB.visLog||[]).slice(-200);
+        try{ localStorage.setItem(k, JSON.stringify({DB:DB,CFG:CFG})); }catch(e2){}
+      }
     }
-  }
+  });
 }
 function loadLocal(){
-  try{const d=JSON.parse(localStorage.getItem('alpha_v3')||'{}');if(d.DB){DB=d.DB;if(!DB.visLog)DB.visLog=[];}if(d.CFG)CFG=d.CFG;}catch(e){}
+  /* Buscar datos en múltiples keys — de más reciente a más antigua.
+     La que tenga más alumnos gana. Esto permite abrir una nueva versión
+     del HTML sin perder los datos del archivo anterior. */
+  var keysToTry = ['alpha_v3','alpha_data','alpha_v4','alpha_v2','alpha_v1','alpha'];
+  var mejorDB = null, mejorCFG = null, mejorConteo = -1;
+  keysToTry.forEach(function(k){
+    try{
+      var raw = localStorage.getItem(k); if(!raw) return;
+      var d = JSON.parse(raw);
+      var cnt = d.DB ? (d.DB.alumnos||[]).length : 0;
+      if(cnt > mejorConteo){ mejorConteo=cnt; mejorDB=d.DB; mejorCFG=d.CFG; }
+      else if(cnt===0 && d.CFG && !mejorCFG) mejorCFG=d.CFG;
+    }catch(e){}
+  });
+  if(mejorDB){ DB=mejorDB; if(!DB.visLog)DB.visLog=[]; }
+  if(mejorCFG) CFG=mejorCFG;
 }
 loadLocal();
 /* Restore custom disciplines and plans from DB */
@@ -1689,41 +1719,15 @@ async function sincJSONBin(){
   }
 }
 
-/* ── Firebase Auth (anónimo, vía REST — sin SDK) ── */
-var _fbToken = null, _fbTokenExp = 0;
-
-async function fbGetToken(){
-  if(_fbToken && Date.now() < _fbTokenExp - 60000) return _fbToken;
-  if(!CFG.fbApiKey) throw new Error('Falta la API Key de Firebase (ver Configuración → Firebase)');
-  var r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + encodeURIComponent(CFG.fbApiKey), {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({returnSecureToken:true})
-  });
-  if(!r.ok) throw new Error('Auth Firebase ' + r.status + ' (revisa que Anonymous esté habilitado y la API Key sea correcta)');
-  var d = await r.json();
-  _fbToken = d.idToken;
-  _fbTokenExp = Date.now() + (parseInt(d.expiresIn,10)||3600) * 1000;
-  return _fbToken;
-}
-
-function fbAuthedUrl(path, token){
-  return CFG.fbUrl + path + '?auth=' + encodeURIComponent(token);
-}
-
 /* ── Firebase ── */
 async function conectarFirebase(){
   var url = (document.getElementById('fb-url').value || '').trim().replace(/\/$/, '');
-  var apiKey = (document.getElementById('fb-apikey').value || '').trim();
   if(!url){ showAlert('al-cfg','Ingresa la URL de Firebase','err'); return; }
-  if(!apiKey){ showAlert('al-cfg','Ingresa la API Key de Firebase (ver Configuración del proyecto → General)','err'); return; }
-  CFG.fbUrl = url; CFG.fbApiKey = apiKey; CFG.proveedor = 'firebase';
-  _fbToken = null; _fbTokenExp = 0; /* forzar nuevo token con la nueva config */
+  CFG.fbUrl = url; CFG.proveedor = 'firebase';
   setCloudStatus('sync','Conectando a Firebase...');
   try{
-    var token = await fbGetToken();
     /* Pull current data first */
-    var r = await fetch(fbAuthedUrl('/alpha.json', token));
+    var r = await fetch(CFG.fbUrl + '/alpha.json');
     if(!r.ok) throw new Error('Firebase GET ' + r.status);
     var d = await r.json();
     if(d && d.alumnos){ DB.alumnos = d.alumnos||[]; DB.citas = d.citas||[]; DB.visLog = d.visLog||[]; if(d._v) DB._v=d._v; if(d.customDiscs) DB.customDiscs=d.customDiscs; if(d.customPlanes) DB.customPlanes=d.customPlanes; }
@@ -1741,8 +1745,7 @@ async function conectarFirebase(){
 
 async function sincFirebase(){
   if(!CFG.fbUrl) return;
-  var token = await fbGetToken();
-  var r = await fetch(fbAuthedUrl('/alpha.json', token), {
+  var r = await fetch(CFG.fbUrl + '/alpha.json', {
     method: 'PUT',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify(DB)
@@ -1767,11 +1770,9 @@ function updateCloudUI(){
   const jbKeyEl = document.getElementById('jb-key');
   const jbBinEl = document.getElementById('jb-bin');
   const fbUrlEl = document.getElementById('fb-url');
-  const fbKeyEl = document.getElementById('fb-apikey');
   if(jbKeyEl && CFG.jbKey) jbKeyEl.value = CFG.jbKey;
   if(jbBinEl && CFG.jbBin) jbBinEl.value = CFG.jbBin;
   if(fbUrlEl && CFG.fbUrl) fbUrlEl.value = CFG.fbUrl;
-  if(fbKeyEl && CFG.fbApiKey) fbKeyEl.value = CFG.fbApiKey;
   const det = document.getElementById('cfg-status-detail');
   if(!det) return;
   if(CFG.proveedor === 'jsonbin' && CFG.jbBin){
@@ -1867,8 +1868,7 @@ async function saveDB(){
     }
   } else if(CFG.proveedor === 'firebase' && CFG.fbUrl){
     try{
-      var token = await fbGetToken();
-      var r = await fetch(fbAuthedUrl('/alpha.json', token), {
+      var r = await fetch(CFG.fbUrl + '/alpha.json', {
         method: 'PUT',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify(DB)
@@ -1936,6 +1936,53 @@ function calcNuevaFechaExpiraConExtras(alumno, plan, fechaPago, mesesAdelantados
     if(dv !== null && dv > 0) baseFecha = alumno.fechaExpira;
   }
   return sumarMeses(baseFecha, mesesTotales);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   FUENTE ÚNICA DE VERDAD PARA fechaExpira
+   ══════════════════════════════════════════════════════════════════
+   Antes, distintas partes del código (editar pago, eliminar pago,
+   registrar pago de alumno existente) recalculaban fechaExpira usando
+   SOLO el último pago completo y calcFechaExpira() simple, ignorando
+   los meses adelantados / meses de regalo ya otorgados en pagos
+   anteriores. Resultado: cada vez que se editaba, eliminaba o volvía a
+   registrar un pago, la vigencia "se encogía" y el calendario mostraba
+   como VENCIDO o PRÓXIMO meses que en realidad ya estaban pagados.
+
+   Esta función es la única que debe usarse de aquí en adelante para
+   fijar a.fechaExpira: recorre TODO el historial de pagos completos,
+   normaliza los que no tengan mesesCubiertos (pagos viejos) y toma el
+   mes más lejano realmente cubierto (pagado o regalo) como base. Así,
+   sin importar qué pago se edite/borre/agregue, la vigencia siempre
+   refleja la realidad completa del historial y se auto-corrige sola. */
+function recalcularFechaExpiraDesdePagos(a){
+  if(!a) return null;
+  normalizePaymentHistory(a);
+
+  var maxMes = null;
+  (a.pagos||[]).forEach(function(p){
+    if(!p || !p.completo) return;
+    (p.mesesCubiertos||[]).forEach(function(mk){ if(!maxMes || mk>maxMes) maxMes=mk; });
+    (p.mesesCubiertosRegalo||[]).forEach(function(mk){ if(!maxMes || mk>maxMes) maxMes=mk; });
+  });
+
+  if(!maxMes){
+    /* Fallback: sin datos de meses cubiertos, usar el comportamiento simple anterior */
+    var pagosCompletos = (a.pagos||[]).filter(function(p){ return p && p.completo; });
+    if(!pagosCompletos.length) return null;
+    var ultimo = pagosCompletos[pagosCompletos.length-1];
+    var planObj = PLANES.find(function(p){ return p.n===ultimo.plan; });
+    return planObj ? calcFechaExpira(ultimo.fecha, planObj.id) : null;
+  }
+
+  /* La vigencia termina al iniciar el mes SIGUIENTE al último mes cubierto */
+  var pp = String(maxMes).split('-');
+  var y = parseInt(pp[0]), m = parseInt(pp[1])-1;
+  m++; if(m>11){ m=0; y++; }
+  var diaFijo = diaPagoFijo(a) || 1;
+  var diaSafe = Math.min(diaFijo, new Date(y, m+1, 0).getDate());
+  var d = new Date(y, m, diaSafe);
+  return d.toISOString().split('T')[0];
 }
 
 /* Calcula cuándo vencerá el paquete por clases agotadas (calendario).
@@ -2261,17 +2308,67 @@ function renderPkgs(){
 function setPrecioLibre(val){ document.getElementById("r-monto").value=val; updateSum(); }
 function updateSum(){
   const c=document.getElementById('sum-card');
-  if(!S.rDiscs.length&&!S.rPlan){c.style.display='none';return;}
+  const totalBox=document.getElementById('r-total-box');
+  if(!S.rDiscs.length&&!S.rPlan){
+    c.style.display='none';
+    if(totalBox) totalBox.style.display='none';
+    return;
+  }
   c.style.display='block';
   const pl=PLANES.find(p=>p.id===S.rPlan);
   const hl=S.rHors.map(k=>k.split('|||')[1]).join(', ')||'(sin seleccionar)';
+
+  const precioBase = pl?pl.p:0;
+  const descMonto = parseFloat((document.getElementById('r-desc-monto')||{}).value)||0;
+  const descPct   = parseFloat((document.getElementById('r-desc-pct')||{}).value)||0;
+  const descTotal = descMonto + Math.round(precioBase * descPct / 100);
+  const total     = Math.max(0, precioBase - descTotal);
+  const costoExtraHors = sumarCostosExtraHorarios(S.rHors);
+
+  /* Actualizar monto automáticamente SIEMPRE que el plan o descuento cambien.
+     Se considera "autoset" si el valor actual coincide con el precio del plan
+     (con o sin descuento), indicando que el usuario no lo escribió manualmente. */
+  const montoEl = document.getElementById('r-monto');
+  if(montoEl){
+    const montoActual = parseFloat(montoEl.value)||0;
+    const precioConDesc = total + costoExtraHors;
+    /* Recalcular automáticamente si: campo vacío, fue autoset, o el valor
+       coincide con el precio base sin descuento (indicando que no fue editado) */
+    const sinEditar = !montoEl.value || montoEl.dataset.autoset==='1' ||
+                      montoActual === precioBase || montoActual === (precioBase + costoExtraHors);
+    if(sinEditar){
+      montoEl.value = precioConDesc;
+      montoEl.dataset.autoset = '1';
+    }
+  }
+
+  /* Mostrar caja de precio desglosado */
+  if(totalBox && precioBase>0){
+    totalBox.style.display='block';
+    const precioBaseEl=document.getElementById('r-precio-base');
+    if(precioBaseEl) precioBaseEl.textContent='$'+precioBase.toLocaleString('es-MX');
+    const dRow=document.getElementById('r-desc-row');
+    const dDisp=document.getElementById('r-desc-display');
+    if(dRow)  dRow.style.display = descTotal>0?'flex':'none';
+    if(dDisp) dDisp.textContent  = '-$'+descTotal.toLocaleString('es-MX');
+    const totDisp=document.getElementById('r-total-display');
+    if(totDisp) totDisp.textContent='$'+(total+costoExtraHors).toLocaleString('es-MX');
+  } else if(totalBox){
+    totalBox.style.display='none';
+  }
+
   document.getElementById('sum-body').innerHTML=`
     <div class="sum-row"><span>Disciplinas</span><span class="sum-v">${S.rDiscs.join(', ')||'—'}</span></div>
     <div class="sum-row"><span>Horarios</span><span class="sum-v">${hl}</span></div>
     <div class="sum-row"><span>Plan</span><span class="sum-v">${pl?pl.n:'—'}</span></div>
     <div class="sum-row"><span>Vigencia</span><span class="sum-v">${pl?pl.t:'—'}</span></div>
-    <div class="sum-row"><span>Total</span><span class="sum-v" style="font-size:17px">$${pl?pl.p.toLocaleString('es-MX'):'0'} MXN</span></div>`;
+    ${descTotal>0?`<div class="sum-row"><span>Descuento</span><span class="sum-v" style="color:#7ec445">-$${descTotal.toLocaleString('es-MX')}</span></div>`:''}
+    ${costoExtraHors>0?`<div class="sum-row"><span>Días extra</span><span class="sum-v" style="color:var(--cyan)">+$${costoExtraHors.toLocaleString('es-MX')}</span></div>`:''}
+    <div class="sum-row"><span>Total</span><span class="sum-v" style="font-size:17px;color:var(--rosa)">$${(total+costoExtraHors).toLocaleString('es-MX')} MXN</span></div>`;
 }
+
+/* Alias — los campos de descuento llaman a esta función */
+function updateSumDesc(){ updateSum(); }
 
 /* ══════════════════════ MODO REGISTRO ══════════════════════ */
 let editExist=null;
@@ -2318,10 +2415,27 @@ async function guardar(){
     }
     const pl=PLANES.find(p=>p.id===S.rPlan);
     const fpago=document.getElementById('r-fpago').value||today();
-    const monto=parseFloat(document.getElementById('r-monto').value)||(pl?pl.p:0);
-    const pago={fecha:fpago,plan:pl?pl.n:'Clase suelta',monto,
-      metodo:document.getElementById('r-met').value,
-      ref:document.getElementById('r-ref').value};
+    const precioBase2 = pl && !pl.libre ? pl.p : 0;
+    const descMonto2 = parseFloat((document.getElementById('r-desc-monto')||{}).value)||0;
+    const descPct2   = parseFloat((document.getElementById('r-desc-pct')||{}).value)||0;
+    const descTotal2 = descMonto2 + Math.round(precioBase2 * descPct2 / 100);
+    const descNota2  = (document.getElementById('r-desc-nota')||{}).value||'';
+    const costoExtra2 = sumarCostosExtraHorarios(S.rHors);
+    const monto=parseFloat(document.getElementById('r-monto').value)||(pl ? Math.max(0,pl.p - descTotal2) + costoExtra2 : 0);
+    const esPagoCompleto2 = pl && !pl.libre && monto >= Math.max(0, precioBase2 - descTotal2);
+    const pago={
+      fecha:    fpago,
+      plan:     pl ? pl.n : 'Clase suelta',
+      monto:    monto,
+      montoFull: Math.max(0, precioBase2 - descTotal2) + costoExtra2,
+      descuento: descTotal2 > 0 ? descTotal2 : undefined,
+      descNota:  descNota2 || undefined,
+      metodo:    document.getElementById('r-met').value,
+      ref:       document.getElementById('r-ref').value,
+      tipo:      pl ? pl.tipo : 'cl',
+      completo:  esPagoCompleto2,
+      mesesCubiertos: (pl && esPagoCompleto2) ? [String(fpago).split('T')[0].split('-').slice(0,2).join('-')] : undefined
+    };
 
     if(editExist){
       /* Update existing alumno */
@@ -2330,7 +2444,41 @@ async function guardar(){
       if(S.rDiscs.length) editExist.disciplinas=[...S.rDiscs];
       editExist.horarios=[...S.rHors];
       if(S.rPlan) editExist.planActual=pl?pl.n:editExist.planActual;
+
+      /* Calcular qué mes(es) cubre este pago, continuando desde el último
+         mes ya cubierto por pagos anteriores (si existe), para que el
+         calendario y la vigencia lo reconozcan correctamente. Este campo
+         faltaba antes en este flujo de registro, lo que dejaba fechaExpira
+         sin actualizar cuando se pagaba a un alumno ya existente aquí. */
+      if(pl && esPagoCompleto2){
+        var ultimoMesCub = null;
+        (editExist.pagos||[]).forEach(function(pAnt){
+          if(!pAnt) return;
+          (pAnt.mesesCubiertos||[]).forEach(function(mk){ if(!ultimoMesCub||mk>ultimoMesCub) ultimoMesCub=mk; });
+          (pAnt.mesesCubiertosRegalo||[]).forEach(function(mk){ if(!ultimoMesCub||mk>ultimoMesCub) ultimoMesCub=mk; });
+        });
+        var baseY, baseM;
+        if(ultimoMesCub){
+          var ucP=String(ultimoMesCub).split('-'); baseY=parseInt(ucP[0]); baseM=parseInt(ucP[1])-1;
+          baseM++; if(baseM>11){baseM=0;baseY++;}
+        } else {
+          var fp=String(fpago).split('T')[0].split('-'); baseY=parseInt(fp[0]); baseM=parseInt(fp[1])-1;
+        }
+        var mesesCub=[];
+        for(var imr=0; imr<(pl.meses||1); imr++){
+          mesesCub.push(baseY+'-'+String(baseM+1).padStart(2,'0'));
+          baseM++; if(baseM>11){baseM=0;baseY++;}
+        }
+        pago.mesesCubiertos = mesesCub;
+      }
+
       editExist.pagos.push(pago);
+
+      /* Recalcular vigencia a partir de TODO el historial (fuente única de verdad) */
+      if(pl && esPagoCompleto2){
+        editExist.fechaExpira = recalcularFechaExpiraDesdePagos(editExist);
+      }
+
       /* Reset this month's visits when payment is registered */
       var mesReset = mesCur();
       editExist.visitas = (editExist.visitas||[]).filter(function(v){
@@ -2346,6 +2494,7 @@ async function guardar(){
       setTimeout(function(){S.writeLock=false;},2000);
       showAlert('al-reg','✓ Pago registrado · Asistencias reiniciadas · '+editExist.folio,'ok');
       abrirQRDatos(editExist);
+      limpiarForm();
       return;
     }
 
@@ -2388,7 +2537,7 @@ async function guardar(){
   }
 }
 function limpiarForm(){
-  ['r-nom','r-ap','r-tel','r-email','r-fnac','r-emer','r-notas','r-ref','r-monto'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['r-nom','r-ap','r-tel','r-email','r-fnac','r-emer','r-notas','r-ref','r-monto','r-desc-monto','r-desc-pct','r-desc-nota'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   S.rDiscs=[];S.rHors=[];S.rPlan=null;editExist=null;
   document.getElementById('r-fpago').value=today();
 var _cmEl=document.getElementById('cal-month');
@@ -2658,8 +2807,20 @@ function verPerfil(f){
     else if(_dias!==null&&_dias<=5){ _vigEl.innerHTML=_vs+' <span style="color:#fabd75;font-size:10px;font-weight:700">Vence en '+_dias+'d</span>'; }
     else{ _vigEl.textContent=_vs+(_dias!==null?' ('+_dias+' días)':''); }
   }
+  /* Auto-sanar fechaExpira: recalcular desde TODO el historial de pagos
+     (fuente única de verdad). Esto corrige automáticamente vigencias que
+     hayan quedado mal por ediciones/registros anteriores a este fix,
+     sin necesidad de tocar nada manualmente — basta con abrir la ficha. */
+  var changed = false;
+  if(a.planActual && a.pagos && a.pagos.length){
+    var expiraCorregida = recalcularFechaExpiraDesdePagos(a);
+    if(expiraCorregida && expiraCorregida !== a.fechaExpira){
+      a.fechaExpira = expiraCorregida;
+      changed = true;
+    }
+  }
   /* Auto-detectar y acumular saldos de meses vencidos */
-  var changed = autoAcumularSaldosPendientes(a);
+  if(autoAcumularSaldosPendientes(a)) changed = true;
   if(changed){
     var idx2=DB.alumnos.findIndex(function(x){return x.folio===a.folio;}); if(idx2>=0) DB.alumnos[idx2]=a;
     saveLocal(); saveDB().catch(function(){});
@@ -3165,13 +3326,14 @@ async function epGuardar(){
     _editado:   today()   /* audit trail */
   });
 
-  /* Recalculate planActual and fechaExpira from last complete pago */
+  /* Recalcular planActual (último pago completo) y fechaExpira a partir de
+     TODO el historial de pagos (no solo el último), para no perder meses
+     adelantados/regalo ya otorgados en pagos anteriores al editado. */
   var pagosCompletos = a.pagos.filter(function(p){ return p.completo; });
   if(pagosCompletos.length){
     var ultimo = pagosCompletos[pagosCompletos.length-1];
     a.planActual = ultimo.plan;
-    var planObj = PLANES.find(function(p){ return p.n===ultimo.plan; });
-    if(planObj) a.fechaExpira = calcFechaExpira(ultimo.fecha, planObj.id);
+    a.fechaExpira = recalcularFechaExpiraDesdePagos(a);
   }
 
   /* Sync to DB */
@@ -3212,13 +3374,13 @@ async function epEliminar(){
   /* Remove pago */
   a.pagos.splice(idx, 1);
 
-  /* Recalculate planActual and fechaExpira */
+  /* Recalcular planActual y fechaExpira a partir de TODO el historial
+     de pagos restantes (no solo el último) */
   var pagosCompletos = a.pagos.filter(function(p){ return p.completo; });
   if(pagosCompletos.length){
     var ultimo = pagosCompletos[pagosCompletos.length-1];
     a.planActual = ultimo.plan;
-    var planObj = PLANES.find(function(p){ return p.n===ultimo.plan; });
-    if(planObj) a.fechaExpira = calcFechaExpira(ultimo.fecha, planObj.id);
+    a.fechaExpira = recalcularFechaExpiraDesdePagos(a);
   } else {
     a.fechaExpira = null;
     /* Keep planActual so profile still shows discipline */
@@ -3254,13 +3416,12 @@ async function eliminarPagoDirecto(idx){
 
   a.pagos.splice(idx, 1);
 
-  /* Recalculate expiry from remaining complete pagos */
+  /* Recalculate expiry from ALL remaining complete pagos (no solo el último) */
   var pagosCompletos = a.pagos.filter(function(p){ return p.completo; });
   if(pagosCompletos.length){
     var ultimo = pagosCompletos[pagosCompletos.length-1];
     a.planActual = ultimo.plan;
-    var planObj = PLANES.find(function(p){ return p.n===ultimo.plan; });
-    if(planObj) a.fechaExpira = calcFechaExpira(ultimo.fecha, planObj.id);
+    a.fechaExpira = recalcularFechaExpiraDesdePagos(a);
   } else {
     a.fechaExpira = null;
   }
@@ -3480,10 +3641,66 @@ function autoDetectarSaldoVencido(a){
     saveDB().catch(function(){});
   }
 }
-function liquidarSaldo(){
-  if(!S.alumno) return;
-  abrirPagoModal('renovar');
+/* ── NORMALIZAR HISTORIAL DE PAGOS ──
+   Rellena mesesCubiertos en pagos viejos que no lo tengan,
+   para que el calendario de pagos funcione correctamente.
+   Se ejecuta al abrir un perfil y también después de guardar pagos. */
+function normalizePaymentHistory(a){
+  if(!a || !a.pagos || !a.pagos.length) return false;
+  var plan = PLANES.find(function(p){ return p.n===a.planActual; });
+  if(!plan) return false;
+  var changed = false;
+
+  a.pagos.forEach(function(p, idx){
+    /* Si ya tiene mesesCubiertos, solo normalizar el formato */
+    if(p.mesesCubiertos && p.mesesCubiertos.length) return;
+    if(!p.fecha || !p.completo) return;
+
+    /* Inferir meses cubiertos */
+    var ppf = String(p.fecha).split('T')[0].split('-');
+    if(ppf.length < 2) return;
+
+    var mesesExtra2 = (p.mesesExtra!==undefined) ? parseInt(p.mesesExtra) : 0;
+    var mesesAdel2  = (p.mesesExtra!==undefined)
+      ? 1 + Math.max(0, mesesExtra2)
+      : (p.mesesAdelantados ? Math.max(1,parseInt(p.mesesAdelantados)) : 1);
+    var mesesReg2  = p.mesesRegalo ? parseInt(p.mesesRegalo) : 0;
+    var planMeses  = plan.meses || 1;
+
+    /* Si este pago tiene vigencia calculada (fechaExpira en el alumno), usar la lógica correcta */
+    var curY = parseInt(ppf[0]), curM = parseInt(ppf[1])-1;
+
+    /* Para el primer pago (índice 0) o si es el único pago, el mes base es el mes del pago */
+    /* Para pagos subsecuentes, el mes base es el mes siguiente al del pago anterior */
+    if(idx > 0){
+      var prevPago = a.pagos[idx-1];
+      if(prevPago && prevPago.mesesCubiertos && prevPago.mesesCubiertos.length){
+        var lastMes = prevPago.mesesCubiertos[prevPago.mesesCubiertos.length-1];
+        if(prevPago.mesesCubiertosRegalo && prevPago.mesesCubiertosRegalo.length)
+          lastMes = prevPago.mesesCubiertosRegalo[prevPago.mesesCubiertosRegalo.length-1];
+        var lp = String(lastMes).split('-');
+        curY = parseInt(lp[0]); curM = parseInt(lp[1])-1;
+        curM++; if(curM>11){curM=0;curY++;}
+      }
+    }
+
+    var pagados = [], regalos = [];
+    for(var im=0; im<(planMeses*mesesAdel2); im++){
+      pagados.push(curY+'-'+String(curM+1).padStart(2,'0'));
+      curM++; if(curM>11){curM=0;curY++;}
+    }
+    for(var ir=0; ir<mesesReg2; ir++){
+      regalos.push(curY+'-'+String(curM+1).padStart(2,'0'));
+      curM++; if(curM>11){curM=0;curY++;}
+    }
+
+    if(pagados.length){ p.mesesCubiertos = pagados; changed=true; }
+    if(regalos.length){ p.mesesCubiertosRegalo = regalos; changed=true; }
+  });
+
+  return changed;
 }
+
 async function marcarVisita(){
   if(!S.alumno) return;
   var discs = s_alumno_discs();
@@ -4421,29 +4638,62 @@ async function pmGuardar(){
   var tipoPlanes = ['paq','mem'];
   var esPaqueteOMem = plan && tipoPlanes.includes(plan.tipo);
 
-  /* ── Calcular la lista EXPLÍCITA de meses (YYYY-MM) que cubre este pago ──
-     Esto incluye los meses pagados (mesesAdel × plan.meses) y los meses de
-     regalo (mesesReg), contados consecutivamente a partir de la fecha base
-     (la fecha de vencimiento previa si sigue vigente, o la fecha del pago). */
+  /* ── LISTA EXPLÍCITA de meses que cubre este pago ──
+     SIEMPRE se genera (completo o parcial) para que autoAcumularSaldosPendientes
+     y renderPaymentTimeline reconozcan este pago en el futuro sin importar
+     el tipo o si fue pago parcial.
+     Regla:
+     • Pago normal (mesesAdel=1): cubre el mes del pago.
+     • Pago adelantado (mesesAdel=N): cubre N meses consecutivos desde el mes del pago.
+     • Si hay vigencia activa futura, los nuevos meses comienzan en el mes
+       siguiente al último mes ya cubierto (no en el mes del pago en sí).
+     • Los meses de regalo van inmediatamente después de los pagados. */
   var mesesPagadosLista = [];
   var mesesRegaloLista  = [];
-  if(plan && esPagoCompleto){
-    var baseParaMeses = fecha;
-    if(pmAlumno.fechaExpira){
-      var dvPrev = diasRestantes(pmAlumno.fechaExpira);
-      if(dvPrev !== null && dvPrev > 0) baseParaMeses = pmAlumno.fechaExpira;
+
+  if(plan){
+    var ppFecha = String(fecha).split('T')[0].split('-');
+    var curY = parseInt(ppFecha[0]);
+    var curM = parseInt(ppFecha[1])-1; /* 0-indexed: mes del pago */
+
+    /* Si ya hay meses cubiertos anteriores (pagos previos), comenzar
+       DESPUÉS del último mes cubierto para no pisarlos */
+    var ultimoMesCubierto = null;
+    (pmAlumno.pagos||[]).forEach(function(p){
+      if(!p) return;
+      if(p.mesesCubiertos && p.mesesCubiertos.length){
+        var ultimo = p.mesesCubiertos[p.mesesCubiertos.length-1];
+        if(!ultimoMesCubierto || ultimo > ultimoMesCubierto) ultimoMesCubierto = ultimo;
+      }
+      if(p.mesesCubiertosRegalo && p.mesesCubiertosRegalo.length){
+        var ultimoR = p.mesesCubiertosRegalo[p.mesesCubiertosRegalo.length-1];
+        if(!ultimoMesCubierto || ultimoR > ultimoMesCubierto) ultimoMesCubierto = ultimoR;
+      }
+    });
+
+    if(ultimoMesCubierto){
+      /* Empezar en el mes SIGUIENTE al último ya cubierto */
+      var ucPts = String(ultimoMesCubierto).split('-');
+      curY = parseInt(ucPts[0]);
+      curM = parseInt(ucPts[1])-1;
+      curM++; if(curM>11){ curM=0; curY++; }
+    } else if(pmAlumno.fechaExpira){
+      /* Fallback: si hay fechaExpira activa, empezar desde el mes del vencimiento */
+      var dvPrev2 = diasRestantes(pmAlumno.fechaExpira);
+      if(dvPrev2 !== null && dvPrev2 > 0){
+        var expPts = String(pmAlumno.fechaExpira).split('T')[0].split('-');
+        curY = parseInt(expPts[0]);
+        curM = parseInt(expPts[1])-1;
+      }
     }
-    var totalMesesPagados = plan.meses * mesesAdel;
-    var cursorMes = baseParaMeses;
-    for(var im=0; im<totalMesesPagados; im++){
-      var pp = String(cursorMes).split('T')[0].split('-');
-      mesesPagadosLista.push(pp[0]+'-'+pp[1]);
-      cursorMes = sumarMeses(cursorMes, 1);
+
+    for(var im=0; im<(plan.meses*mesesAdel); im++){
+      mesesPagadosLista.push(curY+'-'+String(curM+1).padStart(2,'0'));
+      curM++; if(curM>11){curM=0;curY++;}
     }
     for(var ir=0; ir<mesesReg; ir++){
-      var pr = String(cursorMes).split('T')[0].split('-');
-      mesesRegaloLista.push(pr[0]+'-'+pr[1]);
-      cursorMes = sumarMeses(cursorMes, 1);
+      mesesRegaloLista.push(curY+'-'+String(curM+1).padStart(2,'0'));
+      curM++; if(curM>11){curM=0;curY++;}
     }
   }
 
@@ -4481,7 +4731,10 @@ async function pmGuardar(){
   if(pmDiscs.length > 0) pmAlumno.disciplinas = pmDiscs;
   if(plan && esPagoCompleto){
     pmAlumno.planActual = plan.n;
-    pmAlumno.fechaExpira = calcNuevaFechaExpiraConExtras(pmAlumno, plan, fecha, mesesAdel, mesesReg);
+    /* Recalcular desde TODO el historial (fuente única de verdad), no solo
+       este pago — así la vigencia se auto-corrige aunque haya habido
+       inconsistencias previas por ediciones/eliminaciones anteriores. */
+    pmAlumno.fechaExpira = recalcularFechaExpiraDesdePagos(pmAlumno);
   } else if(plan){
     pmAlumno.planActual = plan.n;
   }
@@ -5062,103 +5315,87 @@ setTimeout(function(){
 
 /* ── Firebase Real-time Listener (SSE) ── */
 var fbEventSource = null;
-var _fbListenerRefresh = null;
 
 function startFirebaseListener(){
   if(!CFG.fbUrl) return;
   stopFirebaseListener();
 
-  fbGetToken().then(function(token){
-    var sseUrl = fbAuthedUrl('/alpha.json', token);
-    try{
-      fbEventSource = new EventSource(sseUrl);
+  var sseUrl = CFG.fbUrl + '/alpha.json';
+  try{
+    fbEventSource = new EventSource(sseUrl);
 
-      fbEventSource.addEventListener('put', function(e){
-        try{
-          var payload = JSON.parse(e.data);
-          var data = payload.data;
-          if(!data) return;
-          /* Version check: ignore if our local data is newer */
-          var incomingV = data._v || 0;
-          var localV    = DB._v  || 0;
-          if(S.writeLock && incomingV <= localV) return;
-          /* Apply update */
-          if(payload.path === '/'){
-            if(data.alumnos !== undefined) DB.alumnos = data.alumnos || [];
-            if(data.citas   !== undefined) DB.citas   = data.citas   || [];
-            if(data.visLog  !== undefined) DB.visLog  = data.visLog  || [];
-            if(data._v      !== undefined) DB._v      = data._v;
-          } else if(payload.path === '/alumnos'){
-            DB.alumnos = data || [];
-          } else if(payload.path === '/citas'){
-            DB.citas = data || [];
-          }
-          saveLocal();
-          refreshActiveView();
-          setCloudStatus('ok','Actualizado ' + new Date().toLocaleTimeString('es-MX'));
-        } catch(err){}
-      });
-
-      fbEventSource.addEventListener('patch', function(e){
-        try{
-          if(S.writeLock) return;
-          var payload = JSON.parse(e.data);
-          var data = payload.data;
-          if(!data) return;
+    fbEventSource.addEventListener('put', function(e){
+      try{
+        var payload = JSON.parse(e.data);
+        var data = payload.data;
+        if(!data) return;
+        /* Version check: ignore if our local data is newer */
+        var incomingV = data._v || 0;
+        var localV    = DB._v  || 0;
+        if(S.writeLock && incomingV <= localV) return;
+        /* Apply update */
+        if(payload.path === '/'){
           if(data.alumnos !== undefined) DB.alumnos = data.alumnos || [];
           if(data.citas   !== undefined) DB.citas   = data.citas   || [];
           if(data.visLog  !== undefined) DB.visLog  = data.visLog  || [];
           if(data._v      !== undefined) DB._v      = data._v;
-          saveLocal();
-          refreshActiveView();
-          setCloudStatus('ok','Actualizado ' + new Date().toLocaleTimeString('es-MX'));
-        } catch(err){}
-      });
-
-      fbEventSource.onerror = function(){
-        setCloudStatus('sync', 'Reconectando...');
-        /* EventSource reconects automatically */
-      };
-
-      fbEventSource.onopen = function(){
-        setCloudStatus('ok', 'Firebase en tiempo real');
-      };
-
-    } catch(e){
-      /* SSE not supported - fall back to polling every 5 seconds */
-      setInterval(function(){
-        if(CFG.proveedor === 'firebase' && CFG.fbUrl){
-          fbGetToken().then(function(tok){
-            return fetch(fbAuthedUrl('/alpha.json', tok));
-          })
-            .then(function(r){ return r.json(); })
-            .then(function(d){
-              if(!d) return;
-              var changed = false;
-              if(d.alumnos && JSON.stringify(d.alumnos) !== JSON.stringify(DB.alumnos)){
-                DB.alumnos = d.alumnos; changed = true;
-              }
-              if(d.citas && JSON.stringify(d.citas) !== JSON.stringify(DB.citas)){
-                DB.citas = d.citas; changed = true;
-              }
-              if(changed){ saveLocal(); refreshActiveView(); setCloudStatus('ok','Actualizado'); }
-            })
-            .catch(function(){});
+        } else if(payload.path === '/alumnos'){
+          DB.alumnos = data || [];
+        } else if(payload.path === '/citas'){
+          DB.citas = data || [];
         }
-      }, 5000);
-    }
-  }).catch(function(e){
-    setCloudStatus('err', 'Error de autenticación: ' + e.message);
-  });
+        saveLocal();
+        refreshActiveView();
+        setCloudStatus('ok','Actualizado ' + new Date().toLocaleTimeString('es-MX'));
+      } catch(err){}
+    });
 
-  /* El idToken anónimo expira en ~1h; reconectamos el listener periódicamente con un token fresco */
-  clearInterval(_fbListenerRefresh);
-  _fbListenerRefresh = setInterval(function(){
-    if(CFG.proveedor === 'firebase' && CFG.fbUrl){
-      _fbToken = null; _fbTokenExp = 0;
-      startFirebaseListener();
-    }
-  }, 50 * 60 * 1000);
+    fbEventSource.addEventListener('patch', function(e){
+      try{
+        if(S.writeLock) return;
+        var payload = JSON.parse(e.data);
+        var data = payload.data;
+        if(!data) return;
+        if(data.alumnos !== undefined) DB.alumnos = data.alumnos || [];
+        if(data.citas   !== undefined) DB.citas   = data.citas   || [];
+        if(data.visLog  !== undefined) DB.visLog  = data.visLog  || [];
+        if(data._v      !== undefined) DB._v      = data._v;
+        saveLocal();
+        refreshActiveView();
+        setCloudStatus('ok','Actualizado ' + new Date().toLocaleTimeString('es-MX'));
+      } catch(err){}
+    });
+
+    fbEventSource.onerror = function(){
+      setCloudStatus('sync', 'Reconectando...');
+      /* EventSource reconects automatically */
+    };
+
+    fbEventSource.onopen = function(){
+      setCloudStatus('ok', 'Firebase en tiempo real');
+    };
+
+  } catch(e){
+    /* SSE not supported - fall back to polling every 5 seconds */
+    setInterval(function(){
+      if(CFG.proveedor === 'firebase' && CFG.fbUrl){
+        fetch(CFG.fbUrl + '/alpha.json')
+          .then(function(r){ return r.json(); })
+          .then(function(d){
+            if(!d) return;
+            var changed = false;
+            if(d.alumnos && JSON.stringify(d.alumnos) !== JSON.stringify(DB.alumnos)){
+              DB.alumnos = d.alumnos; changed = true;
+            }
+            if(d.citas && JSON.stringify(d.citas) !== JSON.stringify(DB.citas)){
+              DB.citas = d.citas; changed = true;
+            }
+            if(changed){ saveLocal(); refreshActiveView(); setCloudStatus('ok','Actualizado'); }
+          })
+          .catch(function(){});
+      }
+    }, 5000);
+  }
 }
 
 function stopFirebaseListener(){
@@ -5422,23 +5659,20 @@ function generarFechasPago(a){
   if(!plan || !a.fechaAlta) return [];
 
   var inicio = parseFechaLocal(a.fechaAlta); if(!inicio) return [];
-  var fin    = parseFechaLocal(a.fechaExpira);
-  if(!fin){
-    /* Si no hay fechaExpira, generar solo los próximos 12 meses */
-    fin = new Date(inicio); fin.setFullYear(fin.getFullYear()+1);
-  }
+  var hoy = new Date(); hoy.setHours(0,0,0,0);
 
-  var intervaloMeses = plan.meses||1; /* 1=mensual, 6=semestral, 12=anual */
+  /* El límite del calendario siempre llega al menos 2 meses después del mes actual,
+     así el calendario siempre muestra el próximo pago aunque el plan esté vencido.
+     Si hay fechaExpira y es mayor, usar eso como límite. */
+  var limite2m = new Date(hoy.getFullYear(), hoy.getMonth()+2, inicio.getDate());
+  var finPlan  = parseFechaLocal(a.fechaExpira);
+  var limite   = finPlan && finPlan > limite2m ? finPlan : limite2m;
+
+  var intervaloMeses = plan.meses||1;
   var dia = inicio.getDate();
   var fechas = [];
-  var cursor = new Date(inicio.getFullYear(), inicio.getMonth(), dia);
-
-  /* Primera fecha de pago: el mes siguiente al alta */
-  cursor = new Date(cursor.getFullYear(), cursor.getMonth() + intervaloMeses, dia);
-
-  /* El límite es EXACTAMENTE la fecha de vencimiento real (sin extender) */
-  var limite = new Date(fin);
-  var maxIter = 50;
+  var cursor = new Date(inicio.getFullYear(), inicio.getMonth() + intervaloMeses, dia);
+  var maxIter = 60;
   while(cursor <= limite && maxIter-- > 0){
     var diasEnMes = new Date(cursor.getFullYear(), cursor.getMonth()+1, 0).getDate();
     var diaEf = Math.min(dia, diasEnMes);
@@ -5494,77 +5728,188 @@ function renderPaymentTimeline(a){
   if(!plan || !a.fechaAlta) return '';
 
   var hoy    = new Date(); hoy.setHours(0,0,0,0);
-  var fechas = generarFechasPago(a);
   var pagosReg = (a.pagos||[]);
   var MESES_S  = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
-  /* Map registered payment dates */
-  var pagosDates = {};
+  function normKey(mk){
+    var pp=String(mk).split('-');
+    return parseInt(pp[0]).toString()+'-'+String(parseInt(pp[1]||'1')).padStart(2,'0');
+  }
+
+  /* ══ MAPA YYYY-MM → estado ══
+     PRIORIDAD: PAGADO(5) > REGALO(4) > PARCIAL(3) > PRÓXIMO(2) > VENCIDO(1) > FUTURO(0)
+     REGLA: un mes solo puede avanzar de estado, nunca retroceder.               */
+  var estadoMes = {};
+  var PRIOR = {'PAGADO':5,'REGALO':4,'PARCIAL':3,'PRÓXIMO':2,'VENCIDO':1,'FUTURO':0};
+
+  function setMes(rawKey, estado, pago){
+    var key = normKey(rawKey);
+    var cur = estadoMes[key];
+    if((PRIOR[estado]||0) > (cur ? (PRIOR[cur.estado]||0) : 0)){
+      estadoMes[key]={estado:estado, pago:pago||null};
+    }
+  }
+
+  /* ══ PASO 1: Procesar pagos explícitos (máxima confianza) ══ */
   pagosReg.forEach(function(p){
-    var d = parseFechaLocal(p.fecha);
-    if(d) pagosDates[d.getFullYear()+'-'+(d.getMonth()+1)] = p;
+    if(!p) return;
+    var esCompleto = !!p.completo;
+    var tieneInfo = (p.tipo && ['paq','mem','otro','cl','manual'].includes(p.tipo)) || esCompleto;
+    if(!tieneInfo) return;
+
+    if((p.mesesCubiertos && p.mesesCubiertos.length) ||
+       (p.mesesCubiertosRegalo && p.mesesCubiertosRegalo.length)){
+      /* Tiene mesesCubiertos explícitos — máxima confianza */
+      if(p.mesesCubiertos) p.mesesCubiertos.forEach(function(mk){
+        setMes(mk, esCompleto?'PAGADO':'PARCIAL', p);
+      });
+      if(p.mesesCubiertosRegalo) p.mesesCubiertosRegalo.forEach(function(mk){
+        setMes(mk, 'REGALO', p);
+      });
+    } else {
+      /* Sin mesesCubiertos — inferir desde la fecha del pago.
+         mesesExtra=0 (campo nuevo) → pagó 1 mes (el del propio pago).
+         mesesAdelantados (campo viejo) → total de meses pagados.      */
+      var ppf=String(p.fecha||'').split('T')[0].split('-');
+      if(ppf.length<2) return;
+      var mAdTot, mRg2;
+      if(p.mesesExtra !== undefined){
+        mAdTot = 1 + Math.max(0, parseInt(p.mesesExtra)||0);
+      } else if(p.mesesAdelantados !== undefined){
+        mAdTot = Math.max(1, parseInt(p.mesesAdelantados)||1);
+      } else {
+        mAdTot = 1;
+      }
+      mRg2 = Math.max(0, parseInt(p.mesesRegalo)||0);
+      var curY=parseInt(ppf[0]), curM=parseInt(ppf[1])-1;
+      for(var im=0; im<mAdTot+mRg2; im++){
+        var mk2=curY+'-'+String(curM+1).padStart(2,'0');
+        if(im<mAdTot) setMes(mk2, esCompleto?'PAGADO':'PARCIAL', p);
+        else           setMes(mk2, 'REGALO', p);
+        curM++; if(curM>11){curM=0;curY++;}
+      }
+    }
   });
 
-  /* Alta info */
-  var altaDate  = parseFechaLocal(a.fechaAlta);
+  /* ══ PASO 2: Cubrir automáticamente TODOS los meses entre el alta y fechaExpira ══
+     Si el alumno tiene una fechaExpira registrada, todos los meses entre su alta
+     y esa fecha ESTÁN PAGADOS (la vigencia lo garantiza).
+     Solo se marcan los meses que no tienen ya un estado explícito igual o superior. */
+  var finPlanDate = parseFechaLocal(a.fechaExpira);
+  if(finPlanDate){
+    var altaIt = parseFechaLocal(a.fechaAlta); if(!altaIt) altaIt=new Date();
+    var curIt = new Date(altaIt.getFullYear(), altaIt.getMonth(), 1);
+    var limIt = new Date(finPlanDate.getFullYear(), finPlanDate.getMonth(), 1);
+    /* Buscar el pago más reciente válido como referencia */
+    var ultp2=null;
+    pagosReg.slice().reverse().some(function(p2){
+      if(p2.completo||p2.tipo){ ultp2=p2; return true; }
+    });
+    var maxIt = 60;
+    while(curIt <= limIt && maxIt-- > 0){
+      var mkIt = curIt.getFullYear()+'-'+String(curIt.getMonth()+1).padStart(2,'0');
+      var nkIt = normKey(mkIt);
+      var estadoExistente = estadoMes[nkIt] ? estadoMes[nkIt].estado : null;
+      /* Solo rellenar si no tiene ya un estado >= PARCIAL (no sobreescribir estados explícitos) */
+      if(!estadoExistente || estadoExistente==='VENCIDO' || estadoExistente==='FUTURO'){
+        setMes(mkIt, 'PAGADO', ultp2);
+      }
+      curIt = new Date(curIt.getFullYear(), curIt.getMonth()+1, 1);
+    }
+  }
+
+  /* ══ GENERAR LISTA DE FECHAS A MOSTRAR ══ */
+  var fechas = generarFechasPago(a);
+  var diaFijoVal = diaPagoFijo(a)||1;
+
+  /* Incluir el mes del alta si no está ya */
+  var altaDate2 = parseFechaLocal(a.fechaAlta);
+  if(altaDate2){
+    var altaMK = altaDate2.getFullYear()+'-'+String(altaDate2.getMonth()+1).padStart(2,'0');
+    var yaEnF = fechas.some(function(f){ return normKey(f.getFullYear()+'-'+String(f.getMonth()+1).padStart(2,'0'))===normKey(altaMK); });
+    if(!yaEnF){
+      var dA=Math.min(diaFijoVal,new Date(altaDate2.getFullYear(),altaDate2.getMonth()+1,0).getDate());
+      fechas.unshift(new Date(altaDate2.getFullYear(),altaDate2.getMonth(),dA));
+    }
+  }
+
+  /* Incluir cualquier mes con estado explícito que no esté en la lista */
+  Object.keys(estadoMes).forEach(function(mk){
+    var nk=normKey(mk);
+    var yaE=fechas.some(function(f){ return normKey(f.getFullYear()+'-'+String(f.getMonth()+1).padStart(2,'0'))===nk; });
+    if(!yaE){
+      var pp2=mk.split('-'); var y2=parseInt(pp2[0]),m2=parseInt(pp2[1])-1;
+      var dF2=Math.min(diaFijoVal,new Date(y2,m2+1,0).getDate());
+      fechas.push(new Date(y2,m2,dF2));
+    }
+  });
+
+  /* Incluir el próximo pago */
+  var proximoP = proximaFechaPagoFija(a);
+  if(proximoP){
+    var proxMK=normKey(proximoP.getFullYear()+'-'+String(proximoP.getMonth()+1).padStart(2,'0'));
+    var yaProx=fechas.some(function(f){ return normKey(f.getFullYear()+'-'+String(f.getMonth()+1).padStart(2,'0'))===proxMK; });
+    if(!yaProx) fechas.push(new Date(proximoP.getFullYear(),proximoP.getMonth(),diaFijoVal));
+  }
+
+  /* Ordenar y deduplicar por mes */
+  fechas.sort(function(a2,b2){return a2.getTime()-b2.getTime();});
+  var vistas={};
+  fechas=fechas.filter(function(f){
+    var k=normKey(f.getFullYear()+'-'+String(f.getMonth()+1).padStart(2,'0'));
+    if(vistas[k]) return false; vistas[k]=true; return true;
+  });
+
+  /* Marcar próximo pago en el mapa — SOLO si ese mes no ya es PAGADO/REGALO/PARCIAL */
+  if(proximoP){
+    var pMK=normKey(proximoP.getFullYear()+'-'+String(proximoP.getMonth()+1).padStart(2,'0'));
+    var eActP=estadoMes[pMK]?estadoMes[pMK].estado:null;
+    if(!eActP||eActP==='VENCIDO'||eActP==='FUTURO'){
+      estadoMes[pMK]={estado:'PRÓXIMO',pago:null};
+    }
+  }
+
+  /* ══ Datos de cabecera ══ */
+  var altaInfo  = parseFechaLocal(a.fechaAlta);
   var diaFijo   = diaPagoFijo(a);
   var np        = proximaFechaPagoFija(a);
   var diasNP    = diasAlProximoPago(a);
   var finPlan   = parseFechaLocal(a.fechaExpira);
-
-  /* Color helpers */
-  var npColor = diasNP===null?'var(--muted)':diasNP<0?'#f09595':diasNP===0?'#f09595':diasNP<=7?'#fabd75':'#7ec445';
+  var npColor   = diasNP===null?'var(--muted)':diasNP<0?'#f09595':diasNP===0?'#f09595':diasNP<=7?'#fabd75':'#7ec445';
 
   var html = '<div style="background:var(--bg2);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;margin-bottom:.75rem">'
-
-  /* ── Header ── */
   + '<div style="background:linear-gradient(135deg,rgba(212,83,126,.2),rgba(0,0,0,0));padding:.85rem 1rem;border-bottom:1px solid rgba(255,255,255,.07)">'
   + '<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px">'
-
-  /* Left: plan info */
   + '<div>'
   + '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Plan actual</div>'
   + '<div style="font-size:16px;font-weight:700;color:var(--blanco)">'+esc(plan.n)+'</div>'
   + '<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(plan.d)+'</div>'
   + '</div>'
-
-  /* Right: price */
   + '<div style="text-align:right">'
   + '<div style="font-size:10px;color:var(--muted)">Costo</div>'
   + '<div style="font-size:20px;font-weight:700;color:var(--rosa)">$'+plan.p.toLocaleString('es-MX')+'</div>'
   + '<div style="font-size:10px;color:var(--muted)">c/'+(plan.meses===1?'mes':plan.meses+'m')+'</div>'
   + '</div>'
   + '</div>'
-
-  /* Key dates row */
   + '<div style="display:flex;gap:12px;margin-top:.75rem;flex-wrap:wrap">'
-
-  /* Alta */
   + '<div style="background:rgba(255,255,255,.05);border-radius:8px;padding:6px 10px;min-width:90px">'
   + '<div style="font-size:9px;color:var(--muted);margin-bottom:1px">INSCRIPCIÓN</div>'
-  + '<div style="font-size:12px;font-weight:700;color:var(--blanco)">'+(altaDate?altaDate.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):'—')+'</div>'
+  + '<div style="font-size:12px;font-weight:700;color:var(--blanco)">'+(altaInfo?altaInfo.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):'—')+'</div>'
   + '<div style="font-size:10px;color:var(--muted)">Día fijo: <strong style="color:var(--blanco)">'+diaFijo+'</strong></div>'
   + '</div>'
-
-  /* Próximo pago */
   + '<div style="background:rgba(255,255,255,.05);border-radius:8px;padding:6px 10px;min-width:110px;border:1px solid '+(diasNP!==null&&diasNP<=7?npColor+'55':'transparent')+'">'
   + '<div style="font-size:9px;color:var(--muted);margin-bottom:1px">PRÓXIMO PAGO</div>'
   + '<div style="font-size:12px;font-weight:700;color:'+npColor+'">'+(np?np.toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'}):'—')+'</div>'
   + '<div style="font-size:10px;color:'+npColor+';font-weight:600">'
   + (diasNP===null?'Sin plan':diasNP<0?'⚠ Atrasado '+Math.abs(diasNP)+'d':diasNP===0?'💰 HOY':diasNP===1?'💰 Mañana':'En '+diasNP+' días')
   + '</div></div>'
-
-  /* Vencimiento plan */
   + (finPlan?'<div style="background:rgba(255,255,255,.05);border-radius:8px;padding:6px 10px;min-width:90px">'
   + '<div style="font-size:9px;color:var(--muted);margin-bottom:1px">FIN DE PLAN</div>'
   + '<div style="font-size:12px;font-weight:700;color:var(--blanco)">'+finPlan.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})+'</div>'
   + '<div style="font-size:10px;color:var(--muted)">'+plan.t+'</div>'
   + '</div>':'')
-
   + '</div>'
-  + '</div>' /* end header */
-
-  /* ── Timeline de pagos ── */
+  + '</div>'
   + '<div style="padding:.85rem 1rem">'
   + '<div style="font-size:11px;font-weight:700;color:var(--blanco);margin-bottom:.6rem;display:flex;align-items:center;gap:6px">'
   + '📅 Calendario de pagos'
@@ -5572,34 +5917,31 @@ function renderPaymentTimeline(a){
   + '</div>'
   + '<div style="display:flex;gap:4px;overflow-x:auto;padding-bottom:4px">';
 
-  /* Show all payment dates */
   if(fechas.length){
     fechas.forEach(function(f){
-      var mKey = f.getFullYear()+'-'+(f.getMonth()+1);
-      var pagReg = pagosDates[mKey];
-      var esPasada = f < hoy;
-      var esHoy = f.toDateString()===hoy.toDateString();
-      var esProxima = np && f.toDateString()===np.toDateString();
+      var mKey = f.getFullYear()+'-'+String(f.getMonth()+1).padStart(2,'0');
+      var infoMes   = estadoMes[normKey(mKey)];
+      var pagReg    = infoMes ? infoMes.pago : null;
+      var estadoLabel = infoMes ? infoMes.estado : null;
+      var esPasada  = f < hoy;
 
+      /* Estado final del mes */
       var estado, bg, col, brd, icon;
-      if(pagReg && pagReg.completo){
-        estado='PAGADO'; bg='rgba(59,109,17,.25)'; col='#7ec445';
-        brd='1px solid rgba(59,109,17,.4)'; icon='✓';
-      } else if(pagReg && !pagReg.completo){
-        estado='PARCIAL'; bg='rgba(133,79,11,.25)'; col='#fabd75';
-        brd='1px solid rgba(133,79,11,.4)'; icon='◑';
-      } else if(esProxima){
-        estado='PRÓXIMO'; bg='rgba(212,83,126,.25)'; col='var(--rosa)';
-        brd='2px solid var(--rosa)'; icon='💰';
-      } else if(esPasada){
-        estado='VENCIDO'; bg='rgba(163,45,45,.2)'; col='#f09595';
-        brd='1px solid rgba(163,45,45,.3)'; icon='⚠';
+      if(estadoLabel==='PAGADO'){
+        estado='PAGADO';   bg='rgba(59,109,17,.25)';    col='#7ec445';       brd='1px solid rgba(59,109,17,.4)';    icon='✓';
+      } else if(estadoLabel==='REGALO'){
+        estado='REGALO';   bg='rgba(0,212,255,.15)';    col='var(--cyan)';   brd='1px solid rgba(0,212,255,.35)';   icon='🎁';
+      } else if(estadoLabel==='PARCIAL'){
+        estado='PARCIAL';  bg='rgba(133,79,11,.25)';    col='#fabd75';       brd='1px solid rgba(133,79,11,.4)';    icon='◑';
+      } else if(estadoLabel==='PRÓXIMO'){
+        estado='PRÓXIMO';  bg='rgba(212,83,126,.25)';   col='var(--rosa)';   brd='2px solid var(--rosa)';           icon='💰';
+      } else if(esPasada && !estadoLabel){
+        estado='VENCIDO';  bg='rgba(163,45,45,.2)';     col='#f09595';       brd='1px solid rgba(163,45,45,.3)';    icon='⚠';
       } else {
-        estado='FUTURO'; bg='rgba(255,255,255,.04)'; col='rgba(255,255,255,.4)';
-        brd='1px solid rgba(255,255,255,.06)'; icon='○';
+        estado='FUTURO';   bg='rgba(255,255,255,.04)';  col='rgba(255,255,255,.4)'; brd='1px solid rgba(255,255,255,.06)'; icon='○';
       }
 
-      html += '<div style="flex-shrink:0;width:64px;background:'+bg+';border:'+brd+';border-radius:10px;padding:6px 4px;text-align:center;cursor:default" title="'+f.toLocaleDateString('es-MX')+' · '+estado+(pagReg?' · $'+pagReg.monto.toLocaleString('es-MX'):'')+'">'
+      html += '<div style="flex-shrink:0;width:64px;background:'+bg+';border:'+brd+';border-radius:10px;padding:6px 4px;text-align:center" title="'+f.toLocaleDateString('es-MX')+' · '+estado+(pagReg?' · $'+pagReg.monto.toLocaleString('es-MX'):'')+'">'
         +'<div style="font-size:14px;line-height:1">'+icon+'</div>'
         +'<div style="font-size:11px;font-weight:700;color:'+col+';margin-top:2px">'+MESES_S[f.getMonth()]+'</div>'
         +'<div style="font-size:13px;font-weight:900;color:'+col+'">'+f.getDate()+'</div>'
@@ -5608,21 +5950,19 @@ function renderPaymentTimeline(a){
         +'</div>';
     });
   } else {
-    html += '<div style="font-size:12px;color:var(--muted);padding:.5rem">Sin fechas de pago calculadas.</div>';
+    html += '<div style="font-size:12px;color:var(--muted);padding:.5rem">Sin fechas calculadas.</div>';
   }
 
-  html += '</div>' /* end flex timeline */
-
-  /* ── Leyenda ── */
+  html += '</div>'
   + '<div style="display:flex;gap:10px;margin-top:.5rem;flex-wrap:wrap">'
-  + ['✓ Pagado:#7ec445','◑ Parcial:#fabd75','💰 Próximo:var(--rosa)','⚠ Vencido:#f09595','○ Futuro:rgba(255,255,255,.3)'].map(function(s){
+  + ['✓ Pagado:#7ec445','🎁 Regalo:var(--cyan)','◑ Parcial:#fabd75','💰 Próximo:var(--rosa)','⚠ Vencido:#f09595','○ Futuro:rgba(255,255,255,.3)'].map(function(s){
       var p=s.split(':'); return '<span style="font-size:10px;color:'+p[1]+'">'+p[0]+'</span>';
     }).join('')
   + '</div>'
-  + '</div>' /* end body */
-  + '</div>'; /* end card */
+  + '</div>'
+  + '</div>';
 
-  /* ── Saldos pendientes ── */
+  /* ── Saldos pendientes reales (solo los no pagados) ── */
   var saldosPend = (a.saldos||[]).filter(function(s){ return !s.pagado; });
   if(saldosPend.length){
     var totalPend = saldosPend.reduce(function(t,s){ return t+s.monto; },0);
@@ -5638,24 +5978,13 @@ function renderPaymentTimeline(a){
       +'</div>'
       +'<div style="display:flex;gap:7px;flex-wrap:wrap">'
       +'<button onclick="liquidarSaldo()" style="padding:6px 14px;background:#fabd75;color:#000;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">💵 Pagar ahora</button>'
-      +'<button onclick="abrirSaldoModal()" style="padding:6px 12px;background:rgba(133,79,11,.3);color:#fabd75;border:1px solid #fabd75;border-radius:7px;font-size:12px;cursor:pointer;font-family:var(--font)">⚙ Gestionar</button>'
+      +'<button onclick="abrirSaldoModal()" style="padding:6px 12px;background:rgba(133,79,11,.3);color:#fabd75;border:1px solid #fabd75;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font)">⚙ Gestionar</button>'
       +'</div></div>';
-  }
-
-  /* ── Promos activas ── */
-  var promos = (a.promos||[]).filter(function(p){ return !p.agotado && p.usos_restantes!==0; });
-  if(promos.length){
-    html += '<div style="background:rgba(0,212,255,.07);border:1px solid rgba(0,212,255,.2);border-radius:10px;padding:.65rem .9rem;margin-bottom:.75rem">'
-      +'<div style="font-size:11px;font-weight:700;color:var(--cyan);margin-bottom:.3rem">🎁 Promociones activas</div>'
-      +promos.map(function(p){
-        var ts=p.tipo==='desc_monto'?'-$'+p.valor:p.tipo==='desc_pct'?'-'+p.valor+'%':p.tipo==='mes_gratis'?p.valor+' mes'+(p.valor!==1?'es':'')+' gratis':'Ajuste';
-        return '<div style="font-size:11px;color:var(--muted)">• <strong style="color:var(--cyan)">'+ts+'</strong> — '+esc(p.motivo||'')+(p.usos_restantes>0?' ('+p.usos_restantes+' uso'+(p.usos_restantes!==1?'s':'')+')':' (indefinido)')+'</div>';
-      }).join('')
-      +'</div>';
   }
 
   return html;
 }
+
 
 /* ─── ACUMULACIÓN AUTOMÁTICA DE MESES VENCIDOS ─── */
 /* Recorre todos los meses desde el alta hasta hoy.
@@ -5673,66 +6002,102 @@ function autoAcumularSaldosPendientes(a){
   var hoy=new Date(); hoy.setHours(0,0,0,0);
   if(!a.saldos) a.saldos=[];
 
+  /* ─── Normalizar clave de mes siempre a YYYY-MM (con cero) ─── */
+  function normMes(mk){
+    var pp=String(mk).split('-');
+    return pp[0]+'-'+String(parseInt(pp[1]||'1')).padStart(2,'0');
+  }
+
   /* Índice de saldos ya registrados para no duplicar */
   var yaReg={};
   (a.saldos||[]).forEach(function(s){ if(s.expiraRef) yaReg[s.expiraRef]=true; });
 
-  /* Meses que SÍ tienen pago completo registrado.
-     Usa la lista EXPLÍCITA de meses cubiertos (mesesCubiertos) cuando existe
-     (pagos con meses adelantados), y si no existe usa solo el mes del pago
-     (comportamiento legacy para pagos simples de 1 mes). */
+  /* ─── Construir mapa de meses cubiertos por pagos ───
+     Estrategia robusta: para cada pago, calcular QUÉ MESES cubre
+     teniendo en cuenta mesesCubiertos explícitos (cuando existen) y,
+     para pagos que NO los tienen, inferir los meses cubiertos a partir de:
+       • la fecha del pago (mes base)
+       • mesesAdelantados (cuántos meses extra pagó)
+       • mesesRegalo (meses gratis incluidos)
+     Esto hace que el sistema reconozca pagos adelantados aunque sean
+     anteriores a la implementación del campo mesesCubiertos. */
   var mesesPagados={};
+
   (a.pagos||[]).forEach(function(p){
-    if(!p.completo && !p.tipo) return; /* solo pagos completos o con tipo */
-    if(p.mesesCubiertos && p.mesesCubiertos.length){
-      p.mesesCubiertos.forEach(function(mk){ mesesPagados[mk]=true; });
-    } else {
-      var pp=String(p.fecha||'').split('T')[0].split('-');
-      if(pp.length>=2) mesesPagados[pp[0]+'-'+pp[1]]=true;
+    if(!p) return;
+    var esPagoValido = p.completo || (p.tipo && ['paq','mem','otro'].includes(p.tipo));
+    if(!esPagoValido) return;
+
+    /* Caso 1: tiene mesesCubiertos explícitos (máxima confianza) */
+    if((p.mesesCubiertos && p.mesesCubiertos.length) ||
+       (p.mesesCubiertosRegalo && p.mesesCubiertosRegalo.length)){
+      if(p.mesesCubiertos) p.mesesCubiertos.forEach(function(mk){ mesesPagados[normMes(mk)]=true; });
+      if(p.mesesCubiertosRegalo) p.mesesCubiertosRegalo.forEach(function(mk){ mesesPagados[normMes(mk)]=true; });
+      return;
     }
-    /* Los meses de regalo adjuntos al pago también cuentan como pagados */
-    if(p.mesesCubiertosRegalo && p.mesesCubiertosRegalo.length){
-      p.mesesCubiertosRegalo.forEach(function(mk){ mesesPagados[mk]=true; });
+
+    /* Caso 2: pago sin mesesCubiertos (compatibilidad con pagos viejos) */
+    var pp=String(p.fecha||'').split('T')[0].split('-');
+    if(pp.length<2) return;
+    var mAExtra = (p.mesesExtra!==undefined) ? parseInt(p.mesesExtra) : 0;
+    var mesesAdel3 = (p.mesesExtra!==undefined)
+      ? 1 + Math.max(0, mAExtra)
+      : (p.mesesAdelantados ? Math.max(1,parseInt(p.mesesAdelantados)) : 1);
+    var mesesReg3  = p.mesesRegalo ? parseInt(p.mesesRegalo) : 0;
+    var totalMeses3 = mesesAdel3 + Math.max(0, mesesReg3);
+
+    var cursorY=parseInt(pp[0]), cursorM=parseInt(pp[1])-1;
+    for(var im=0; im<totalMeses3; im++){
+      var mk = cursorY+'-'+String(cursorM+1).padStart(2,'0');
+      mesesPagados[mk]=true;
+      cursorM++; if(cursorM>11){ cursorM=0; cursorY++; }
     }
   });
 
-  /* Promos de mes gratis activas: generan una lista de meses exentos.
-     Usa mesesCubiertos (el mes REAL que cubre el regalo) cuando existe;
-     si no, cae al comportamiento legacy de usar p.fecha. */
+  /* ─── Promos de mes gratis → exentos (no generan saldo) ─── */
   var mesexentos={};
   (a.promos||[]).forEach(function(p){
     if(p.tipo!=='mes_gratis') return;
     if(p.mesesCubiertos && p.mesesCubiertos.length){
-      p.mesesCubiertos.forEach(function(mk){ mesexentos[mk]=true; });
+      p.mesesCubiertos.forEach(function(mk){ mesexentos[normMes(mk)]=true; });
     } else if(!p.agotado && p.fecha){
-      var pp=String(p.fecha).split('T')[0].split('-');
-      if(pp.length>=2) mesexentos[pp[0]+'-'+pp[1]]=true;
+      var pf=String(p.fecha).split('T')[0].split('-');
+      if(pf.length>=2) mesexentos[normMes(pf[0]+'-'+pf[1])]=true;
     }
   });
 
+  /* ─── CRÍTICO: si el plan tiene fechaExpira en el futuro, todos los meses
+     ANTERIORES a esa fecha ya están cubiertos por la vigencia actual.
+     No generar saldos para ellos aunque no tengan mesesCubiertos explícitos. ─── */
+  var finPlanDate2 = parseFechaLocal(a.fechaExpira);
+  if(finPlanDate2 && finPlanDate2 > hoy){
+    /* Marcar como pagados todos los meses que caen antes de la expiracion */
+    var cur2 = new Date(parseInt(pts[0]),parseInt(pts[1])-1,1);
+    while(cur2 < finPlanDate2){
+      var mk2 = cur2.getFullYear()+'-'+String(cur2.getMonth()+1).padStart(2,'0');
+      mesesPagados[mk2]=true;
+      cur2 = new Date(cur2.getFullYear(), cur2.getMonth()+1, 1);
+    }
+  }
+
   var changed=false;
   var MESES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  /* Iterar desde el mes del alta hasta el mes anterior al actual */
   var cursor=new Date(parseInt(pts[0]),parseInt(pts[1])-1,1);
   var thisMonth=new Date(hoy.getFullYear(),hoy.getMonth(),1);
 
   while(cursor<thisMonth){
     var y=cursor.getFullYear(), mo=cursor.getMonth();
     var mesKey=y+'-'+String(mo+1).padStart(2,'0');
-    /* La fecha de vencimiento es el día de alta de ese mes */
-    var diasEnMes = new Date(y,mo+1,0).getDate();
-    var diaEfectivo = Math.min(dia, diasEnMes);
-    var fechaVencStr=mesKey+'-'+String(diaEfectivo).padStart(2,'0');
-    var fechaVenc=new Date(y,mo,diaEfectivo);
+    var diasEnMes=new Date(y,mo+1,0).getDate();
+    var diaEf=Math.min(dia,diasEnMes);
+    var fechaVencStr=mesKey+'-'+String(diaEf).padStart(2,'0');
+    var fechaVenc=new Date(y,mo,diaEf);
 
     if(!mesesPagados[mesKey] && !yaReg[fechaVencStr] && !mesexentos[mesKey] && fechaVenc<hoy){
       a.saldos.push({
-        fecha:     fechaVencStr,
-        monto:     plan.p,
-        motivo:    'Mensualidad vencida — '+MESES[mo]+' '+y+' · '+plan.n,
-        plan:      plan.n,
-        expiraRef: fechaVencStr,
-        pagado:    false
+        fecha:fechaVencStr, monto:plan.p,
+        motivo:'Mensualidad vencida — '+MESES[mo]+' '+y+' · '+plan.n,
+        plan:plan.n, expiraRef:fechaVencStr, pagado:false
       });
       yaReg[fechaVencStr]=true;
       changed=true;
