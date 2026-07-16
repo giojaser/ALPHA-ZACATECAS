@@ -844,17 +844,20 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
       <div style="background:var(--bg3);border-radius:var(--r2);padding:1rem;margin-bottom:.75rem">
         <p style="font-size:13px;font-weight:600;margin-bottom:.5rem">Pasos para conectar Firebase (Google):</p>
         <ol style="font-size:12px;color:var(--muted);padding-left:1.2rem;line-height:2">
-          <li>Ve a <a href="https://console.firebase.google.com" target="_blank" style="color:var(--rosa)">console.firebase.google.com</a></li>
-          <li>Crear proyecto → nombre libre → continuar</li>
-          <li>Lado izquierdo: <strong style="color:var(--blanco)">Realtime Database</strong> → Crear base de datos</li>
-          <li>Elige la región más cercana → modo de prueba (30 días)</li>
-          <li>Copia la URL (ej: https://mi-app-default-rtdb.firebaseio.com)</li>
-          <li>En Reglas pon: <code style="background:var(--bg);padding:2px 5px;border-radius:4px;font-size:11px">".read":true,".write":true</code></li>
+          <li>Ve a <a href="https://console.firebase.google.com" target="_blank" style="color:var(--rosa)">console.firebase.google.com</a> y entra a tu proyecto</li>
+          <li>Lado izquierdo: <strong style="color:var(--blanco)">Realtime Database</strong> → copia la URL (ej: https://mi-app-default-rtdb.firebaseio.com)</li>
+          <li>En <strong style="color:var(--blanco)">Reglas</strong>, para mantener la base protegida, deja: <code style="background:var(--bg);padding:2px 5px;border-radius:4px;font-size:11px">".read": "auth != null", ".write": "auth != null"</code></li>
+          <li>Ve a ⚙️ <strong style="color:var(--blanco)">Configuración del proyecto → General</strong> → copia la <strong style="color:var(--blanco)">clave de API web</strong> y pégala abajo (esto permite que la app inicie sesión de forma anónima para cumplir la regla de arriba, sin pedirle usuario/contraseña a nadie)</li>
+          <li>Activa el método <strong style="color:var(--blanco)">Anónimo</strong> en Authentication → Sign-in method</li>
         </ol>
       </div>
       <div class="field" style="margin-bottom:.75rem">
         <label>URL de Realtime Database</label>
         <input type="text" id="fb-url" placeholder="https://mi-app-default-rtdb.firebaseio.com" style="font-family:monospace;font-size:12px">
+      </div>
+      <div class="field" style="margin-bottom:.75rem">
+        <label>Clave de API web (Web API Key)</label>
+        <input type="text" id="fb-apikey" placeholder="AIzaSy..." style="font-family:monospace;font-size:12px">
       </div>
       <button class="btn-p" onclick="conectarFirebase()">Conectar Firebase</button>
     </div>
@@ -1422,7 +1425,7 @@ let S={
   scanCanvas:null,scanCtx:null,writeLock:false,saving:false,evAlumno:null
 };
 // Cloud config
-let CFG={proveedor:'local',jbKey:'',jbBin:'',fbUrl:''};
+let CFG={proveedor:'local',jbKey:'',jbBin:'',fbUrl:'',fbApiKey:'',fbAuthToken:'',fbAuthUid:'',fbAuthExpira:0};
 
 function saveLocal(){
   var payload = JSON.stringify({DB:DB, CFG:CFG});
@@ -1719,15 +1722,75 @@ async function sincJSONBin(){
   }
 }
 
+/* ── Firebase: autenticación anónima (Identity Toolkit) ──
+   Las reglas de la base de datos exigen "auth != null", así que TODA
+   llamada a Firebase debe llevar un token. Esta función obtiene un
+   token anónimo (sin pedir usuario/contraseña a nadie), lo cachea en
+   CFG y lo renueva automáticamente cuando está por expirar (~1 hora). */
+async function ensureFirebaseAuthToken(forzar){
+  if(!CFG.fbApiKey) return null; // sin API Key no se puede autenticar
+  var ahora = Date.now();
+  if(!forzar && CFG.fbAuthToken && CFG.fbAuthExpira && ahora < (CFG.fbAuthExpira - 60000)){
+    return CFG.fbAuthToken;
+  }
+  try{
+    var resp = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + encodeURIComponent(CFG.fbApiKey), {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({returnSecureToken:true})
+    });
+    var data = await resp.json();
+    if(!resp.ok || !data.idToken){
+      throw new Error((data.error && data.error.message) || ('Auth HTTP ' + resp.status));
+    }
+    CFG.fbAuthToken  = data.idToken;
+    CFG.fbAuthUid    = data.localId;
+    CFG.fbAuthExpira = ahora + (parseInt(data.expiresIn||'3600',10) * 1000);
+    saveLocal();
+    return CFG.fbAuthToken;
+  } catch(e){
+    console.error('Firebase auth anónima falló:', e);
+    return null;
+  }
+}
+
+/* Arma la URL de Firebase agregando ?auth=TOKEN si hay un token disponible */
+function fbUrlConAuth(path){
+  var base = CFG.fbUrl + path;
+  if(CFG.fbAuthToken){
+    return base + (base.indexOf('?')>=0 ? '&' : '?') + 'auth=' + encodeURIComponent(CFG.fbAuthToken);
+  }
+  return base;
+}
+
+/* fetch autenticado a Firebase. Si el token expiró (401), lo renueva
+   una vez y reintenta automáticamente. */
+async function fbFetch(path, opts){
+  await ensureFirebaseAuthToken(false);
+  var r = await fetch(fbUrlConAuth(path), opts);
+  if(r.status === 401){
+    var nuevoToken = await ensureFirebaseAuthToken(true);
+    if(nuevoToken) r = await fetch(fbUrlConAuth(path), opts);
+  }
+  return r;
+}
+
 /* ── Firebase ── */
 async function conectarFirebase(){
   var url = (document.getElementById('fb-url').value || '').trim().replace(/\/$/, '');
+  var apiKeyEl = document.getElementById('fb-apikey');
+  var apiKey = apiKeyEl ? (apiKeyEl.value || '').trim() : '';
   if(!url){ showAlert('al-cfg','Ingresa la URL de Firebase','err'); return; }
   CFG.fbUrl = url; CFG.proveedor = 'firebase';
+  if(apiKey) CFG.fbApiKey = apiKey;
   setCloudStatus('sync','Conectando a Firebase...');
   try{
+    if(CFG.fbApiKey){
+      var token = await ensureFirebaseAuthToken(true);
+      if(!token) throw new Error('No se pudo autenticar (revisa la API Key)');
+    }
     /* Pull current data first */
-    var r = await fetch(CFG.fbUrl + '/alpha.json');
+    var r = await fbFetch('/alpha.json');
     if(!r.ok) throw new Error('Firebase GET ' + r.status);
     var d = await r.json();
     if(d && d.alumnos){ DB.alumnos = d.alumnos||[]; DB.citas = d.citas||[]; DB.visLog = d.visLog||[]; if(d._v) DB._v=d._v; if(d.customDiscs) DB.customDiscs=d.customDiscs; if(d.customPlanes) DB.customPlanes=d.customPlanes; }
@@ -1745,7 +1808,7 @@ async function conectarFirebase(){
 
 async function sincFirebase(){
   if(!CFG.fbUrl) return;
-  var r = await fetch(CFG.fbUrl + '/alpha.json', {
+  var r = await fbFetch('/alpha.json', {
     method: 'PUT',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify(DB)
@@ -1770,9 +1833,11 @@ function updateCloudUI(){
   const jbKeyEl = document.getElementById('jb-key');
   const jbBinEl = document.getElementById('jb-bin');
   const fbUrlEl = document.getElementById('fb-url');
+  const fbApiKeyEl = document.getElementById('fb-apikey');
   if(jbKeyEl && CFG.jbKey) jbKeyEl.value = CFG.jbKey;
   if(jbBinEl && CFG.jbBin) jbBinEl.value = CFG.jbBin;
   if(fbUrlEl && CFG.fbUrl) fbUrlEl.value = CFG.fbUrl;
+  if(fbApiKeyEl && CFG.fbApiKey) fbApiKeyEl.value = CFG.fbApiKey;
   const det = document.getElementById('cfg-status-detail');
   if(!det) return;
   if(CFG.proveedor === 'jsonbin' && CFG.jbBin){
@@ -1868,7 +1933,7 @@ async function saveDB(){
     }
   } else if(CFG.proveedor === 'firebase' && CFG.fbUrl){
     try{
-      var r = await fetch(CFG.fbUrl + '/alpha.json', {
+      var r = await fbFetch('/alpha.json', {
         method: 'PUT',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify(DB)
@@ -5316,11 +5381,12 @@ setTimeout(function(){
 /* ── Firebase Real-time Listener (SSE) ── */
 var fbEventSource = null;
 
-function startFirebaseListener(){
+async function startFirebaseListener(){
   if(!CFG.fbUrl) return;
   stopFirebaseListener();
 
-  var sseUrl = CFG.fbUrl + '/alpha.json';
+  if(CFG.fbApiKey) await ensureFirebaseAuthToken(false);
+  var sseUrl = fbUrlConAuth('/alpha.json');
   try{
     fbEventSource = new EventSource(sseUrl);
 
@@ -5368,7 +5434,12 @@ function startFirebaseListener(){
 
     fbEventSource.onerror = function(){
       setCloudStatus('sync', 'Reconectando...');
-      /* EventSource reconects automatically */
+      /* El token de auth pudo haber expirado (~1h). Si tenemos API Key,
+         lo renovamos y reiniciamos el listener con la URL actualizada
+         en vez de dejar que el navegador reintente con un token viejo. */
+      if(CFG.fbApiKey){
+        ensureFirebaseAuthToken(true).then(function(){ startFirebaseListener(); });
+      }
     };
 
     fbEventSource.onopen = function(){
@@ -5379,7 +5450,7 @@ function startFirebaseListener(){
     /* SSE not supported - fall back to polling every 5 seconds */
     setInterval(function(){
       if(CFG.proveedor === 'firebase' && CFG.fbUrl){
-        fetch(CFG.fbUrl + '/alpha.json')
+        fbFetch('/alpha.json')
           .then(function(r){ return r.json(); })
           .then(function(d){
             if(!d) return;
