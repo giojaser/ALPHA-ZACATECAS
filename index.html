@@ -463,6 +463,13 @@ hl{background:rgba(212,83,126,.3);border-radius:3px;padding:0 2px}
     </div>
     <!-- Filtro por disciplina y plan -->
     <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <select id="als-f-estado" onchange="renderAls()" style="flex:1;min-width:120px;background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:7px 9px;color:var(--blanco);font-size:12px;outline:none">
+        <option value="Activo">🟢 Activos</option>
+        <option value="">Todos los estados</option>
+        <option value="Inactivo">⚪ Inactivos</option>
+        <option value="Suspendido">🔴 Suspendidos</option>
+        <option value="Becado">🎓 Becados</option>
+      </select>
       <select id="als-f-disc" onchange="renderAls()" style="flex:1;min-width:120px;background:var(--bg3);border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:7px 9px;color:var(--blanco);font-size:12px;outline:none">
         <option value="">Todas las disciplinas</option>
       </select>
@@ -2707,12 +2714,13 @@ function alsInitSelects(){
 function renderAls(){
   alsInitSelects();
   const q   = (document.getElementById('als-q').value||'').toLowerCase().trim();
+  const fEstado = (document.getElementById('als-f-estado')||{}).value !== undefined ? (document.getElementById('als-f-estado')||{}).value : 'Activo';
   const fDisc = (document.getElementById('als-f-disc')||{}).value || '';
   const fPlan = (document.getElementById('als-f-plan')||{}).value || '';
   const fOrd  = (document.getElementById('als-f-ord')||{}).value  || 'nombre';
   const lst   = document.getElementById('als-list');
   const pfw   = document.getElementById('pf-wrap');
-  if(pfw.style.display!=='none'&&!q&&!fDisc&&!fPlan&&alsFiltroActual==='todos') return;
+  if(pfw.style.display!=='none'&&!q&&!fDisc&&!fPlan&&fEstado==='Activo'&&alsFiltroActual==='todos') return;
   pfw.style.display='none'; lst.style.display='';
 
   let arr = DB.alumnos||[];
@@ -2722,6 +2730,9 @@ function renderAls(){
     (a.nombre||'')+' '+(a.apellidos||'')+' '+(a.folio||'')+' '
     +(a.telefono||'')+' '+(a.disciplinas||[]).join(' ')
   ).toLowerCase().includes(q));
+
+  /* Estado filter (Activo/Inactivo/Suspendido/Becado) — sin estado guardado = Activo */
+  if(fEstado) arr = arr.filter(a=>(a.estado||'Activo')===fEstado);
 
   /* Disc filter */
   if(fDisc) arr = arr.filter(a=>(a.disciplinas||[]).includes(fDisc));
@@ -2795,16 +2806,31 @@ function renderAls(){
     /* Modalidad: normal / intensiva / ambas */
     const modBadge = modalidadBadge(a, 'sm');
 
+    /* Estado del alumno (Activo/Inactivo/Suspendido/Becado) */
+    const estadoVal = a.estado||'Activo';
+    const estadoColors = {
+      'Activo':    {bg:'rgba(59,109,17,.25)',  col:'#7ec445'},
+      'Inactivo':  {bg:'rgba(255,255,255,.08)',col:'rgba(255,255,255,.5)'},
+      'Suspendido':{bg:'rgba(163,45,45,.3)',   col:'#f09595'},
+      'Becado':    {bg:'rgba(0,212,255,.15)',  col:'var(--cyan)'}
+    };
+    const estColor = estadoColors[estadoVal] || estadoColors['Activo'];
+    const estadoBadge = `<span style="font-size:9px;background:${estColor.bg};color:${estColor.col};border-radius:4px;padding:1px 5px;font-weight:700">${estadoVal}</span>`;
+
+    /* Disciplina + día/horario en una línea compacta */
+    const horariosStr = formatHorariosCompact(a);
+
     return `<div class="arow" style="flex-wrap:wrap;gap:4px;flex-direction:column" data-f="${a.folio}">
       <div style="display:flex;align-items:flex-start;gap:8px">
         <div style="flex:1;min-width:0;cursor:pointer" onclick="verPerfil('${a.folio}')">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             <span class="arow-name">${a.nombre} ${a.apellidos}</span>
+            ${estadoBadge}
             ${modBadge}
             ${dv!==null&&dv<0?'<span style="font-size:9px;background:rgba(163,45,45,.3);color:#f09595;border-radius:4px;padding:1px 5px;font-weight:700">VENCIDO</span>':''}
             ${totalSaldo>0?`<span style="font-size:9px;background:rgba(133,79,11,.3);color:#fabd75;border-radius:4px;padding:1px 5px;font-weight:700">Saldo $${totalSaldo.toLocaleString('es-MX')}</span>`:''}
           </div>
-          <div class="arow-disc">${(a.disciplinas||[]).join(' · ')}</div>
+          <div class="arow-disc" style="max-width:none;white-space:normal">${horariosStr || (a.disciplinas||[]).join(' · ')}</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px">
             ${dpStr?`<span style="font-size:10px;color:${dpColor};font-weight:600">${dpStr}${npStr?' ('+npStr+')':''}</span>`:''}
             ${dvStr&&dv!==null&&dv<=10?`<span style="font-size:10px;color:${dvColor}">· ${dvStr}</span>`:''}
@@ -2939,6 +2965,29 @@ function verPerfil(f){
     }
   }
   window.scrollTo(0,0);
+}
+
+/* Versión compacta (una línea, texto plano) de los horarios de un alumno,
+   pensada para la lista de alumnos: "Pole Sport: Lun/Mié 18:00 · Yoga: Mar 19:00" */
+function formatHorariosCompact(a){
+  var discs = a.disciplinas||[];
+  if(!discs.length) return '';
+  var horarios = a.horarios||[];
+  var porDisc = {};
+  horarios.forEach(function(h){
+    var pp = h.split('|||');
+    var d = pp[0], hor = pp[1]||'';
+    if(!porDisc[d]) porDisc[d]=[];
+    if(hor) porDisc[d].push(hor);
+  });
+  return discs.map(function(d){
+    var horsGuardados = porDisc[d] || [];
+    var horsDefault = (DISCS[d] && DISCS[d].hors) ? DISCS[d].hors.map(function(h){
+      return h.g + (h.h&&h.h.length ? ' '+h.h.join(', ') : '');
+    }) : [];
+    var horsAMostrar = horsGuardados.length ? horsGuardados : horsDefault;
+    return horsAMostrar.length ? (d+': '+horsAMostrar.join(', ')) : d;
+  }).join(' · ');
 }
 
 /* Muestra de forma visible y organizada los horarios y días de clase
@@ -5865,6 +5914,13 @@ function renderPaymentTimeline(a){
   /* ══ PASO 2: Cubrir automáticamente TODOS los meses entre el alta y fechaExpira ══
      Si el alumno tiene una fechaExpira registrada, todos los meses entre su alta
      y esa fecha ESTÁN PAGADOS (la vigencia lo garantiza).
+     IMPORTANTE: fechaExpira es la fecha en que INICIA el siguiente periodo SIN
+     PAGAR ("la vigencia termina al iniciar el mes SIGUIENTE al último mes
+     cubierto" — ver recalcularFechaExpiraDesdePagos). Por lo tanto el mes de
+     fechaExpira NUNCA debe marcarse como pagado: es el mes que aún se debe.
+     Antes el ciclo llegaba hasta ese mes inclusive (curIt <= limIt), lo que
+     pintaba en verde/pagado el mes que el alumno todavía no cubre. Se corrige
+     deteniendo el ciclo ANTES de llegar al mes de fechaExpira (curIt < limIt).
      Solo se marcan los meses que no tienen ya un estado explícito igual o superior. */
   var finPlanDate = parseFechaLocal(a.fechaExpira);
   if(finPlanDate){
@@ -5877,7 +5933,7 @@ function renderPaymentTimeline(a){
       if(p2.completo||p2.tipo){ ultp2=p2; return true; }
     });
     var maxIt = 60;
-    while(curIt <= limIt && maxIt-- > 0){
+    while(curIt < limIt && maxIt-- > 0){
       var mkIt = curIt.getFullYear()+'-'+String(curIt.getMonth()+1).padStart(2,'0');
       var nkIt = normKey(mkIt);
       var estadoExistente = estadoMes[nkIt] ? estadoMes[nkIt].estado : null;
