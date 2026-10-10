@@ -6357,7 +6357,7 @@ function catRenderDiscs(){
       +(d.custom?'<span style="font-size:9px;background:rgba(212,83,126,.2);color:var(--rosa);border-radius:4px;padding:1px 5px;margin-left:5px">Custom</span>':'')
       +'</div>'
       +'<span style="font-size:14px;font-weight:700;color:var(--rosa)">$'+d.precio.toLocaleString('es-MX')+'/mes</span>'
-      +'<button onclick="catEditarDisc(\''+esc(d.nombre)+'\')" class="btn-s" style="padding:5px 10px;font-size:11px">✏️ Editar</button>'
+      +'<button data-nombre="'+encodeURIComponent(d.nombre)+'" onclick="catEditarDisc(decodeURIComponent(this.dataset.nombre))" class="btn-s" style="padding:5px 10px;font-size:11px">✏️ Editar</button>'
       +'</div>'
       +(hs?'<div style="margin-top:5px;line-height:1.8">'+hs+'</div>'
           :'<div style="font-size:10px;color:var(--muted);margin-top:4px">Sin horarios configurados</div>')
